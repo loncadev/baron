@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.DS_Store
+
+# Baron credentials are NEVER committed - policy is, secrets are not.
+.baron/credentials
+.baron/credentials.*
+.env
+.env.*
+!.env.example

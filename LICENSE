@@ -1,0 +1,21 @@
+Copyright 2026 Baron contributors
+
+The OSS portion of this project (packages/core, packages/adapters/*,
+packages/mcp-server, packages/cli, packages/knowledge-loop, packages/recipes,
+packages/conformance, plugins/claude-code) is licensed under the Apache License,
+Version 2.0 (the "License"); you may not use these files except in compliance
+with the License. You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
+
+NOTE: The full Apache-2.0 license text must be vendored into this file before
+the first public release (use the canonical text from the URL above verbatim).
+
+Future commercial-tier features (SSO, secret-manager integrations, multi-team
+governance, audit) are NOT covered by this license and will ship under a
+separate commercial license.
