@@ -14,6 +14,10 @@ export const RECIPE_OPS = {
   scmBranchCreate: 'scm.branch.create',
   scmPrCreate: 'scm.pr.create',
   scmPrThread: 'scm.pr.thread',
+  learningAppend: 'learning.append',
+  learningQuery: 'learning.query',
+  followupAppend: 'followup.append',
+  followupList: 'followup.list',
 } as const;
 
 export type RecipeOp = (typeof RECIPE_OPS)[keyof typeof RECIPE_OPS];

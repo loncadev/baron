@@ -7,17 +7,24 @@ import {
 } from '@baron/adapter-github';
 import { createMemoryScmTransport, createMemoryTransport } from '@baron/conformance';
 import { type IssuesPort, type ScmPort, WORKFLOW_ROLES, WORK_ITEM_TYPE_ROLES } from '@baron/core';
+import { KnowledgeLoop, createMemoryKnowledgeStore } from '@baron/knowledge-loop';
 import { describe, expect, it } from 'vitest';
 import {
+  LOOP_TOOL_NAMES,
   MCP_TOOL_NAMES,
   SCM_TOOL_NAMES,
   TOOL_DEFINITIONS,
+  callLoopTool,
   callScmTool,
   callTool,
 } from './tools.js';
 
 function scmPort(): ScmPort {
   return defineGithubScmAdapter(createMemoryScmTransport());
+}
+
+function loop(): KnowledgeLoop {
+  return new KnowledgeLoop(createMemoryKnowledgeStore());
 }
 
 function githubPort(): IssuesPort {
@@ -242,6 +249,42 @@ describe('callScmTool', () => {
       targetBranch: 'main',
       draft: 'yes',
     });
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent?.code).toBe('INVALID_ARGS');
+  });
+});
+
+describe('callLoopTool', () => {
+  it('appends and queries a learning', async () => {
+    const port = loop();
+    const appended = await callLoopTool(port, LOOP_TOOL_NAMES.learningAppend, {
+      title: 'Roles beat states',
+      body: 'recipes speak roles',
+      tags: ['design'],
+    });
+    expect(appended.isError).toBeUndefined();
+
+    const queried = await callLoopTool(port, LOOP_TOOL_NAMES.learningQuery, { tag: 'design' });
+    const learnings = JSON.parse(queried.content[0]?.text ?? '[]') as Array<{ title: string }>;
+    expect(learnings.some((l) => l.title === 'Roles beat states')).toBe(true);
+  });
+
+  it('appends an open follow-up and lists it by status', async () => {
+    const port = loop();
+    await callLoopTool(port, LOOP_TOOL_NAMES.followupAppend, { title: 'Wire live smoke' });
+    const listed = await callLoopTool(port, LOOP_TOOL_NAMES.followupList, { status: 'open' });
+    const followups = JSON.parse(listed.content[0]?.text ?? '[]') as unknown[];
+    expect(followups).toHaveLength(1);
+  });
+
+  it('rejects a missing learning title as INVALID_ARGS', async () => {
+    const result = await callLoopTool(loop(), LOOP_TOOL_NAMES.learningAppend, { body: 'x' });
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent?.code).toBe('INVALID_ARGS');
+  });
+
+  it('rejects an out-of-enum follow-up status as INVALID_ARGS', async () => {
+    const result = await callLoopTool(loop(), LOOP_TOOL_NAMES.followupList, { status: 'archived' });
     expect(result.isError).toBe(true);
     expect(result.structuredContent?.code).toBe('INVALID_ARGS');
   });

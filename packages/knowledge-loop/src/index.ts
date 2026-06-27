@@ -4,3 +4,4 @@ export * from './filter.js';
 export * from './loop.js';
 export * from './memory-store.js';
 export * from './markdown-store.js';
+export * from './local.js';

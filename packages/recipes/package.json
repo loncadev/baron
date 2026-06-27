@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@baron/core": "workspace:*",
+    "@baron/knowledge-loop": "workspace:*",
     "yaml": "^2.6.0"
   },
   "devDependencies": {

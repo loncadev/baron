@@ -9,3 +9,8 @@ export const BARON_DIR = '.baron';
 export function policyPath(root: string): string {
   return `${root}/${BARON_DIR}/policy.json`;
 }
+
+/** Directory the default local-markdown knowledge loop persists into. */
+export function knowledgeDir(root: string): string {
+  return `${root}/${BARON_DIR}/knowledge`;
+}

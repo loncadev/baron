@@ -1,13 +1,14 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { BaronError, parsePolicyJson } from '@baron/core';
-import { type Env, buildPorts, policyPath } from '@baron/providers';
+import { createLocalKnowledgeLoop } from '@baron/knowledge-loop';
+import { type Env, buildPorts, knowledgeDir, policyPath } from '@baron/providers';
 import type { McpPorts } from './tools.js';
 
 /**
- * Load the committed policy and build the live ports it binds. The issues and scm ports are
- * independent (a policy may bind either or both); a missing policy is a server-lifecycle failure
- * (POLICY_NOT_FOUND) and so is a policy that binds neither port. Credentials come from `env`, never
- * from the committed policy.
+ * Load the committed policy and build the ports it serves: the issues/scm ports it binds (either or
+ * both) plus the always-available local knowledge loop (markdown store under `.baron/knowledge`). A
+ * missing policy is a server-lifecycle failure (POLICY_NOT_FOUND). Credentials come from `env`,
+ * never from the committed policy.
  */
 export function loadPorts(root: string, env: Env): McpPorts {
   const path = policyPath(root);
@@ -19,12 +20,8 @@ export function loadPorts(root: string, env: Env): McpPorts {
     );
   }
 
-  const ports = buildPorts(parsePolicyJson(raw), env);
-  if (ports.issues === undefined && ports.scm === undefined) {
-    throw new BaronError(
-      `Policy at ${path} binds neither an issues nor an scm provider; nothing to serve.`,
-      'NO_PORTS',
-    );
-  }
-  return ports;
+  return {
+    ...buildPorts(parsePolicyJson(raw), env),
+    knowledge: createLocalKnowledgeLoop(knowledgeDir(root)),
+  };
 }

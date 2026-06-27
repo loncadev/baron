@@ -46,6 +46,8 @@ describe('loadPorts', () => {
       const ports = loadPorts(root, dummyEnv);
       expect(ports.issues?.manifest.provider).toBe('github');
       expect(ports.scm?.manifest.provider).toBe('github');
+      // The knowledge loop is always available (local-md store), regardless of provider bindings.
+      expect(ports.knowledge).toBeDefined();
     });
   });
 });

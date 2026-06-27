@@ -1,5 +1,6 @@
 import { BaronError, parsePolicyJson } from '@baron/core';
-import { type Env, buildPorts } from '@baron/providers';
+import { createLocalKnowledgeLoop } from '@baron/knowledge-loop';
+import { type Env, buildPorts, knowledgeDir } from '@baron/providers';
 import {
   type RecipeAsker,
   type RecipeContext,
@@ -34,7 +35,10 @@ export async function runRecipeFile(options: RunRecipeFileOptions): Promise<RunR
       'POLICY_NOT_FOUND',
     );
   }
-  const ports = buildPorts(parsePolicyJson(policyRaw), options.env);
+  const ports = {
+    ...buildPorts(parsePolicyJson(policyRaw), options.env),
+    knowledge: createLocalKnowledgeLoop(knowledgeDir(options.root)),
+  };
 
   const recipeRaw = options.fs.read(options.recipePath);
   if (recipeRaw === undefined) {

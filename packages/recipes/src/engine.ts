@@ -13,6 +13,7 @@ import {
   isWorkItemTypeRole,
   isWorkflowRole,
 } from '@baron/core';
+import { type FollowupStatus, type KnowledgeLoop, isFollowupStatus } from '@baron/knowledge-loop';
 import type { RecipeAsker } from './ask.js';
 import { type RecipeContext, interpolate } from './interpolate.js';
 import {
@@ -27,6 +28,7 @@ import {
 export interface RecipePorts {
   readonly issues?: IssuesPort;
   readonly scm?: ScmPort;
+  readonly knowledge?: KnowledgeLoop;
 }
 
 export interface RunRecipeOptions {
@@ -103,13 +105,22 @@ function optNum(params: Params, key: string, op: string): number | undefined {
   return value;
 }
 
-function optLabels(params: Params, op: string): string[] | undefined {
-  const value = params.labels;
+function optStrArray(params: Params, key: string, op: string): string[] | undefined {
+  const value = params[key];
   if (value === undefined) return undefined;
-  if (!Array.isArray(value) || value.some((label) => typeof label !== 'string')) {
-    throw new BaronError(`Step '${op}' 'labels' must be an array of strings.`, ARGS);
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
+    throw new BaronError(`Step '${op}' '${key}' must be an array of strings.`, ARGS);
   }
   return value as string[];
+}
+
+function optStatus(params: Params, op: string): FollowupStatus | undefined {
+  const value = optStr(params, 'status', op);
+  if (value === undefined) return undefined;
+  if (!isFollowupStatus(value)) {
+    throw new BaronError(`Step '${op}' 'status'='${value}' must be 'open' or 'done'.`, ARGS);
+  }
+  return value;
 }
 
 function issues(ports: RecipePorts, op: string): IssuesPort {
@@ -132,6 +143,16 @@ function scm(ports: RecipePorts, op: string): ScmPort {
   return ports.scm;
 }
 
+function knowledge(ports: RecipePorts, op: string): KnowledgeLoop {
+  if (ports.knowledge === undefined) {
+    throw new BaronError(
+      `Step '${op}' needs the knowledge loop, which is not configured.`,
+      'PORT_UNBOUND',
+    );
+  }
+  return ports.knowledge;
+}
+
 /** Map a recipe op + resolved params onto the corresponding port call. */
 async function dispatchOp(ports: RecipePorts, op: RecipeOp, params: Params): Promise<unknown> {
   switch (op) {
@@ -143,7 +164,9 @@ async function dispatchOp(ports: RecipePorts, op: RecipeOp, params: Params): Pro
         ...(optStr(params, 'parentId', op) !== undefined
           ? { parentId: optStr(params, 'parentId', op) }
           : {}),
-        ...(optLabels(params, op) !== undefined ? { labels: optLabels(params, op) } : {}),
+        ...(optStrArray(params, 'labels', op) !== undefined
+          ? { labels: optStrArray(params, 'labels', op) }
+          : {}),
         ...(optStr(params, 'initialRole', op) !== undefined
           ? { initialRole: reqRole(params, 'initialRole', op) }
           : {}),
@@ -187,6 +210,43 @@ async function dispatchOp(ports: RecipePorts, op: RecipeOp, params: Params): Pro
         reqStr(params, 'pullRequestId', op),
         reqStr(params, 'body', op),
       );
+    case RECIPE_OPS.learningAppend: {
+      const tags = optStrArray(params, 'tags', op);
+      return knowledge(ports, op).learningAppend({
+        title: reqStr(params, 'title', op),
+        body: reqStr(params, 'body', op),
+        ...(tags !== undefined ? { tags } : {}),
+      });
+    }
+    case RECIPE_OPS.learningQuery: {
+      const tag = optStr(params, 'tag', op);
+      const text = optStr(params, 'text', op);
+      const limit = optNum(params, 'limit', op);
+      return knowledge(ports, op).learningQuery({
+        ...(tag !== undefined ? { tag } : {}),
+        ...(text !== undefined ? { text } : {}),
+        ...(limit !== undefined ? { limit } : {}),
+      });
+    }
+    case RECIPE_OPS.followupAppend: {
+      const body = optStr(params, 'body', op);
+      const tags = optStrArray(params, 'tags', op);
+      return knowledge(ports, op).followupAppend({
+        title: reqStr(params, 'title', op),
+        ...(body !== undefined ? { body } : {}),
+        ...(tags !== undefined ? { tags } : {}),
+      });
+    }
+    case RECIPE_OPS.followupList: {
+      const status = optStatus(params, op);
+      const tag = optStr(params, 'tag', op);
+      const limit = optNum(params, 'limit', op);
+      return knowledge(ports, op).followupList({
+        ...(status !== undefined ? { status } : {}),
+        ...(tag !== undefined ? { tag } : {}),
+        ...(limit !== undefined ? { limit } : {}),
+      });
+    }
     default: {
       // Exhaustiveness guard: a new RecipeOp without a case lands here at compile time.
       const unreachable: never = op;

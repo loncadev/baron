@@ -14,11 +14,18 @@ import {
   isWorkItemTypeRole,
   isWorkflowRole,
 } from '@baron/core';
+import {
+  FOLLOWUP_STATUSES,
+  type FollowupStatus,
+  type KnowledgeLoop,
+  isFollowupStatus,
+} from '@baron/knowledge-loop';
 
-/** The ports the MCP server serves; each is present only if bound in policy.json. */
+/** The ports the MCP server serves. issues/scm bind from policy; knowledge is always available. */
 export interface McpPorts {
   readonly issues?: IssuesPort;
   readonly scm?: ScmPort;
+  readonly knowledge?: KnowledgeLoop;
 }
 
 /** Tool names: snake_case, `baron_` (product) namespace, singular noun to mirror the primitives. */
@@ -35,6 +42,13 @@ export const SCM_TOOL_NAMES = {
   branchCreate: 'baron_scm_branch_create',
   prCreate: 'baron_scm_pr_create',
   prThread: 'baron_scm_pr_thread',
+} as const;
+
+export const LOOP_TOOL_NAMES = {
+  learningAppend: 'baron_learning_append',
+  learningQuery: 'baron_learning_query',
+  followupAppend: 'baron_followup_append',
+  followupList: 'baron_followup_list',
 } as const;
 
 /** A tool definition shaped for the MCP ListTools response (plain JSON Schema, no zod). */
@@ -62,6 +76,7 @@ export interface ToolResult {
 const ROLE_ENUM = [...WORKFLOW_ROLES];
 const TYPE_ROLE_ENUM = [...WORK_ITEM_TYPE_ROLES];
 const LINK_TYPE_ENUM = [...ISSUE_LINK_TYPES];
+const FOLLOWUP_STATUS_ENUM = [...FOLLOWUP_STATUSES];
 
 export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   {
@@ -221,6 +236,63 @@ export const SCM_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
       properties: {
         pullRequestId: { type: 'string', minLength: 1 },
         body: { type: 'string', minLength: 1 },
+      },
+    },
+  },
+];
+
+export const LOOP_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
+  {
+    name: LOOP_TOOL_NAMES.learningAppend,
+    description: 'Record a durable learning (knowledge that should survive across runs).',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['title', 'body'],
+      properties: {
+        title: { type: 'string', minLength: 1 },
+        body: { type: 'string' },
+        tags: { type: 'array', items: { type: 'string' } },
+      },
+    },
+  },
+  {
+    name: LOOP_TOOL_NAMES.learningQuery,
+    description: 'Query recorded learnings by tag and/or free text (newest first).',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        tag: { type: 'string' },
+        text: { type: 'string', description: 'Case-insensitive substring over title + body.' },
+        limit: { type: 'number', minimum: 1 },
+      },
+    },
+  },
+  {
+    name: LOOP_TOOL_NAMES.followupAppend,
+    description: 'Record an open follow-up (deferred work to revisit later).',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['title'],
+      properties: {
+        title: { type: 'string', minLength: 1 },
+        body: { type: 'string' },
+        tags: { type: 'array', items: { type: 'string' } },
+      },
+    },
+  },
+  {
+    name: LOOP_TOOL_NAMES.followupList,
+    description: 'List follow-ups by status and/or tag (newest first).',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        status: { type: 'string', enum: FOLLOWUP_STATUS_ENUM },
+        tag: { type: 'string' },
+        limit: { type: 'number', minimum: 1 },
       },
     },
   },
@@ -449,9 +521,101 @@ export function callScmTool(
   }
 }
 
+function optStringArray(
+  args: Record<string, unknown> | undefined,
+  key: string,
+): string[] | undefined {
+  const value = args?.[key];
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
+    throw new BaronError(`Argument '${key}' must be an array of strings.`, INVALID_ARGS);
+  }
+  return value as string[];
+}
+
+function optNumber(args: Record<string, unknown> | undefined, key: string): number | undefined {
+  const value = args?.[key];
+  if (value === undefined) return undefined;
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new BaronError(`Argument '${key}' must be a number.`, INVALID_ARGS);
+  }
+  return value;
+}
+
+function optFollowupStatus(args: Record<string, unknown> | undefined): FollowupStatus | undefined {
+  const value = optionalString(args, 'status');
+  if (value === undefined) return undefined;
+  if (!isFollowupStatus(value)) {
+    throw new BaronError(
+      `Invalid status '${value}'. Expected one of: ${FOLLOWUP_STATUSES.join(', ')}.`,
+      INVALID_ARGS,
+    );
+  }
+  return value;
+}
+
+/** Dispatch a knowledge-loop tool call (marshalling + error shaping only). */
+export function callLoopTool(
+  loop: KnowledgeLoop,
+  name: string,
+  args: Record<string, unknown> | undefined,
+): Promise<ToolResult> {
+  switch (name) {
+    case LOOP_TOOL_NAMES.learningAppend:
+      return run(() => {
+        const tags = optStringArray(args, 'tags');
+        return loop.learningAppend({
+          title: requireString(args, 'title'),
+          body: requireString(args, 'body'),
+          ...(tags !== undefined ? { tags } : {}),
+        });
+      });
+    case LOOP_TOOL_NAMES.learningQuery:
+      return run(() => {
+        const tag = optionalString(args, 'tag');
+        const text = optionalString(args, 'text');
+        const limit = optNumber(args, 'limit');
+        return loop.learningQuery({
+          ...(tag !== undefined ? { tag } : {}),
+          ...(text !== undefined ? { text } : {}),
+          ...(limit !== undefined ? { limit } : {}),
+        });
+      });
+    case LOOP_TOOL_NAMES.followupAppend:
+      return run(() => {
+        const body = optionalString(args, 'body');
+        const tags = optStringArray(args, 'tags');
+        return loop.followupAppend({
+          title: requireString(args, 'title'),
+          ...(body !== undefined ? { body } : {}),
+          ...(tags !== undefined ? { tags } : {}),
+        });
+      });
+    case LOOP_TOOL_NAMES.followupList:
+      return run(() => {
+        const status = optFollowupStatus(args);
+        const tag = optionalString(args, 'tag');
+        const limit = optNumber(args, 'limit');
+        return loop.followupList({
+          ...(status !== undefined ? { status } : {}),
+          ...(tag !== undefined ? { tag } : {}),
+          ...(limit !== undefined ? { limit } : {}),
+        });
+      });
+    default:
+      return run(() => {
+        throw new BaronError(`Unknown tool '${name}'.`, 'UNKNOWN_TOOL');
+      });
+  }
+}
+
 /** The tool definitions advertised for the currently-bound ports. */
 export function activeToolDefinitions(ports: McpPorts): ToolDefinition[] {
-  return [...(ports.issues ? TOOL_DEFINITIONS : []), ...(ports.scm ? SCM_TOOL_DEFINITIONS : [])];
+  return [
+    ...(ports.issues ? TOOL_DEFINITIONS : []),
+    ...(ports.scm ? SCM_TOOL_DEFINITIONS : []),
+    ...(ports.knowledge ? LOOP_TOOL_DEFINITIONS : []),
+  ];
 }
 
 /** Route a tool call to the right port by its name prefix; unbound ports / unknown names error. */
@@ -475,6 +639,14 @@ export function dispatchTool(
       });
     }
     return callScmTool(ports.scm, name, args);
+  }
+  if (name.startsWith('baron_learning_') || name.startsWith('baron_followup_')) {
+    if (ports.knowledge === undefined) {
+      return run(() => {
+        throw new BaronError('The knowledge loop is not configured.', 'PORT_UNBOUND');
+      });
+    }
+    return callLoopTool(ports.knowledge, name, args);
   }
   return run(() => {
     throw new BaronError(`Unknown tool '${name}'.`, 'UNKNOWN_TOOL');

@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "@baron/core": "workspace:*",
+    "@baron/knowledge-loop": "workspace:*",
     "@baron/providers": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0"
   },

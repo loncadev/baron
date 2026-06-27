@@ -7,6 +7,7 @@ import {
 } from '@baron/adapter-github';
 import { createMemoryScmTransport, createMemoryTransport } from '@baron/conformance';
 import { BaronError, type IssuesPort, type ScmPort } from '@baron/core';
+import { KnowledgeLoop, createMemoryKnowledgeStore } from '@baron/knowledge-loop';
 import { describe, expect, it } from 'vitest';
 import type { RecipeAsker } from './ask.js';
 import { type RecipePorts, runRecipe } from './engine.js';
@@ -31,7 +32,11 @@ function scmPort(): ScmPort {
 }
 
 function allPorts(): RecipePorts {
-  return { issues: issuesPort(), scm: scmPort() };
+  return {
+    issues: issuesPort(),
+    scm: scmPort(),
+    knowledge: new KnowledgeLoop(createMemoryKnowledgeStore()),
+  };
 }
 
 /** A scripted asker: text answers replay from a queue; notes are recorded. */
@@ -142,6 +147,30 @@ steps:
       limit: 1
 `);
     const { context } = await runRecipe(recipe, { ports: allPorts(), asker: scriptedAsker() });
+    expect((context.found as unknown[]).length).toBe(1);
+  });
+
+  it('captures a learning and a follow-up through the knowledge loop', async () => {
+    const recipe = loadRecipe(`
+name: capture
+steps:
+  - do: learning.append
+    as: note
+    with:
+      title: Roles beat states
+      body: Recipes speak abstract roles.
+      tags: [design]
+  - do: followup.append
+    with:
+      title: Wire live smoke
+      tags: [debt]
+  - do: learning.query
+    as: found
+    with:
+      tag: design
+`);
+    const { context } = await runRecipe(recipe, { ports: allPorts(), asker: scriptedAsker() });
+    expect((context.note as { id: string }).id).toBeTruthy();
     expect((context.found as unknown[]).length).toBe(1);
   });
 

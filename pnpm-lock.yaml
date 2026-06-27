@@ -58,6 +58,9 @@ importers:
       '@baron/core':
         specifier: workspace:*
         version: link:../core
+      '@baron/knowledge-loop':
+        specifier: workspace:*
+        version: link:../knowledge-loop
       '@baron/providers':
         specifier: workspace:*
         version: link:../providers
@@ -101,6 +104,9 @@ importers:
       '@baron/core':
         specifier: workspace:*
         version: link:../core
+      '@baron/knowledge-loop':
+        specifier: workspace:*
+        version: link:../knowledge-loop
       '@baron/providers':
         specifier: workspace:*
         version: link:../providers
@@ -135,6 +141,9 @@ importers:
       '@baron/core':
         specifier: workspace:*
         version: link:../core
+      '@baron/knowledge-loop':
+        specifier: workspace:*
+        version: link:../knowledge-loop
       yaml:
         specifier: ^2.6.0
         version: 2.9.0
