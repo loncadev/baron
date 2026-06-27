@@ -18,6 +18,7 @@ import {
 } from '@baron/adapter-github';
 import {
   BaronError,
+  type BaronPolicyFile,
   BaseIssuesAdapter,
   BaseScmAdapter,
   type CapabilityManifest,
@@ -31,6 +32,8 @@ import {
   type ScmManifest,
   type ScmPort,
   type ScmTransport,
+  parseGapPolicy,
+  resolveIssuesConfig,
 } from '@baron/core';
 
 export * from './paths.js';
@@ -184,4 +187,27 @@ export function buildScmPort(
     gapPolicy,
     logger,
   );
+}
+
+export interface BoundPorts {
+  issues?: IssuesPort;
+  scm?: ScmPort;
+}
+
+/**
+ * Build every port a parsed policy binds (issues and/or scm), from environment credentials. Shared
+ * by the MCP server and the CLI's `run` so both turn a `policy.json` into live ports identically;
+ * neither port is built unless `providers` binds it.
+ */
+export function buildPorts(policy: BaronPolicyFile, env: Env, logger?: Logger): BoundPorts {
+  const ports: BoundPorts = {};
+  if (policy.providers.issues !== undefined) {
+    ports.issues = buildIssuesPort(resolveIssuesConfig(policy), env, logger);
+  }
+  const scmProvider = policy.providers.scm;
+  if (scmProvider !== undefined) {
+    const gapPolicy = parseGapPolicy(policy.gapPolicy?.[scmProvider] ?? {});
+    ports.scm = buildScmPort(scmProvider, env, gapPolicy, logger);
+  }
+  return ports;
 }

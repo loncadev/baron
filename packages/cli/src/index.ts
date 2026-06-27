@@ -3,6 +3,8 @@ export * from './ports.js';
 export * from './paths.js';
 export * from './init.js';
 export * from './doctor.js';
+export * from './run.js';
 export * from './cli.js';
 export { nodeFileSystem } from './node-fs.js';
 export { nodePrompter } from './node-prompter.js';
+export { nodeAsker } from './node-asker.js';

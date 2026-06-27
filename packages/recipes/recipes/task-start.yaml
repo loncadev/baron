@@ -1,0 +1,24 @@
+name: task-start
+description: Create a task, branch for it, and move it into progress.
+steps:
+  - ask: { as: title, type: text, message: "Task title?" }
+  - do: issue.create
+    as: issue
+    with:
+      title: ${title}
+      typeRole: task
+  - do: scm.branch.create
+    as: branch
+    with:
+      name: feature/${issue.id}
+      fromBranch: main
+  - do: issue.transition
+    as: issue
+    with:
+      id: ${issue.id}
+      role: in_progress
+  - do: issue.comment
+    with:
+      id: ${issue.id}
+      body: "Started on branch ${branch.name}."
+  - message: "Task ${issue.key} is in progress on ${branch.name}."

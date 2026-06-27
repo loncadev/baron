@@ -1,0 +1,22 @@
+name: task-finish
+description: Open a pull request for a branch and move its issue to review.
+steps:
+  - ask: { as: issueId, type: text, message: "Issue id?" }
+  - ask: { as: branch, type: text, message: "Source branch?" }
+  - ask: { as: title, type: text, message: "Pull request title?" }
+  - do: scm.pr.create
+    as: pr
+    with:
+      title: ${title}
+      sourceBranch: ${branch}
+      targetBranch: main
+      draft: true
+  - do: issue.transition
+    with:
+      id: ${issueId}
+      role: in_review
+  - do: scm.pr.thread
+    with:
+      pullRequestId: ${pr.id}
+      body: "Opened for issue ${issueId}."
+  - message: "Opened PR ${pr.url}; moved ${issueId} to review."

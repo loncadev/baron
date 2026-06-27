@@ -28,7 +28,8 @@
   },
   "dependencies": {
     "@baron/core": "workspace:*",
-    "@baron/providers": "workspace:*"
+    "@baron/providers": "workspace:*",
+    "@baron/recipes": "workspace:*"
   },
   "devDependencies": {
     "@baron/conformance": "workspace:*",

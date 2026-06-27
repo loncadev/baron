@@ -1,26 +1,32 @@
 import { BaronError } from '@baron/core';
 import { type Env, KNOWN_PROVIDERS } from '@baron/providers';
+import type { RecipeAsker } from '@baron/recipes';
 import { runDoctor } from './doctor.js';
 import { runInit } from './init.js';
 import type { FileSystem, Prompter } from './ports.js';
+import { runRecipeFile } from './run.js';
 
 export interface CliPorts {
   readonly fs: FileSystem;
   readonly prompter: Prompter;
+  /** Typed prompter for `run` recipe `ask` steps. */
+  readonly asker: RecipeAsker;
   readonly env: Env;
   out(message: string): void;
   err(message: string): void;
 }
 
-const USAGE = `baron — work-orchestration config engine
+const USAGE = `baron — platform-agnostic work-orchestration
 
 Usage:
   baron init --provider <id> [--root <dir>] [--force]
   baron doctor [--root <dir>]
+  baron run --recipe <path> [--root <dir>]
 
 Commands:
   init     Introspect a provider, propose a role/type/gap map, confirm, and write .baron/policy.json
   doctor   Validate .baron/policy.json against the live provider and report drift
+  run      Execute a YAML recipe against the policy's live ports
 
 Providers: ${KNOWN_PROVIDERS.join(', ')}`;
 
@@ -84,6 +90,24 @@ async function cmdDoctor(flags: Record<string, string>, ports: CliPorts): Promis
   return 1;
 }
 
+async function cmdRun(flags: Record<string, string>, ports: CliPorts): Promise<number> {
+  const recipePath = flags.recipe;
+  if (recipePath === undefined) {
+    ports.err('run requires --recipe <path>.');
+    ports.err(USAGE);
+    return 2;
+  }
+  await runRecipeFile({
+    root: flags.root ?? '.',
+    recipePath,
+    fs: ports.fs,
+    asker: ports.asker,
+    env: ports.env,
+  });
+  ports.out(`Recipe ${recipePath} finished.`);
+  return 0;
+}
+
 /**
  * Parse argv and dispatch a command, returning a process exit code. All side effects flow through
  * the injected {@link CliPorts}, so the whole CLI is testable without a real terminal. The shell in
@@ -99,6 +123,8 @@ export async function runCli(argv: readonly string[], ports: CliPorts): Promise<
         return await cmdInit(flags, ports);
       case 'doctor':
         return await cmdDoctor(flags, ports);
+      case 'run':
+        return await cmdRun(flags, ports);
       case undefined:
       case 'help':
       case '--help':

@@ -61,6 +61,9 @@ importers:
       '@baron/providers':
         specifier: workspace:*
         version: link:../providers
+      '@baron/recipes':
+        specifier: workspace:*
+        version: link:../recipes
     devDependencies:
       '@baron/conformance':
         specifier: workspace:*
@@ -129,6 +132,9 @@ importers:
       '@baron/conformance':
         specifier: workspace:*
         version: link:../conformance
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.0
 
 packages:
 

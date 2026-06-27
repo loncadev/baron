@@ -1,3 +1,4 @@
+import type { RecipeAsker } from '@baron/recipes';
 import type { FileSystem, Prompter } from './ports.js';
 
 /** In-memory {@link FileSystem} keyed by exact path; directories are not modelled (mkdirp is a no-op). */
@@ -32,5 +33,30 @@ export function scriptedPrompter(answers: readonly boolean[]): ScriptedPrompter 
       notes.push(message);
     },
     confirm: async () => answers[cursor++] ?? false,
+  };
+}
+
+/** {@link RecipeAsker} that replays scripted text answers and records notes. */
+export interface ScriptedAsker extends RecipeAsker {
+  readonly notes: string[];
+}
+
+export function scriptedAsker(textAnswers: readonly (string | undefined)[] = []): ScriptedAsker {
+  const notes: string[] = [];
+  let cursor = 0;
+  return {
+    notes,
+    async text() {
+      return textAnswers[cursor++];
+    },
+    async confirm() {
+      return true;
+    },
+    async choice(_message, choices) {
+      return choices[0] ?? '';
+    },
+    note: (message) => {
+      notes.push(message);
+    },
   };
 }

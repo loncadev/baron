@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { type CliPorts, runCli } from './cli.js';
-import { memoryFileSystem, scriptedPrompter } from './fakes.js';
+import { memoryFileSystem, scriptedAsker, scriptedPrompter } from './fakes.js';
 import { policyPath } from './paths.js';
 
 function harness(seed: Record<string, string> = {}) {
@@ -9,6 +9,7 @@ function harness(seed: Record<string, string> = {}) {
   const ports: CliPorts = {
     fs: memoryFileSystem(seed),
     prompter: scriptedPrompter([true]),
+    asker: scriptedAsker(),
     env: {},
     out: (m) => out.push(m),
     err: (m) => err.push(m),
@@ -53,5 +54,11 @@ describe('runCli', () => {
     const { ports, err } = harness();
     expect(await runCli(['doctor'], ports)).toBe(1);
     expect(err.join('\n')).toContain('POLICY_NOT_FOUND');
+  });
+
+  it('exits 2 when run is missing --recipe', async () => {
+    const { ports, err } = harness();
+    expect(await runCli(['run'], ports)).toBe(2);
+    expect(err.join('\n')).toContain('--recipe');
   });
 });
