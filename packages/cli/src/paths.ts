@@ -1,12 +1,8 @@
-/**
- * Canonical `.baron` layout. Kept POSIX-joined (forward slashes) — the Node fs layer accepts these
- * on every platform, and it keeps the FileSystem fakes in tests trivial to key by path.
- */
-export const BARON_DIR = '.baron';
+import { BARON_DIR } from '@baron/providers';
 
-export function policyPath(root: string): string {
-  return `${root}/${BARON_DIR}/policy.json`;
-}
+// BARON_DIR + policyPath are shared infra (the MCP server reads the same policy); re-export them so
+// CLI consumers keep a single import surface while the canonical definition lives in @baron/providers.
+export { BARON_DIR, policyPath } from '@baron/providers';
 
 export function credentialsExamplePath(root: string): string {
   return `${root}/${BARON_DIR}/credentials.example`;

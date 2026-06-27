@@ -21,6 +21,8 @@ import {
   type Logger,
 } from '@baron/core';
 
+export * from './paths.js';
+
 /** A read-only view of process environment (credentials live here, never in committed policy). */
 export type Env = Record<string, string | undefined>;
 
