@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { BaronError } from '@baron/core';
 import { filterFollowups, filterLearnings } from './filter.js';
 import type { KnowledgeStore } from './store.js';
@@ -12,10 +13,22 @@ import type {
 
 const ARGS = 'KNOWLEDGE_ARGS';
 
-/** Default id generator: process-local, time-prefixed + a counter (unique within a run). */
-function defaultIdGenerator(): () => string {
-  let seq = 0;
-  return () => `${Date.now().toString(36)}-${(seq++).toString(36)}`;
+/**
+ * Default id: a sortable time prefix + a random UUID. The random suffix keeps ids unique across
+ * concurrent processes sharing the committed `.baron/knowledge` dir (a counter alone resets per
+ * process and would collide).
+ */
+function defaultNewId(): string {
+  return `${Date.now().toString(36)}-${randomUUID()}`;
+}
+
+/** Tags become a comma-joined single line in the markdown store; reject values that would corrupt it. */
+function assertTags(tags: readonly string[] | undefined): void {
+  for (const tag of tags ?? []) {
+    if (tag.includes(',') || /[\r\n]/.test(tag)) {
+      throw new BaronError(`tag '${tag}' must not contain a comma or a newline.`, ARGS);
+    }
+  }
 }
 
 export interface KnowledgeLoopOptions {
@@ -40,13 +53,14 @@ export class KnowledgeLoop {
     options: KnowledgeLoopOptions = {},
   ) {
     this.now = options.now ?? (() => new Date().toISOString());
-    this.newId = options.newId ?? defaultIdGenerator();
+    this.newId = options.newId ?? defaultNewId;
   }
 
   async learningAppend(draft: LearningDraft): Promise<Learning> {
     if (draft.title.trim().length === 0) {
       throw new BaronError('learning requires a non-empty title.', ARGS);
     }
+    assertTags(draft.tags);
     const learning: Learning = {
       id: this.newId(),
       title: draft.title,
@@ -66,6 +80,7 @@ export class KnowledgeLoop {
     if (draft.title.trim().length === 0) {
       throw new BaronError('followup requires a non-empty title.', ARGS);
     }
+    assertTags(draft.tags);
     const followup: Followup = {
       id: this.newId(),
       title: draft.title,

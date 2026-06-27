@@ -53,7 +53,7 @@ function frontmatter(record: Learning | Followup): Record<string, string> {
   return {
     id: record.id,
     title: oneLine(record.title),
-    tags: record.tags.join(', '),
+    tags: record.tags.map(oneLine).join(', '),
     createdAt: record.createdAt,
   };
 }
@@ -70,7 +70,9 @@ function serialize(fields: Record<string, string>, body: string): string {
 
 function write(directory: string, id: string, content: string): void {
   mkdirSync(directory, { recursive: true });
-  writeFileSync(join(directory, `${id}.md`), content, 'utf8');
+  // Records are append-only and ids are unique; refuse to clobber so an id collision surfaces loudly
+  // instead of silently overwriting durable knowledge ('wx' fails if the file already exists).
+  writeFileSync(join(directory, `${id}.md`), content, { encoding: 'utf8', flag: 'wx' });
 }
 
 function readAll(directory: string): Array<{ fields: Record<string, string>; body: string }> {
@@ -80,7 +82,10 @@ function readAll(directory: string): Array<{ fields: Record<string, string>; bod
     .map((name) => parseEntry(readFileSync(join(directory, name), 'utf8')));
 }
 
-function parseEntry(text: string): { fields: Record<string, string>; body: string } {
+function parseEntry(raw: string): { fields: Record<string, string>; body: string } {
+  // Normalize CRLF first: these files are human-editable, and a Windows editor save rewrites them
+  // with \r\n — without this the frontmatter regex would miss and swallow every field into the body.
+  const text = raw.replace(/\r\n/g, '\n');
   const match = text.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
   if (match?.[1] === undefined) return { fields: {}, body: text.trimEnd() };
   const fields: Record<string, string> = {};
@@ -89,7 +94,10 @@ function parseEntry(text: string): { fields: Record<string, string>; body: strin
     if (idx === -1) continue;
     fields[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
   }
-  return { fields, body: (match[2] ?? '').trimEnd() };
+  // serialize() appends exactly one trailing newline after the body; strip just that to round-trip
+  // a body's own trailing whitespace exactly.
+  const body = match[2] ?? '';
+  return { fields, body: body.endsWith('\n') ? body.slice(0, -1) : body };
 }
 
 function parseTags(raw: string | undefined): string[] {

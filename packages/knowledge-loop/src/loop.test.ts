@@ -50,6 +50,16 @@ describe('KnowledgeLoop learnings', () => {
       BaronError,
     );
   });
+
+  it('rejects a tag containing a comma or newline (would corrupt the markdown store)', async () => {
+    const loop = deterministicLoop();
+    await expect(
+      loop.learningAppend({ title: 'T', body: 'b', tags: ['a,b'] }),
+    ).rejects.toBeInstanceOf(BaronError);
+    await expect(
+      loop.learningAppend({ title: 'T', body: 'b', tags: ['a\nb'] }),
+    ).rejects.toBeInstanceOf(BaronError);
+  });
 });
 
 describe('KnowledgeLoop follow-ups', () => {
