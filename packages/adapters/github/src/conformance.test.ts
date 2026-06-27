@@ -1,6 +1,17 @@
-import { createMemoryTransport, runIssuesConformance } from '@baron/conformance';
+import {
+  createMemoryIntrospector,
+  createMemoryTransport,
+  githubIntrospectionFixture,
+  runIntrospectionConformance,
+  runIssuesConformance,
+} from '@baron/conformance';
 import { RecordingLogger } from '@baron/core';
-import { defineGithubIssuesAdapter, exampleGithubRoleMap, exampleGithubTypeMap } from './index.js';
+import {
+  defineGithubIssuesAdapter,
+  exampleGithubRoleMap,
+  exampleGithubTypeMap,
+  githubManifest,
+} from './index.js';
 
 runIssuesConformance({
   label: 'github',
@@ -20,4 +31,10 @@ runIssuesConformance({
   mappedMidRole: 'in_review',
   mappedDoneRole: 'done',
   unmappedRole: 'blocked',
+});
+
+runIntrospectionConformance({
+  label: 'github',
+  manifest: githubManifest,
+  build: () => createMemoryIntrospector(githubIntrospectionFixture),
 });
