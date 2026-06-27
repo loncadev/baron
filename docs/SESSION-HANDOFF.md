@@ -8,9 +8,10 @@ note plus [ARCHITECTURE.md](../ARCHITECTURE.md) and [CLAUDE.md](../CLAUDE.md) ca
 ## Where we are
 
 The foundation, the **first vertical slice**, the **config engine**, the **live SDK transports +
-introspectors**, the **MCP server**, and a **second port (`scm`)** are committed and green:
+introspectors**, the **MCP server**, a **second port (`scm`)**, and the **recipe + plugin layer**
+are committed and green:
 
-- `pnpm test` → 126/126 pass (+6 gated smoke skipped) · `pnpm typecheck` → clean (7 packages) ·
+- `pnpm test` → 148/148 pass (+6 gated smoke skipped) · `pnpm typecheck` → clean (8 packages) ·
   `pnpm lint` → clean.
 - Two capability ports now exist (invariant #1, "ports not a tracker"): `issues` and `scm`, each
   bound to a provider independently across **Azure DevOps** and **GitHub**.
@@ -36,6 +37,11 @@ introspectors**, the **MCP server**, and a **second port (`scm`)** are committed
   `policy.json` and routing each call by name prefix (an unbound port → `PORT_UNBOUND` isError).
   Tool-input enums come from the core unions; `BaronError` surfaces as an `isError` result with the
   `.code`. Verified end-to-end over the MCP protocol via the SDK's in-memory transport pair.
+- Recipe + plugin layer done: `@baron/recipes` is a declarative YAML engine (typed `ask` steps,
+  `do` steps mapped 1:1 to port primitives, `message` steps, `${path}` interpolation) — workflow
+  opinion lives in recipes, not the core (decisions #3/#6/#7). `baron run --recipe <path>` executes
+  one against the policy's live ports; `plugins/claude-code` is the harness wrapper (MCP-server
+  registration + a skill + `/baron-run`).
 
 ## What exists
 
@@ -47,9 +53,16 @@ introspectors**, the **MCP server**, and a **second port (`scm`)** are committed
   for both ports.
 - `@baron/conformance` — in-memory issues + scm transports + in-memory introspector + the shared
   issues / introspection / scm suites every adapter passes.
-- `@baron/cli` — `baron init` / `baron doctor`. Pure command logic (`runInit` / `runDoctor`) behind
-  injected `FileSystem` / `Prompter` / `Introspector` ports (tested with in-memory fakes); thin
-  Node-backed shell in `bin.ts`; a dependency-free flag parser.
+- `@baron/cli` — `baron init` / `baron doctor` / `baron run`. Pure command logic (`runInit` /
+  `runDoctor` / `runRecipeFile`) behind injected `FileSystem` / `Prompter` / `RecipeAsker` ports
+  (tested with in-memory fakes); thin Node-backed shell in `bin.ts`; a dependency-free flag parser.
+- `@baron/recipes` — YAML recipe engine: `parseRecipe` / `loadRecipe`, `${path}` `interpolate`,
+  `runRecipe(recipe, {ports, asker, inputs})`, the `RecipeAsker` contract, and shipped example
+  recipes (`recipes/task-start.yaml`, `task-finish.yaml`). Pure mechanism — no role/native
+  translation (that stays in the ports).
+- `plugins/claude-code` — Claude Code plugin scaffold (not a workspace package): `plugin.json`
+  registers the `baron` MCP server; a `baron` skill + `/baron-run` command. Validated by installing
+  into Claude Code (no automated test).
 - `@baron/providers` — shared infrastructure both the CLI and the MCP server depend on (so they
   don't depend on each other): the provider registry (id → issues + scm manifests, credential env
   keys, live transport / introspector / scm-transport factories), `buildIssuesPort` / `buildScmPort`,
@@ -84,22 +97,27 @@ introspectors**, the **MCP server**, and a **second port (`scm`)** are committed
   type (GitHub → `issue`). Faithful round-trip needs label emulation (same pattern as hierarchy).
 - The proposal heuristics (board-column / type keyword matching) are English-biased and best-effort
   by design — every guess is recorded in `proposal.notes` for the human to confirm in `baron init`.
+- The recipe DSL is intentionally a v1: no conditionals, loops, error handling, or idempotency
+  markers yet (ARCHITECTURE "Deferred"). `${path}` refs inside a YAML *flow* map must be quoted
+  (`{ id: "${x}" }`) or written in block style — a YAML quirk, not a Baron limitation.
 
 ## Agreed next step
 
-Two ports (`issues`, `scm`) are usable end-to-end by an agent (CLI to configure, MCP to drive).
-Remaining queued options — not yet chosen; decide at the start of the next session:
+Two ports (`issues`, `scm`), the config engine, the MCP server, and the recipe + plugin layer are
+all usable end-to-end. Remaining queued options — not yet chosen; decide at the start of the next
+session:
 
 - **Live validation.** Point the gated smoke tests at a throwaway GitHub repo + Azure project to
   confirm the wiring against real APIs (especially the Azure board-column WEF write, the issue
-  query/link paths, and the scm branch/PR/thread paths), then drive the MCP server from a real
-  client. This is the highest-value next step — everything so far is verified in-memory/by review,
-  never against a live provider.
-- **Recipes + knowledge-loop + the Claude Code plugin** (declarative workflow layer; the remaining
-  packages in the ARCHITECTURE layout). This is where workflow *opinion* lives, on top of the
-  primitives both ports now expose.
+  query/link paths, and the scm branch/PR/thread paths), then drive the MCP server / `baron run`
+  from a real client. This is the highest-value next step — everything so far is verified
+  in-memory/by review, never against a live provider.
+- **`knowledge-loop` package** (`learning` / `followup` primitives + pluggable store; decision #11)
+  — the last unbuilt package in the ARCHITECTURE layout.
 - **`notify` / `docs` ports**, or a third issues/scm provider (Jira, Linear, GitLab), to further
   exercise the multi-provider bet.
+- **Recipe DSL v2** (conditionals, error handling, idempotency markers) once a real workflow needs
+  them.
 
 ## How to resume in this repo
 
