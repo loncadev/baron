@@ -7,11 +7,11 @@ note plus [ARCHITECTURE.md](../ARCHITECTURE.md) and [CLAUDE.md](../CLAUDE.md) ca
 
 ## Where we are
 
-The foundation, the **first vertical slice**, the **config engine**, the **live SDK transports +
-introspectors**, the **MCP server**, a **second port (`scm`)**, and the **recipe + plugin layer**
-are committed and green:
+**Every package in the ARCHITECTURE layout now exists** — config engine, live transports, MCP
+server, two ports (`issues` + `scm`), the recipe + plugin layer, and the knowledge loop — all
+committed and green:
 
-- `pnpm test` → 148/148 pass (+6 gated smoke skipped) · `pnpm typecheck` → clean (8 packages) ·
+- `pnpm test` → 170/170 pass (+6 gated smoke skipped) · `pnpm typecheck` → clean (9 packages) ·
   `pnpm lint` → clean.
 - Two capability ports now exist (invariant #1, "ports not a tracker"): `issues` and `scm`, each
   bound to a provider independently across **Azure DevOps** and **GitHub**.
@@ -42,6 +42,11 @@ are committed and green:
   opinion lives in recipes, not the core (decisions #3/#6/#7). `baron run --recipe <path>` executes
   one against the policy's live ports; `plugins/claude-code` is the harness wrapper (MCP-server
   registration + a skill + `/baron-run`).
+- Knowledge loop done (decision #11): `@baron/knowledge-loop` exposes `learning.append`/`query` +
+  `followup.append`/`list` over a pluggable `KnowledgeStore` (in-memory + the default `local-md`
+  store: one human-readable, CRLF-tolerant markdown file per record). The loop is always available;
+  it's wired into the MCP server (`baron_learning_*` / `baron_followup_*` tools) and recipes
+  (`learning.*` / `followup.*` ops), persisting under `.baron/knowledge`.
 
 ## What exists
 
@@ -53,6 +58,9 @@ are committed and green:
   for both ports.
 - `@baron/conformance` — in-memory issues + scm transports + in-memory introspector + the shared
   issues / introspection / scm suites every adapter passes.
+- `@baron/knowledge-loop` — `KnowledgeLoop` (`learning`/`followup` primitives + filtering),
+  `KnowledgeStore` contract + an in-memory store and the default `local-md` markdown store, an
+  in-package store conformance suite, and `createLocalKnowledgeLoop(dir)`.
 - `@baron/cli` — `baron init` / `baron doctor` / `baron run`. Pure command logic (`runInit` /
   `runDoctor` / `runRecipeFile`) behind injected `FileSystem` / `Prompter` / `RecipeAsker` ports
   (tested with in-memory fakes); thin Node-backed shell in `bin.ts`; a dependency-free flag parser.
@@ -103,21 +111,20 @@ are committed and green:
 
 ## Agreed next step
 
-Two ports (`issues`, `scm`), the config engine, the MCP server, and the recipe + plugin layer are
-all usable end-to-end. Remaining queued options — not yet chosen; decide at the start of the next
-session:
+The planned ARCHITECTURE is built end-to-end (config → ports → MCP → recipes → knowledge loop).
+What remains is validation and expansion — not yet chosen; decide at the start of the next session:
 
-- **Live validation.** Point the gated smoke tests at a throwaway GitHub repo + Azure project to
-  confirm the wiring against real APIs (especially the Azure board-column WEF write, the issue
-  query/link paths, and the scm branch/PR/thread paths), then drive the MCP server / `baron run`
-  from a real client. This is the highest-value next step — everything so far is verified
-  in-memory/by review, never against a live provider.
-- **`knowledge-loop` package** (`learning` / `followup` primitives + pluggable store; decision #11)
-  — the last unbuilt package in the ARCHITECTURE layout.
+- **Live validation (highest value).** Point the gated smoke tests at a throwaway GitHub repo +
+  Azure project to confirm the wiring against real APIs (especially the Azure board-column WEF write,
+  the issue query/link paths, and the scm branch/PR/thread paths), then drive the MCP server /
+  `baron run` from a real client. Everything so far is verified in-memory / by adversarial review,
+  never against a live provider.
 - **`notify` / `docs` ports**, or a third issues/scm provider (Jira, Linear, GitLab), to further
   exercise the multi-provider bet.
 - **Recipe DSL v2** (conditionals, error handling, idempotency markers) once a real workflow needs
   them.
+- **Polish for release**: vendor the full LICENSE text; extend `baron init` to scaffold scm
+  credentials; publish (`pnpm build` flips packages to `dist`).
 
 ## How to resume in this repo
 
