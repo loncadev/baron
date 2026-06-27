@@ -1,14 +1,17 @@
 import {
   azureIntrospectionFixture,
   createMemoryIntrospector,
+  createMemoryScmTransport,
   createMemoryTransport,
   runIntrospectionConformance,
   runIssuesConformance,
+  runScmConformance,
 } from '@baron/conformance';
 import { RecordingLogger } from '@baron/core';
 import {
   azureDevOpsManifest,
   defineAzureDevOpsIssuesAdapter,
+  defineAzureDevOpsScmAdapter,
   exampleAzureDevOpsRoleMap,
   exampleAzureDevOpsTypeMap,
 } from './index.js';
@@ -37,4 +40,13 @@ runIntrospectionConformance({
   label: 'azure-devops',
   manifest: azureDevOpsManifest,
   build: () => createMemoryIntrospector(azureIntrospectionFixture),
+});
+
+runScmConformance({
+  label: 'azure-devops',
+  build(gapPolicy) {
+    const logger = new RecordingLogger();
+    const adapter = defineAzureDevOpsScmAdapter(createMemoryScmTransport(), gapPolicy, logger);
+    return { adapter, logger };
+  },
 });

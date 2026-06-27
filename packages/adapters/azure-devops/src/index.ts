@@ -79,3 +79,9 @@ export function defineAzureDevOpsIssuesAdapter(
 
 export { createAzureDevOpsTransport, type AzureDevOpsTransportOptions } from './transport.js';
 export { createAzureDevOpsIntrospector } from './introspector.js';
+export {
+  createAzureDevOpsScmTransport,
+  defineAzureDevOpsScmAdapter,
+  azureDevOpsScmManifest,
+  type AzureDevOpsScmTransportOptions,
+} from './scm.js';
