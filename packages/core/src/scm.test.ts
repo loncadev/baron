@@ -68,3 +68,36 @@ describe('BaseScmAdapter draft-PR gap', () => {
     expect(pr.draft).toBe(false);
   });
 });
+
+const noThreads: ScmManifest = {
+  provider: 'fake',
+  scm: { draftPullRequests: true, pullRequestThreads: false },
+};
+
+describe('BaseScmAdapter pull-request-thread gap', () => {
+  it('adds a thread when the provider supports threads', async () => {
+    const adapter = new BaseScmAdapter(withDraft, transport);
+    const thread = await adapter.addPullRequestThread('pr1', 'hi');
+    expect(thread.id).toBeTruthy();
+  });
+
+  it('degrades and warns when threads are unsupported', async () => {
+    const log = new RecordingLogger();
+    const adapter = new BaseScmAdapter(
+      noThreads,
+      transport,
+      { pullRequestThreads: { kind: 'degrade' } },
+      log,
+    );
+    const thread = await adapter.addPullRequestThread('pr1', 'hi');
+    expect(thread.id).toBeTruthy();
+    expect(log.entries.some((e) => e.level === 'warn')).toBe(true);
+  });
+
+  it('errors on a thread under the strict default policy (never silent)', async () => {
+    const adapter = new BaseScmAdapter(noThreads, transport);
+    await expect(adapter.addPullRequestThread('pr1', 'hi')).rejects.toBeInstanceOf(
+      CapabilityGapError,
+    );
+  });
+});

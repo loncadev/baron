@@ -11,7 +11,10 @@ import {
   type ScmTransport,
 } from '@baron/core';
 import * as azdev from 'azure-devops-node-api';
-import type { GitPullRequest } from 'azure-devops-node-api/interfaces/GitInterfaces.js';
+import {
+  type GitPullRequest,
+  GitRefUpdateStatus,
+} from 'azure-devops-node-api/interfaces/GitInterfaces.js';
 import { AZURE_DEVOPS_PROVIDER } from './index.js';
 
 export interface AzureDevOpsScmTransportOptions {
@@ -51,7 +54,7 @@ export function createAzureDevOpsScmTransport(
   };
 
   const prWebUrl = (id: string): string =>
-    `${orgUrl}/${project}/_git/${repository}/pullrequest/${id}`;
+    `${orgUrl}/${encodeURIComponent(project)}/_git/${encodeURIComponent(repository)}/pullrequest/${id}`;
 
   return {
     async createBranch(name: string, fromBranch: string): Promise<NativeBranch> {
@@ -69,9 +72,17 @@ export function createAzureDevOpsScmTransport(
         repository,
         project,
       );
-      if (result?.success === false) {
+      // Treat anything other than an explicit success as failure — an empty result array (undefined
+      // result) or a missing `success` must not be reported as a created branch (invariant #5).
+      if (result?.success !== true) {
+        const status = result?.updateStatus;
+        const statusName =
+          status !== undefined ? (GitRefUpdateStatus[status] ?? String(status)) : undefined;
+        const hint =
+          status === GitRefUpdateStatus.StaleOldObjectId ? ' (the branch may already exist)' : '';
+        const detail = result?.customMessage ?? statusName ?? 'ref update rejected';
         throw new BaronError(
-          `Failed to create branch '${name}': ${result.customMessage ?? 'ref update rejected'}.`,
+          `Failed to create branch '${name}': ${detail}${hint}.`,
           'BRANCH_CREATE_FAILED',
         );
       }

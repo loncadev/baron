@@ -165,6 +165,16 @@ export class BaseScmAdapter implements ScmPort {
   }
 
   async addPullRequestThread(pullRequestId: string, body: string): Promise<PullRequestThread> {
+    if (!this.manifest.scm.pullRequestThreads) {
+      // Provider lacks first-class PR threads: negotiate rather than failing with a raw error.
+      resolveCapabilityGap(
+        false,
+        'pullRequestThreads',
+        this.manifest.provider,
+        this.gapPolicy,
+        this.logger,
+      );
+    }
     const native = await this.transport.addPullRequestThread(pullRequestId, body);
     return { id: native.id, url: native.url };
   }
