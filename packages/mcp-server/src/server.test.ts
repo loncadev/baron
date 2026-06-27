@@ -56,11 +56,18 @@ function textOf(result: ToolCallResult): string {
 }
 
 describe('createMcpServer (end-to-end over the MCP protocol)', () => {
-  it('advertises exactly the three issue tools', async () => {
+  it('advertises the six issue tools', async () => {
     const client = await connectClient(githubPort());
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(
-      [MCP_TOOL_NAMES.create, MCP_TOOL_NAMES.get, MCP_TOOL_NAMES.transition].sort(),
+      [
+        MCP_TOOL_NAMES.create,
+        MCP_TOOL_NAMES.get,
+        MCP_TOOL_NAMES.transition,
+        MCP_TOOL_NAMES.comment,
+        MCP_TOOL_NAMES.link,
+        MCP_TOOL_NAMES.query,
+      ].sort(),
     );
   });
 

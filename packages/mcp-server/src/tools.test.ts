@@ -29,11 +29,14 @@ function parse(text: string): Record<string, unknown> {
 }
 
 describe('TOOL_DEFINITIONS', () => {
-  it('exposes exactly the three implemented primitives', () => {
+  it('exposes the six implemented issue primitives', () => {
     expect(TOOL_DEFINITIONS.map((t) => t.name)).toEqual([
       MCP_TOOL_NAMES.create,
       MCP_TOOL_NAMES.get,
       MCP_TOOL_NAMES.transition,
+      MCP_TOOL_NAMES.comment,
+      MCP_TOOL_NAMES.link,
+      MCP_TOOL_NAMES.query,
     ]);
   });
 
@@ -120,5 +123,65 @@ describe('callTool', () => {
     const result = await callTool(githubPort(), 'baron_issue_delete', {});
     expect(result.isError).toBe(true);
     expect(result.structuredContent?.code).toBe('UNKNOWN_TOOL');
+  });
+
+  it('comments on an issue', async () => {
+    const port = githubPort();
+    const created = parse(
+      await callTool(port, MCP_TOOL_NAMES.create, { title: 'x', typeRole: 'task' }).then(
+        (r) => r.content[0]?.text ?? '{}',
+      ),
+    );
+    const result = await callTool(port, MCP_TOOL_NAMES.comment, {
+      id: created.id,
+      body: 'a note',
+    });
+    expect(result.isError).toBeUndefined();
+    expect(parse(result.content[0]?.text ?? '{}').body).toBe('a note');
+  });
+
+  it('queries issues by role', async () => {
+    const port = githubPort();
+    const created = parse(
+      await callTool(port, MCP_TOOL_NAMES.create, { title: 'x', typeRole: 'task' }).then(
+        (r) => r.content[0]?.text ?? '{}',
+      ),
+    );
+    await callTool(port, MCP_TOOL_NAMES.transition, { id: created.id, role: 'in_review' });
+    const result = await callTool(port, MCP_TOOL_NAMES.query, { role: 'in_review' });
+    expect(result.isError).toBeUndefined();
+    const issues = JSON.parse(result.content[0]?.text ?? '[]') as Array<{ id: string }>;
+    expect(issues.some((i) => i.id === created.id)).toBe(true);
+  });
+
+  it('links issues via label emulation on a flat provider and returns ok', async () => {
+    const port = githubPort();
+    const a = parse(
+      await callTool(port, MCP_TOOL_NAMES.create, { title: 'a', typeRole: 'task' }).then(
+        (r) => r.content[0]?.text ?? '{}',
+      ),
+    );
+    const b = parse(
+      await callTool(port, MCP_TOOL_NAMES.create, { title: 'b', typeRole: 'task' }).then(
+        (r) => r.content[0]?.text ?? '{}',
+      ),
+    );
+    const result = await callTool(port, MCP_TOOL_NAMES.link, {
+      fromId: a.id,
+      toId: b.id,
+      type: 'blocks',
+    });
+    expect(result.isError).toBeUndefined();
+    expect(parse(result.content[0]?.text ?? '{}').ok).toBe(true);
+  });
+
+  it('rejects an out-of-enum link type as INVALID_ARGS', async () => {
+    const result = await callTool(githubPort(), MCP_TOOL_NAMES.link, {
+      fromId: '1',
+      toId: '2',
+      type: 'mentions',
+    });
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent?.code).toBe('INVALID_ARGS');
   });
 });

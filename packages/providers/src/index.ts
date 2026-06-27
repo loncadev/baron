@@ -3,11 +3,13 @@ import {
   azureDevOpsManifest,
   createAzureDevOpsIntrospector,
   createAzureDevOpsTransport,
+  exampleAzureDevOpsLinkMap,
 } from '@baron/adapter-azure-devops';
 import {
   GITHUB_PROVIDER,
   createGithubIntrospector,
   createGithubTransport,
+  exampleGithubLinkMap,
   githubManifest,
 } from '@baron/adapter-github';
 import {
@@ -18,6 +20,7 @@ import {
   type IssuesPort,
   type IssuesProviderConfig,
   type IssuesTransport,
+  type LinkMap,
   type Logger,
 } from '@baron/core';
 
@@ -37,6 +40,8 @@ export interface ProviderDescriptor {
   readonly id: string;
   readonly manifest: CapabilityManifest;
   readonly credentialEnvKeys: readonly string[];
+  /** Fixed abstract→native link types (provider knowledge, not policy); see {@link buildIssuesPort}. */
+  readonly linkMap: LinkMap;
   createTransport(env: Env): IssuesTransport;
   createIntrospector(env: Env): Introspector;
 }
@@ -46,6 +51,7 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
     id: AZURE_DEVOPS_PROVIDER,
     manifest: azureDevOpsManifest,
     credentialEnvKeys: ['AZURE_DEVOPS_ORG', 'AZURE_DEVOPS_PROJECT', 'AZURE_DEVOPS_TOKEN'],
+    linkMap: exampleAzureDevOpsLinkMap,
     createTransport(env) {
       return createAzureDevOpsTransport({
         organization: env.AZURE_DEVOPS_ORG ?? '',
@@ -65,6 +71,7 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
     id: GITHUB_PROVIDER,
     manifest: githubManifest,
     credentialEnvKeys: ['GITHUB_OWNER', 'GITHUB_REPO', 'GITHUB_TOKEN'],
+    linkMap: exampleGithubLinkMap,
     createTransport(env) {
       return createGithubTransport({
         owner: env.GITHUB_OWNER ?? '',
@@ -107,9 +114,15 @@ export function buildIssuesPort(
   logger?: Logger,
 ): IssuesPort {
   const descriptor = getProviderDescriptor(config.provider);
+  // The link map is fixed provider knowledge (not in policy.json), so inject the descriptor's
+  // unless the caller already supplied one.
+  const resolved: IssuesProviderConfig = {
+    ...config,
+    linkMap: config.linkMap ?? descriptor.linkMap,
+  };
   return new BaseIssuesAdapter(
     descriptor.manifest,
-    config,
+    resolved,
     descriptor.createTransport(env),
     logger,
   );

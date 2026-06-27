@@ -1,10 +1,15 @@
 import {
   BaronError,
+  ISSUE_LINK_TYPES,
   type IssueDraft,
+  type IssueLinkType,
+  type IssueQuery,
   type IssuesPort,
   WORKFLOW_ROLES,
   WORK_ITEM_TYPE_ROLES,
+  type WorkItemTypeRole,
   type WorkflowRole,
+  isIssueLinkType,
   isWorkItemTypeRole,
   isWorkflowRole,
 } from '@baron/core';
@@ -14,6 +19,9 @@ export const MCP_TOOL_NAMES = {
   create: 'baron_issue_create',
   get: 'baron_issue_get',
   transition: 'baron_issue_transition',
+  comment: 'baron_issue_comment',
+  link: 'baron_issue_link',
+  query: 'baron_issue_query',
 } as const;
 
 /** A tool definition shaped for the MCP ListTools response (plain JSON Schema, no zod). */
@@ -40,6 +48,7 @@ export interface ToolResult {
 // strings; #2: never expose provider-native states here).
 const ROLE_ENUM = [...WORKFLOW_ROLES];
 const TYPE_ROLE_ENUM = [...WORK_ITEM_TYPE_ROLES];
+const LINK_TYPE_ENUM = [...ISSUE_LINK_TYPES];
 
 export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   {
@@ -104,6 +113,53 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
       },
     },
   },
+  {
+    name: MCP_TOOL_NAMES.comment,
+    description: 'Add a comment to an issue.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['id', 'body'],
+      properties: {
+        id: { type: 'string', minLength: 1 },
+        body: { type: 'string', minLength: 1 },
+      },
+    },
+  },
+  {
+    name: MCP_TOOL_NAMES.link,
+    description:
+      'Link two issues with an abstract relationship. On providers without native typed links the ' +
+      'link is emulated or degraded per the gap policy.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['fromId', 'toId', 'type'],
+      properties: {
+        fromId: { type: 'string', minLength: 1 },
+        toId: { type: 'string', minLength: 1 },
+        type: {
+          type: 'string',
+          enum: LINK_TYPE_ENUM,
+          description: 'Relationship from the source (fromId) to the target (toId) issue.',
+        },
+      },
+    },
+  },
+  {
+    name: MCP_TOOL_NAMES.query,
+    description:
+      'List issues filtered by workflow role and/or type role (filters are AND-combined).',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        role: { type: 'string', enum: ROLE_ENUM, description: 'Filter by workflow role.' },
+        typeRole: { type: 'string', enum: TYPE_ROLE_ENUM, description: 'Filter by type role.' },
+        limit: { type: 'number', minimum: 1, description: 'Maximum number of issues to return.' },
+      },
+    },
+  },
 ];
 
 const INVALID_ARGS = 'INVALID_ARGS';
@@ -148,6 +204,43 @@ function requireRole(args: Record<string, unknown> | undefined): WorkflowRole {
   return value;
 }
 
+function requireLinkType(args: Record<string, unknown> | undefined): IssueLinkType {
+  const value = requireString(args, 'type');
+  if (!isIssueLinkType(value)) {
+    throw new BaronError(
+      `Invalid link type '${value}'. Expected one of: ${ISSUE_LINK_TYPES.join(', ')}.`,
+      INVALID_ARGS,
+    );
+  }
+  return value;
+}
+
+function toQuery(args: Record<string, unknown> | undefined): IssueQuery {
+  const roleRaw = optionalString(args, 'role');
+  if (roleRaw !== undefined && !isWorkflowRole(roleRaw)) {
+    throw new BaronError(
+      `Invalid role '${roleRaw}'. Expected one of: ${WORKFLOW_ROLES.join(', ')}.`,
+      INVALID_ARGS,
+    );
+  }
+  const typeRoleRaw = optionalString(args, 'typeRole');
+  if (typeRoleRaw !== undefined && !isWorkItemTypeRole(typeRoleRaw)) {
+    throw new BaronError(
+      `Invalid typeRole '${typeRoleRaw}'. Expected one of: ${WORK_ITEM_TYPE_ROLES.join(', ')}.`,
+      INVALID_ARGS,
+    );
+  }
+  const limit = args?.limit;
+  if (limit !== undefined && (typeof limit !== 'number' || !Number.isFinite(limit) || limit < 1)) {
+    throw new BaronError("Argument 'limit' must be a positive number.", INVALID_ARGS);
+  }
+  return {
+    ...(roleRaw !== undefined ? { role: roleRaw as WorkflowRole } : {}),
+    ...(typeRoleRaw !== undefined ? { typeRole: typeRoleRaw as WorkItemTypeRole } : {}),
+    ...(limit !== undefined ? { limit: limit as number } : {}),
+  };
+}
+
 function toDraft(args: Record<string, unknown> | undefined): IssueDraft {
   const title = requireString(args, 'title');
   const typeRole = requireString(args, 'typeRole');
@@ -180,7 +273,10 @@ function toDraft(args: Record<string, unknown> | undefined): IssueDraft {
 async function run(fn: () => Promise<unknown>): Promise<ToolResult> {
   try {
     const result = await fn();
-    return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+    // A void primitive (link) has no payload; report a stable success object rather than `undefined`,
+    // which JSON.stringify would drop (leaving an invalid non-string text block).
+    const text = result === undefined ? '{"ok":true}' : JSON.stringify(result);
+    return { content: [{ type: 'text', text }] };
   } catch (error) {
     // BaronError carries an actionable, branchable code; surface it as an isError result (not a
     // protocol error) so the agent sees the gap and can self-correct (invariant #5: never silent).
@@ -218,6 +314,18 @@ export function callTool(
       return run(() => port.get(requireString(args, 'id')));
     case MCP_TOOL_NAMES.transition:
       return run(() => port.transition(requireString(args, 'id'), requireRole(args)));
+    case MCP_TOOL_NAMES.comment:
+      return run(() => port.comment(requireString(args, 'id'), requireString(args, 'body')));
+    case MCP_TOOL_NAMES.link:
+      return run(() =>
+        port.link(
+          requireString(args, 'fromId'),
+          requireString(args, 'toId'),
+          requireLinkType(args),
+        ),
+      );
+    case MCP_TOOL_NAMES.query:
+      return run(() => port.query(toQuery(args)));
     default:
       return run(() => {
         throw new BaronError(`Unknown tool '${name}'.`, 'UNKNOWN_TOOL');
