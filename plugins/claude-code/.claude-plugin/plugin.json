@@ -1,0 +1,15 @@
+{
+  "name": "baron",
+  "version": "0.0.0",
+  "description": "Platform-agnostic work orchestration (issues + scm) for AI coding agents: drives work tracking and source control across providers via the Baron MCP server and declarative recipes.",
+  "author": { "name": "Baron contributors" },
+  "license": "Apache-2.0",
+  "mcpServers": {
+    "baron": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@baron/mcp-server"],
+      "env": {}
+    }
+  }
+}
