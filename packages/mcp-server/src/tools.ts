@@ -5,6 +5,7 @@ import {
   type IssueLinkType,
   type IssueQuery,
   type IssuesPort,
+  type ScmPort,
   WORKFLOW_ROLES,
   WORK_ITEM_TYPE_ROLES,
   type WorkItemTypeRole,
@@ -14,6 +15,12 @@ import {
   isWorkflowRole,
 } from '@baron/core';
 
+/** The ports the MCP server serves; each is present only if bound in policy.json. */
+export interface McpPorts {
+  readonly issues?: IssuesPort;
+  readonly scm?: ScmPort;
+}
+
 /** Tool names: snake_case, `baron_` (product) namespace, singular noun to mirror the primitives. */
 export const MCP_TOOL_NAMES = {
   create: 'baron_issue_create',
@@ -22,6 +29,12 @@ export const MCP_TOOL_NAMES = {
   comment: 'baron_issue_comment',
   link: 'baron_issue_link',
   query: 'baron_issue_query',
+} as const;
+
+export const SCM_TOOL_NAMES = {
+  branchCreate: 'baron_scm_branch_create',
+  prCreate: 'baron_scm_pr_create',
+  prThread: 'baron_scm_pr_thread',
 } as const;
 
 /** A tool definition shaped for the MCP ListTools response (plain JSON Schema, no zod). */
@@ -157,6 +170,57 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
         role: { type: 'string', enum: ROLE_ENUM, description: 'Filter by workflow role.' },
         typeRole: { type: 'string', enum: TYPE_ROLE_ENUM, description: 'Filter by type role.' },
         limit: { type: 'number', minimum: 1, description: 'Maximum number of issues to return.' },
+      },
+    },
+  },
+];
+
+export const SCM_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
+  {
+    name: SCM_TOOL_NAMES.branchCreate,
+    description: 'Create a branch from an existing base branch.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['name', 'fromBranch'],
+      properties: {
+        name: {
+          type: 'string',
+          minLength: 1,
+          description: 'New branch name (without refs/heads/).',
+        },
+        fromBranch: { type: 'string', minLength: 1, description: 'Existing branch to fork from.' },
+      },
+    },
+  },
+  {
+    name: SCM_TOOL_NAMES.prCreate,
+    description:
+      'Open a pull request. A requested draft may be degraded to a ready PR if the provider lacks ' +
+      'draft support (per the gap policy); the returned `draft` reflects what was actually opened.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['title', 'sourceBranch', 'targetBranch'],
+      properties: {
+        title: { type: 'string', minLength: 1 },
+        body: { type: 'string' },
+        sourceBranch: { type: 'string', minLength: 1 },
+        targetBranch: { type: 'string', minLength: 1 },
+        draft: { type: 'boolean', description: 'Open as a draft PR when supported.' },
+      },
+    },
+  },
+  {
+    name: SCM_TOOL_NAMES.prThread,
+    description: 'Add a discussion thread/comment to a pull request.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['pullRequestId', 'body'],
+      properties: {
+        pullRequestId: { type: 'string', minLength: 1 },
+        body: { type: 'string', minLength: 1 },
       },
     },
   },
@@ -331,4 +395,88 @@ export function callTool(
         throw new BaronError(`Unknown tool '${name}'.`, 'UNKNOWN_TOOL');
       });
   }
+}
+
+function optionalBoolean(
+  args: Record<string, unknown> | undefined,
+  key: string,
+): boolean | undefined {
+  const value = args?.[key];
+  if (value === undefined) return undefined;
+  if (typeof value !== 'boolean') {
+    throw new BaronError(`Argument '${key}' must be a boolean.`, INVALID_ARGS);
+  }
+  return value;
+}
+
+/** Dispatch an scm tool call to the scm port (marshalling + error shaping only). */
+export function callScmTool(
+  port: ScmPort,
+  name: string,
+  args: Record<string, unknown> | undefined,
+): Promise<ToolResult> {
+  switch (name) {
+    case SCM_TOOL_NAMES.branchCreate:
+      return run(() =>
+        port.createBranch({
+          name: requireString(args, 'name'),
+          fromBranch: requireString(args, 'fromBranch'),
+        }),
+      );
+    case SCM_TOOL_NAMES.prCreate:
+      return run(() => {
+        const draft = optionalBoolean(args, 'draft');
+        const body = optionalString(args, 'body');
+        return port.createPullRequest({
+          title: requireString(args, 'title'),
+          sourceBranch: requireString(args, 'sourceBranch'),
+          targetBranch: requireString(args, 'targetBranch'),
+          ...(body !== undefined ? { body } : {}),
+          ...(draft !== undefined ? { draft } : {}),
+        });
+      });
+    case SCM_TOOL_NAMES.prThread:
+      return run(() =>
+        port.addPullRequestThread(
+          requireString(args, 'pullRequestId'),
+          requireString(args, 'body'),
+        ),
+      );
+    default:
+      return run(() => {
+        throw new BaronError(`Unknown tool '${name}'.`, 'UNKNOWN_TOOL');
+      });
+  }
+}
+
+/** The tool definitions advertised for the currently-bound ports. */
+export function activeToolDefinitions(ports: McpPorts): ToolDefinition[] {
+  return [...(ports.issues ? TOOL_DEFINITIONS : []), ...(ports.scm ? SCM_TOOL_DEFINITIONS : [])];
+}
+
+/** Route a tool call to the right port by its name prefix; unbound ports / unknown names error. */
+export function dispatchTool(
+  ports: McpPorts,
+  name: string,
+  args: Record<string, unknown> | undefined,
+): Promise<ToolResult> {
+  if (name.startsWith('baron_issue_')) {
+    if (ports.issues === undefined) {
+      return run(() => {
+        throw new BaronError('The issues port is not configured.', 'PORT_UNBOUND');
+      });
+    }
+    return callTool(ports.issues, name, args);
+  }
+  if (name.startsWith('baron_scm_')) {
+    if (ports.scm === undefined) {
+      return run(() => {
+        throw new BaronError('The scm port is not configured.', 'PORT_UNBOUND');
+      });
+    }
+    return callScmTool(ports.scm, name, args);
+  }
+  return run(() => {
+    throw new BaronError(`Unknown tool '${name}'.`, 'UNKNOWN_TOOL');
+  });
 }

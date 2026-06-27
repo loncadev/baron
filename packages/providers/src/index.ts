@@ -1,27 +1,36 @@
 import {
   AZURE_DEVOPS_PROVIDER,
   azureDevOpsManifest,
+  azureDevOpsScmManifest,
   createAzureDevOpsIntrospector,
+  createAzureDevOpsScmTransport,
   createAzureDevOpsTransport,
   exampleAzureDevOpsLinkMap,
 } from '@baron/adapter-azure-devops';
 import {
   GITHUB_PROVIDER,
   createGithubIntrospector,
+  createGithubScmTransport,
   createGithubTransport,
   exampleGithubLinkMap,
   githubManifest,
+  githubScmManifest,
 } from '@baron/adapter-github';
 import {
   BaronError,
   BaseIssuesAdapter,
+  BaseScmAdapter,
   type CapabilityManifest,
+  type GapPolicy,
   type Introspector,
   type IssuesPort,
   type IssuesProviderConfig,
   type IssuesTransport,
   type LinkMap,
   type Logger,
+  type ScmManifest,
+  type ScmPort,
+  type ScmTransport,
 } from '@baron/core';
 
 export * from './paths.js';
@@ -44,6 +53,11 @@ export interface ProviderDescriptor {
   readonly linkMap: LinkMap;
   createTransport(env: Env): IssuesTransport;
   createIntrospector(env: Env): Introspector;
+  // scm port
+  readonly scmManifest: ScmManifest;
+  /** Env keys for the scm transport (Azure adds AZURE_DEVOPS_REPO over the issues keys). */
+  readonly scmCredentialEnvKeys: readonly string[];
+  createScmTransport(env: Env): ScmTransport;
 }
 
 const DESCRIPTORS: Record<string, ProviderDescriptor> = {
@@ -66,6 +80,21 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
         token: env.AZURE_DEVOPS_TOKEN ?? '',
       });
     },
+    scmManifest: azureDevOpsScmManifest,
+    scmCredentialEnvKeys: [
+      'AZURE_DEVOPS_ORG',
+      'AZURE_DEVOPS_PROJECT',
+      'AZURE_DEVOPS_REPO',
+      'AZURE_DEVOPS_TOKEN',
+    ],
+    createScmTransport(env) {
+      return createAzureDevOpsScmTransport({
+        organization: env.AZURE_DEVOPS_ORG ?? '',
+        project: env.AZURE_DEVOPS_PROJECT ?? '',
+        repository: env.AZURE_DEVOPS_REPO ?? '',
+        token: env.AZURE_DEVOPS_TOKEN ?? '',
+      });
+    },
   },
   [GITHUB_PROVIDER]: {
     id: GITHUB_PROVIDER,
@@ -81,6 +110,15 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
     },
     createIntrospector(env) {
       return createGithubIntrospector({
+        owner: env.GITHUB_OWNER ?? '',
+        repo: env.GITHUB_REPO ?? '',
+        token: env.GITHUB_TOKEN ?? '',
+      });
+    },
+    scmManifest: githubScmManifest,
+    scmCredentialEnvKeys: ['GITHUB_OWNER', 'GITHUB_REPO', 'GITHUB_TOKEN'],
+    createScmTransport(env) {
+      return createGithubScmTransport({
         owner: env.GITHUB_OWNER ?? '',
         repo: env.GITHUB_REPO ?? '',
         token: env.GITHUB_TOKEN ?? '',
@@ -124,6 +162,26 @@ export function buildIssuesPort(
     descriptor.manifest,
     resolved,
     descriptor.createTransport(env),
+    logger,
+  );
+}
+
+/**
+ * Build a live {@link ScmPort} for a provider from environment credentials. The scm port has no
+ * role/type map to resolve from policy, so it binds directly from the provider id + env + an
+ * optional gap policy.
+ */
+export function buildScmPort(
+  provider: string,
+  env: Env,
+  gapPolicy?: GapPolicy,
+  logger?: Logger,
+): ScmPort {
+  const descriptor = getProviderDescriptor(provider);
+  return new BaseScmAdapter(
+    descriptor.scmManifest,
+    descriptor.createScmTransport(env),
+    gapPolicy,
     logger,
   );
 }

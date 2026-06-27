@@ -1,13 +1,24 @@
 import {
   defineGithubIssuesAdapter,
+  defineGithubScmAdapter,
   exampleGithubRoleMap,
   exampleGithubTypeMap,
   recommendedGithubGapPolicy,
 } from '@baron/adapter-github';
-import { createMemoryTransport } from '@baron/conformance';
-import { type IssuesPort, WORKFLOW_ROLES, WORK_ITEM_TYPE_ROLES } from '@baron/core';
+import { createMemoryScmTransport, createMemoryTransport } from '@baron/conformance';
+import { type IssuesPort, type ScmPort, WORKFLOW_ROLES, WORK_ITEM_TYPE_ROLES } from '@baron/core';
 import { describe, expect, it } from 'vitest';
-import { MCP_TOOL_NAMES, TOOL_DEFINITIONS, callTool } from './tools.js';
+import {
+  MCP_TOOL_NAMES,
+  SCM_TOOL_NAMES,
+  TOOL_DEFINITIONS,
+  callScmTool,
+  callTool,
+} from './tools.js';
+
+function scmPort(): ScmPort {
+  return defineGithubScmAdapter(createMemoryScmTransport());
+}
 
 function githubPort(): IssuesPort {
   const transport = createMemoryTransport({
@@ -180,6 +191,56 @@ describe('callTool', () => {
       fromId: '1',
       toId: '2',
       type: 'mentions',
+    });
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent?.code).toBe('INVALID_ARGS');
+  });
+});
+
+describe('callScmTool', () => {
+  it('creates a branch', async () => {
+    const result = await callScmTool(scmPort(), SCM_TOOL_NAMES.branchCreate, {
+      name: 'feature/x',
+      fromBranch: 'main',
+    });
+    expect(result.isError).toBeUndefined();
+    expect(parse(result.content[0]?.text ?? '{}').name).toBe('feature/x');
+  });
+
+  it('opens a draft pull request', async () => {
+    const result = await callScmTool(scmPort(), SCM_TOOL_NAMES.prCreate, {
+      title: 'PR',
+      sourceBranch: 'feature/x',
+      targetBranch: 'main',
+      draft: true,
+    });
+    expect(result.isError).toBeUndefined();
+    expect(parse(result.content[0]?.text ?? '{}').draft).toBe(true);
+  });
+
+  it('adds a pull request thread', async () => {
+    const port = scmPort();
+    const pr = parse(
+      await callScmTool(port, SCM_TOOL_NAMES.prCreate, {
+        title: 'PR',
+        sourceBranch: 'feature/x',
+        targetBranch: 'main',
+      }).then((r) => r.content[0]?.text ?? '{}'),
+    );
+    const result = await callScmTool(port, SCM_TOOL_NAMES.prThread, {
+      pullRequestId: pr.id,
+      body: 'looks good',
+    });
+    expect(result.isError).toBeUndefined();
+    expect(parse(result.content[0]?.text ?? '{}').id).toBeTruthy();
+  });
+
+  it('rejects a non-boolean draft as INVALID_ARGS', async () => {
+    const result = await callScmTool(scmPort(), SCM_TOOL_NAMES.prCreate, {
+      title: 'PR',
+      sourceBranch: 'feature/x',
+      targetBranch: 'main',
+      draft: 'yes',
     });
     expect(result.isError).toBe(true);
     expect(result.structuredContent?.code).toBe('INVALID_ARGS');

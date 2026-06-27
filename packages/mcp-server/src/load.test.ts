@@ -4,11 +4,11 @@ import { join } from 'node:path';
 import { BaronError, type BaronPolicyFile, serializePolicy } from '@baron/core';
 import { policyPath } from '@baron/providers';
 import { describe, expect, it } from 'vitest';
-import { loadIssuesPort } from './load.js';
+import { loadPorts } from './load.js';
 
 const githubPolicy: BaronPolicyFile = {
   version: 1,
-  providers: { issues: 'github' },
+  providers: { issues: 'github', scm: 'github' },
   roleMap: {
     github: {
       stateKey: 'label',
@@ -32,19 +32,20 @@ function withTempRoot(fn: (root: string) => void): void {
   }
 }
 
-describe('loadIssuesPort', () => {
+describe('loadPorts', () => {
   it('throws POLICY_NOT_FOUND when no policy exists', () => {
     withTempRoot((root) => {
-      expect(() => loadIssuesPort(root, dummyEnv)).toThrow(BaronError);
+      expect(() => loadPorts(root, dummyEnv)).toThrow(BaronError);
     });
   });
 
-  it('builds a live issues port from a committed policy', () => {
+  it('builds the issues and scm ports bound by the policy', () => {
     withTempRoot((root) => {
       mkdirSync(join(root, '.baron'), { recursive: true });
       writeFileSync(policyPath(root), serializePolicy(githubPolicy), 'utf8');
-      const port = loadIssuesPort(root, dummyEnv);
-      expect(port.manifest.provider).toBe('github');
+      const ports = loadPorts(root, dummyEnv);
+      expect(ports.issues?.manifest.provider).toBe('github');
+      expect(ports.scm?.manifest.provider).toBe('github');
     });
   });
 });

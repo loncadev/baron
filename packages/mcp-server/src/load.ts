@@ -1,22 +1,45 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { BaronError, type IssuesPort, parsePolicy, resolveIssuesConfig } from '@baron/core';
-import { type Env, buildIssuesPort, policyPath } from '@baron/providers';
+import { BaronError, parseGapPolicy, parsePolicy, resolveIssuesConfig } from '@baron/core';
+import { type Env, buildIssuesPort, buildScmPort, policyPath } from '@baron/providers';
+import type { McpPorts } from './tools.js';
 
 /**
- * Load the committed policy and build the live {@link IssuesPort} the server serves. A missing
- * policy is a server-lifecycle failure (POLICY_NOT_FOUND) — only a human running `baron init` can
- * fix it — so it throws here rather than starting a server that errors on every call. Credentials
- * come from `env`, never from the committed policy.
+ * Load the committed policy and build the live ports it binds. The issues and scm ports are
+ * independent (a policy may bind either or both); a missing policy is a server-lifecycle failure
+ * (POLICY_NOT_FOUND) and so is a policy that binds neither port. Credentials come from `env`, never
+ * from the committed policy.
  */
-export function loadIssuesPort(root: string, env: Env): IssuesPort {
+export function loadPorts(root: string, env: Env): McpPorts {
   const path = policyPath(root);
-  if (!existsSync(path)) {
+  const raw = existsSync(path) ? readFileSync(path, 'utf8') : undefined;
+  if (raw === undefined) {
     throw new BaronError(
       `No policy found at ${path}. Run \`baron init\` first.`,
       'POLICY_NOT_FOUND',
     );
   }
-  const policy = parsePolicy(JSON.parse(readFileSync(path, 'utf8')));
-  const config = resolveIssuesConfig(policy);
-  return buildIssuesPort(config, env);
+
+  const policy = parsePolicy(JSON.parse(raw));
+  const ports: {
+    issues?: ReturnType<typeof buildIssuesPort>;
+    scm?: ReturnType<typeof buildScmPort>;
+  } = {};
+
+  if (policy.providers.issues !== undefined) {
+    ports.issues = buildIssuesPort(resolveIssuesConfig(policy), env);
+  }
+
+  const scmProvider = policy.providers.scm;
+  if (scmProvider !== undefined) {
+    const gapPolicy = parseGapPolicy(policy.gapPolicy?.[scmProvider] ?? {});
+    ports.scm = buildScmPort(scmProvider, env, gapPolicy);
+  }
+
+  if (ports.issues === undefined && ports.scm === undefined) {
+    throw new BaronError(
+      `Policy at ${path} binds neither an issues nor an scm provider; nothing to serve.`,
+      'NO_PORTS',
+    );
+  }
+  return ports;
 }
