@@ -31,11 +31,20 @@ export function runIssuesConformance(target: IssuesConformanceTarget): void {
   describe(`issues conformance: ${target.label}`, () => {
     it('create returns a normalized issue', async () => {
       const { adapter } = target.build({});
-      const issue = await adapter.create({ title: 'Hello', typeRole: 'task' });
+      const issue = await adapter.create({
+        title: 'Hello',
+        typeRole: 'task',
+        labels: ['conformance-label'],
+      });
       expect(issue.provider).toBe(adapter.manifest.provider);
       expect(issue.key).toBeTruthy();
       expect(issue.title).toBe('Hello');
       expect(issue.nativeType).toBeTruthy();
+      // A provider with native labels must persist labels supplied at creation (a transport that
+      // drops them is a silent capability gap — invariant #5).
+      if (adapter.manifest.issues.nativeLabels) {
+        expect(issue.labels).toContain('conformance-label');
+      }
       // Reverse type-role resolution is best-effort: providers that collapse every type role
       // onto one native type (GitHub -> 'issue') cannot round-trip the exact role from the native
       // type alone. Faithful round-trip on such providers needs label emulation (same pattern as

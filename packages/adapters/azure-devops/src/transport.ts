@@ -104,6 +104,15 @@ export function createAzureDevOpsTransport(options: AzureDevOpsTransportOptions)
       if (input.body !== undefined) {
         ops.push({ op: Operation.Add, path: fieldPath(FIELD.DESCRIPTION), value: input.body });
       }
+      if (input.labels.length > 0) {
+        // System.Tags is the inverse of parseTags on read; without this, labels (and any emulated
+        // parent:<id> label) would be silently dropped despite the nativeLabels capability.
+        ops.push({
+          op: Operation.Add,
+          path: fieldPath(FIELD.TAGS),
+          value: input.labels.join('; '),
+        });
+      }
       if (input.parentId !== undefined) {
         ops.push({
           op: Operation.Add,
