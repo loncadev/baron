@@ -11,3 +11,4 @@ export * from './proposal.js';
 export * from './role-resolver.js';
 export * from './issue.js';
 export * from './ports.js';
+export * from './scm.js';

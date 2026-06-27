@@ -13,8 +13,11 @@ export type GapBehavior =
   | { readonly kind: 'emulate'; readonly strategy: string }
   | { readonly kind: 'degrade' };
 
-/** Per-capability gap behavior. Capabilities absent from the map default to `error` (strict). */
-export type GapPolicy = Partial<Record<CapabilityName, GapBehavior>>;
+/**
+ * Per-capability gap behavior. Keyed by capability name (string) so the same policy shape serves
+ * every port (issues, scm, ...). Capabilities absent from the map default to `error` (strict).
+ */
+export type GapPolicy = Partial<Record<string, GapBehavior>>;
 
 /**
  * Parse the on-disk string form into a GapBehavior.
@@ -50,30 +53,48 @@ export interface GapResolution {
 }
 
 /**
- * Decide what happens for one needed-but-unsupported capability. `error` throws; `emulate` and
- * `degrade` both return `proceed: true` after logging a warning so the gap is never silent.
+ * Port-agnostic gap resolution. `supported` is whether the provider has the capability (read from
+ * the relevant port's manifest by the caller). `error` throws; `emulate` and `degrade` both return
+ * `proceed: true` after logging a warning so the gap is never silent. Used by every port.
  */
-export function resolveGap(
-  capability: CapabilityName,
-  manifest: CapabilityManifest,
+export function resolveCapabilityGap(
+  supported: boolean,
+  capability: string,
+  provider: string,
   policy: GapPolicy,
   logger: Logger,
 ): GapResolution {
-  if (manifest.issues[capability]) {
+  if (supported) {
     return { proceed: true, behavior: { kind: 'emulate', strategy: 'native' } };
   }
 
   const behavior = policy[capability] ?? { kind: 'error' };
 
   if (behavior.kind === 'error') {
-    throw new CapabilityGapError(capability, manifest.provider);
+    throw new CapabilityGapError(capability, provider);
   }
 
   logger.warn(`capability gap handled by '${behavior.kind}' policy`, {
     capability,
-    provider: manifest.provider,
+    provider,
     strategy: behavior.kind === 'emulate' ? behavior.strategy : undefined,
   });
 
   return { proceed: true, behavior };
+}
+
+/** Issues-port gap resolution: reads the capability from the issues manifest. */
+export function resolveGap(
+  capability: CapabilityName,
+  manifest: CapabilityManifest,
+  policy: GapPolicy,
+  logger: Logger,
+): GapResolution {
+  return resolveCapabilityGap(
+    manifest.issues[capability],
+    capability,
+    manifest.provider,
+    policy,
+    logger,
+  );
 }
