@@ -1,7 +1,8 @@
 import type { CapabilityManifest } from './capabilities.js';
 import type { IssuesProviderConfig, NativeTarget } from './config.js';
 import { BaronError } from './errors.js';
-import type { Issue, IssueDraft } from './issue.js';
+import type { Issue, IssueComment, IssueDraft, IssueQuery } from './issue.js';
+import type { IssueLinkType } from './links.js';
 import type { Logger } from './logger.js';
 import { silentLogger } from './logger.js';
 import { resolveGap } from './policy.js';
@@ -30,6 +31,26 @@ export interface NativeCreateInput {
   readonly labels: readonly string[];
 }
 
+/** A raw comment as a provider transport speaks it (before normalization to {@link IssueComment}). */
+export interface NativeComment {
+  readonly id: string;
+  readonly body: string;
+  readonly author?: string | undefined;
+  readonly createdAt?: string | undefined;
+  readonly url?: string | undefined;
+}
+
+/**
+ * A query the transport executes, expressed in already-translated native terms: `target` is the
+ * role's native discriminator (the transport reads its own key, e.g. state or label), `nativeType`
+ * the work-item type. The role→native translation happened in {@link BaseIssuesAdapter}.
+ */
+export interface NativeQuery {
+  readonly target?: NativeTarget | undefined;
+  readonly nativeType?: string | undefined;
+  readonly limit?: number | undefined;
+}
+
 /**
  * The thin, provider-specific transport an adapter delegates I/O to. Real implementations call
  * the vendor SDK; tests pass an in-memory fake. Keeping this separate from the translation logic
@@ -39,6 +60,10 @@ export interface IssuesTransport {
   createIssue(input: NativeCreateInput): Promise<NativeIssue>;
   getIssue(id: string): Promise<NativeIssue>;
   applyTarget(id: string, target: NativeTarget): Promise<NativeIssue>;
+  addComment(id: string, body: string): Promise<NativeComment>;
+  /** Create a native typed link. Only called when the manifest declares `issueLinks`. */
+  linkIssues(fromId: string, toId: string, nativeLinkType: string): Promise<void>;
+  queryIssues(query: NativeQuery): Promise<readonly NativeIssue[]>;
 }
 
 /** The normalized primitive surface the core exposes for the `issues` port. */
@@ -47,6 +72,9 @@ export interface IssuesPort {
   create(draft: IssueDraft): Promise<Issue>;
   get(id: string): Promise<Issue>;
   transition(id: string, role: WorkflowRole): Promise<Issue>;
+  comment(id: string, body: string): Promise<IssueComment>;
+  link(fromId: string, toId: string, type: IssueLinkType): Promise<void>;
+  query(filter: IssueQuery): Promise<readonly Issue[]>;
 }
 
 /**
@@ -126,6 +154,69 @@ export class BaseIssuesAdapter implements IssuesPort {
     }
 
     return this.toIssue(await this.transport.applyTarget(id, target));
+  }
+
+  async comment(id: string, body: string): Promise<IssueComment> {
+    if (!this.manifest.issues.comments) {
+      resolveGap('comments', this.manifest, this.cfg.gapPolicy, this.logger);
+    }
+    const native = await this.transport.addComment(id, body);
+    return {
+      id: native.id,
+      body: native.body,
+      author: native.author,
+      createdAt: native.createdAt,
+      url: native.url,
+    };
+  }
+
+  async link(fromId: string, toId: string, type: IssueLinkType): Promise<void> {
+    if (this.manifest.issues.issueLinks) {
+      const nativeLinkType = this.cfg.linkMap?.[type];
+      if (nativeLinkType === undefined) {
+        throw new BaronError(
+          `No native link mapping for link type '${type}' on provider '${this.cfg.provider}'. ` +
+            'Add it to the adapter link map.',
+          'LINK_MAPPING',
+        );
+      }
+      await this.transport.linkIssues(fromId, toId, nativeLinkType);
+      return;
+    }
+
+    const { behavior } = resolveGap('issueLinks', this.manifest, this.cfg.gapPolicy, this.logger);
+    if (behavior.kind === 'emulate') {
+      if (behavior.strategy === 'labels') {
+        // Mirror hierarchy emulation: encode the link as a label on the source issue.
+        await this.transport.applyTarget(fromId, { label: `${type}:${toId}` });
+      } else {
+        throw new BaronError(
+          `Unsupported issueLinks emulation strategy '${behavior.strategy}' for provider ` +
+            `'${this.cfg.provider}'. Supported: 'labels'.`,
+          'GAP_STRATEGY',
+        );
+      }
+    }
+    // 'degrade' intentionally drops the link; resolveGap already logged a warning.
+  }
+
+  async query(filter: IssueQuery): Promise<readonly Issue[]> {
+    const nativeType =
+      filter.typeRole === undefined ? undefined : this.cfg.typeMap[filter.typeRole];
+    if (filter.typeRole !== undefined && nativeType === undefined) {
+      throw new BaronError(
+        `No native type mapping for type role '${filter.typeRole}' on provider ` +
+          `'${this.cfg.provider}'. Add it to policy.typeMap.`,
+        'TYPE_MAPPING',
+      );
+    }
+    const query = {
+      ...(filter.role !== undefined ? { target: this.resolver.toNative(filter.role) } : {}),
+      ...(nativeType !== undefined ? { nativeType } : {}),
+      ...(filter.limit !== undefined ? { limit: filter.limit } : {}),
+    };
+    const natives = await this.transport.queryIssues(query);
+    return natives.map((native) => this.toIssue(native));
   }
 
   private toIssue(native: NativeIssue): Issue {

@@ -35,6 +35,8 @@ const githubManifest: CapabilityManifest = {
     sprints: false,
     arbitraryStates: false,
     nativeLabels: true,
+    comments: true,
+    issueLinks: false,
   },
 };
 

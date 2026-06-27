@@ -3,6 +3,7 @@ import {
   type CapabilityManifest,
   type IssuesProviderConfig,
   type IssuesTransport,
+  type LinkMap,
   type Logger,
   type ProviderRoleMap,
   type TypeMap,
@@ -23,6 +24,8 @@ export const azureDevOpsManifest: CapabilityManifest = {
     sprints: true,
     arbitraryStates: true,
     nativeLabels: true,
+    comments: true,
+    issueLinks: true,
   },
 };
 
@@ -47,6 +50,14 @@ export const exampleAzureDevOpsTypeMap: TypeMap = {
   subtask: 'Task',
 };
 
+/** Abstract link types onto Azure's fixed native link reference names. */
+export const exampleAzureDevOpsLinkMap: LinkMap = {
+  relates: 'System.LinkTypes.Related',
+  blocks: 'System.LinkTypes.Dependency-Forward',
+  blocked_by: 'System.LinkTypes.Dependency-Reverse',
+  duplicates: 'System.LinkTypes.Duplicate-Forward',
+};
+
 export type AzureDevOpsIssuesConfig = Omit<IssuesProviderConfig, 'provider'>;
 
 /**
@@ -60,7 +71,7 @@ export function defineAzureDevOpsIssuesAdapter(
 ): BaseIssuesAdapter {
   return new BaseIssuesAdapter(
     azureDevOpsManifest,
-    { ...config, provider: AZURE_DEVOPS_PROVIDER },
+    { linkMap: exampleAzureDevOpsLinkMap, ...config, provider: AZURE_DEVOPS_PROVIDER },
     transport,
     logger,
   );

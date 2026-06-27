@@ -4,6 +4,7 @@ import {
   type GapPolicy,
   type IssuesProviderConfig,
   type IssuesTransport,
+  type LinkMap,
   type Logger,
   type ProviderRoleMap,
   type TypeMap,
@@ -26,6 +27,8 @@ export const githubManifest: CapabilityManifest = {
     sprints: false,
     arbitraryStates: false,
     nativeLabels: true,
+    comments: true,
+    issueLinks: false,
   },
 };
 
@@ -47,6 +50,9 @@ export const exampleGithubTypeMap: TypeMap = {
   subtask: 'issue',
 };
 
+/** GitHub has no native typed links; links are emulated/degraded per the gap policy, so this is empty. */
+export const exampleGithubLinkMap: LinkMap = {};
+
 /**
  * Recommended gap policy for GitHub: emulate hierarchy and arbitrary states via labels, and drop
  * sprints with a warning. Installations may override; the point is the choice is explicit, not a
@@ -56,6 +62,7 @@ export const recommendedGithubGapPolicy: GapPolicy = {
   hierarchy: { kind: 'emulate', strategy: 'labels' },
   arbitraryStates: { kind: 'emulate', strategy: 'labels' },
   sprints: { kind: 'degrade' },
+  issueLinks: { kind: 'emulate', strategy: 'labels' },
 };
 
 export type GithubIssuesConfig = Omit<IssuesProviderConfig, 'provider'>;
@@ -67,7 +74,7 @@ export function defineGithubIssuesAdapter(
 ): BaseIssuesAdapter {
   return new BaseIssuesAdapter(
     githubManifest,
-    { ...config, provider: GITHUB_PROVIDER },
+    { linkMap: exampleGithubLinkMap, ...config, provider: GITHUB_PROVIDER },
     transport,
     logger,
   );

@@ -20,6 +20,23 @@ export interface Issue {
   readonly provider: string;
 }
 
+/** A normalized comment on an issue, independent of the backing provider. */
+export interface IssueComment {
+  readonly id: string;
+  readonly body: string;
+  readonly author?: string | undefined;
+  /** ISO-8601 creation timestamp, when the provider supplies one. */
+  readonly createdAt?: string | undefined;
+  readonly url?: string | undefined;
+}
+
+/** Filter for `issue.query`, expressed in abstract terms. All fields are optional (AND-combined). */
+export interface IssueQuery {
+  readonly role?: WorkflowRole | undefined;
+  readonly typeRole?: WorkItemTypeRole | undefined;
+  readonly limit?: number | undefined;
+}
+
 /** Input to `issue.create`, expressed in abstract terms. */
 export interface IssueDraft {
   readonly title: string;

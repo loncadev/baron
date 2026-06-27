@@ -124,5 +124,58 @@ export function runIssuesConformance(target: IssuesConformanceTarget): void {
         expect(emu.logger.entries.some((e) => e.level === 'warn')).toBe(true);
       });
     });
+
+    it('declares the comments and issueLinks capabilities', () => {
+      const { adapter } = target.build({});
+      expect(typeof adapter.manifest.issues.comments).toBe('boolean');
+      expect(typeof adapter.manifest.issues.issueLinks).toBe('boolean');
+    });
+
+    it('comment adds a comment and returns it normalized', async () => {
+      const { adapter } = target.build({});
+      const issue = await adapter.create({ title: 'x', typeRole: 'task' });
+      const comment = await adapter.comment(issue.id, 'hello there');
+      expect(comment.id).toBeTruthy();
+      expect(comment.body).toBe('hello there');
+    });
+
+    it('query filters by role and by type role', async () => {
+      const { adapter } = target.build(emulateStates);
+      const issue = await adapter.create({ title: 'q', typeRole: 'task' });
+      await adapter.transition(issue.id, target.mappedMidRole);
+
+      const byRole = await adapter.query({ role: target.mappedMidRole });
+      expect(byRole.some((i) => i.id === issue.id)).toBe(true);
+
+      const byType = await adapter.query({ typeRole: 'task' });
+      expect(byType.some((i) => i.id === issue.id)).toBe(true);
+    });
+
+    describe('link handling per manifest + policy', () => {
+      it('native links succeed; flat providers emulate or error', async () => {
+        const probe = target.build({});
+        const a = await probe.adapter.create({ title: 'a', typeRole: 'task' });
+        const b = await probe.adapter.create({ title: 'b', typeRole: 'task' });
+
+        if (probe.adapter.manifest.issues.issueLinks) {
+          await expect(probe.adapter.link(a.id, b.id, 'relates')).resolves.toBeUndefined();
+          return;
+        }
+
+        // Flat provider, strict policy -> loud failure, never silent.
+        await expect(probe.adapter.link(a.id, b.id, 'relates')).rejects.toBeInstanceOf(
+          CapabilityGapError,
+        );
+
+        // Flat provider, emulate:labels -> link encoded as a label on the source + a warning.
+        const emu = target.build({ issueLinks: { kind: 'emulate', strategy: 'labels' } });
+        const ea = await emu.adapter.create({ title: 'a', typeRole: 'task' });
+        const eb = await emu.adapter.create({ title: 'b', typeRole: 'task' });
+        await emu.adapter.link(ea.id, eb.id, 'blocks');
+        const fetched = await emu.adapter.get(ea.id);
+        expect(fetched.labels.some((l) => l.startsWith('blocks:'))).toBe(true);
+        expect(emu.logger.entries.some((e) => e.level === 'warn')).toBe(true);
+      });
+    });
   });
 }

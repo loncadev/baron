@@ -1,3 +1,4 @@
+import type { IssueLinkType } from './links.js';
 import type { GapPolicy } from './policy.js';
 import type { WorkItemTypeRole, WorkflowRole } from './roles.js';
 
@@ -21,10 +22,19 @@ export interface ProviderRoleMap {
 /** Map of abstract type roles onto provider-native work-item type names. */
 export type TypeMap = Partial<Record<WorkItemTypeRole, string>>;
 
+/**
+ * Map of abstract link types onto provider-native link type names (Azure `System.LinkTypes.*`).
+ * Unlike the role/type maps this is FIXED provider knowledge, not install-specific config, so the
+ * adapter supplies it rather than `policy.json`.
+ */
+export type LinkMap = Partial<Record<IssueLinkType, string>>;
+
 /** Everything an `issues` adapter needs that is policy (committed), not credentials. */
 export interface IssuesProviderConfig {
   readonly provider: string;
   readonly roleMap: ProviderRoleMap;
   readonly typeMap: TypeMap;
   readonly gapPolicy: GapPolicy;
+  /** Abstract→native link types. Adapter-supplied (fixed provider knowledge); defaults to empty. */
+  readonly linkMap?: LinkMap;
 }

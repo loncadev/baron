@@ -1,4 +1,11 @@
-import type { IssuesTransport, NativeCreateInput, NativeIssue, NativeTarget } from '@baron/core';
+import type {
+  IssuesTransport,
+  NativeComment,
+  NativeCreateInput,
+  NativeIssue,
+  NativeQuery,
+  NativeTarget,
+} from '@baron/core';
 
 interface Rec {
   id: string;
@@ -10,6 +17,7 @@ interface Rec {
   parentId: string | undefined;
   labels: string[];
   url: string;
+  links: Array<{ toId: string; type: string }>;
 }
 
 export interface MemoryTransportOptions {
@@ -27,6 +35,7 @@ export interface MemoryTransportOptions {
  */
 export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTransport {
   let seq = 0;
+  let commentSeq = 0;
   const store = new Map<string, Rec>();
 
   const snapshot = (r: Rec): NativeIssue => ({
@@ -61,6 +70,7 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
         parentId: input.parentId,
         labels: [...input.labels],
         url: `mem://${id}`,
+        links: [],
       };
       store.set(id, rec);
       return snapshot(rec);
@@ -77,6 +87,29 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
       const label = target.label;
       if (label !== undefined && !rec.labels.includes(label)) rec.labels.push(label);
       return snapshot(rec);
+    },
+
+    async addComment(id: string, body: string): Promise<NativeComment> {
+      must(id);
+      commentSeq += 1;
+      return { id: `mem-comment-${commentSeq}`, body, url: `mem://comment/${commentSeq}` };
+    },
+
+    async linkIssues(fromId: string, toId: string, nativeLinkType: string): Promise<void> {
+      const rec = must(fromId);
+      must(toId);
+      rec.links.push({ toId, type: nativeLinkType });
+    },
+
+    async queryIssues(query: NativeQuery): Promise<readonly NativeIssue[]> {
+      const discriminator = query.target?.[opts.stateKey];
+      const results: NativeIssue[] = [];
+      for (const rec of store.values()) {
+        if (discriminator !== undefined && rec.discriminator !== discriminator) continue;
+        if (query.nativeType !== undefined && rec.nativeType !== query.nativeType) continue;
+        results.push(snapshot(rec));
+      }
+      return query.limit !== undefined ? results.slice(0, query.limit) : results;
     },
   };
 }

@@ -1,4 +1,11 @@
-import type { IssuesTransport, NativeCreateInput, NativeIssue, NativeTarget } from '@baron/core';
+import type {
+  IssuesTransport,
+  NativeComment,
+  NativeCreateInput,
+  NativeIssue,
+  NativeQuery,
+  NativeTarget,
+} from '@baron/core';
 import * as azdev from 'azure-devops-node-api';
 import {
   type WorkItem,
@@ -39,6 +46,11 @@ type WitApi = Awaited<ReturnType<InstanceType<typeof azdev.WebApi>['getWorkItemT
 
 function fieldPath(refName: string): string {
   return `/fields/${refName}`;
+}
+
+/** Escape a value for embedding in a single-quoted WIQL string literal. */
+function escapeWiql(value: string): string {
+  return value.replace(/'/g, "''");
 }
 
 function parseTrailingId(url: string | undefined): string | undefined {
@@ -158,6 +170,61 @@ export function createAzureDevOpsTransport(options: AzureDevOpsTransportOptions)
       // State + column go in ONE patch (atomic transition, per ARCHITECTURE decision #6).
       const updated = await witApi.updateWorkItem(null, ops, numId);
       return toNative(updated, state);
+    },
+
+    async addComment(id: string, body: string): Promise<NativeComment> {
+      const witApi = await api();
+      const comment = await witApi.addComment({ text: body }, project, Number(id));
+      return {
+        id: String(comment.id ?? ''),
+        body: comment.text ?? body,
+        author: comment.createdBy?.displayName,
+        createdAt: comment.createdDate?.toISOString(),
+        url: comment.url,
+      };
+    },
+
+    async linkIssues(fromId: string, toId: string, nativeLinkType: string): Promise<void> {
+      const witApi = await api();
+      await witApi.updateWorkItem(
+        null,
+        [
+          {
+            op: Operation.Add,
+            path: '/relations/-',
+            value: { rel: nativeLinkType, url: `${orgUrl}/_apis/wit/workItems/${toId}` },
+          },
+        ],
+        Number(fromId),
+      );
+    },
+
+    async queryIssues(query: NativeQuery): Promise<readonly NativeIssue[]> {
+      const witApi = await api();
+      const clauses: string[] = [];
+      const state = query.target?.[TARGET.STATE];
+      if (state !== undefined) clauses.push(`[System.State] = '${escapeWiql(state)}'`);
+      if (query.nativeType !== undefined) {
+        clauses.push(`[System.WorkItemType] = '${escapeWiql(query.nativeType)}'`);
+      }
+      const where = clauses.length > 0 ? ` WHERE ${clauses.join(' AND ')}` : '';
+      const wiql = `SELECT [System.Id] FROM WorkItems${where}`;
+
+      const result = await witApi.queryByWiql({ query: wiql }, { project }, undefined, query.limit);
+      const ids = (result.workItems ?? [])
+        .map((ref) => ref.id)
+        .filter((id): id is number => id !== undefined);
+      if (ids.length === 0) return [];
+
+      const items = await witApi.getWorkItems(
+        ids,
+        undefined,
+        undefined,
+        WorkItemExpand.All,
+        undefined,
+        project,
+      );
+      return items.map((item) => toNative(item));
     },
   };
 }

@@ -19,6 +19,13 @@ export interface IssuesCapabilities {
   arbitraryStates: boolean;
   /** First-class labels/tags. */
   nativeLabels: boolean;
+  /** Comments/discussion on a work item. */
+  comments: boolean;
+  /**
+   * Native, typed links between work items beyond hierarchy (relates / blocks / duplicates).
+   * Azure: yes (System.LinkTypes.*); GitHub issues: no (must be emulated or degraded).
+   */
+  issueLinks: boolean;
 }
 
 export type CapabilityName = keyof IssuesCapabilities;

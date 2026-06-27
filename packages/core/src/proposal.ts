@@ -159,8 +159,10 @@ export function proposeGapPolicy(manifest: CapabilityManifest): {
 
   if (!caps.hierarchy) gapPolicy.hierarchy = 'emulate:labels';
   if (!caps.arbitraryStates) gapPolicy.arbitraryStates = 'emulate:labels';
+  if (!caps.issueLinks) gapPolicy.issueLinks = 'emulate:labels';
   if (!caps.sprints) gapPolicy.sprints = 'degrade';
   if (!caps.subIssues) gapPolicy.subIssues = 'degrade';
+  if (!caps.comments) gapPolicy.comments = 'degrade';
 
   if (!caps.nativeLabels && (gapPolicy.hierarchy || gapPolicy.arbitraryStates)) {
     notes.push(

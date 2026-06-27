@@ -12,6 +12,8 @@ const richManifest: CapabilityManifest = {
     sprints: true,
     arbitraryStates: true,
     nativeLabels: true,
+    comments: true,
+    issueLinks: true,
   },
 };
 
@@ -38,6 +40,8 @@ const flatManifest: CapabilityManifest = {
     sprints: false,
     arbitraryStates: false,
     nativeLabels: true,
+    comments: true,
+    issueLinks: false,
   },
 };
 

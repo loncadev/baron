@@ -1,4 +1,12 @@
-import type { IssuesTransport, NativeCreateInput, NativeIssue, NativeTarget } from '@baron/core';
+import {
+  BaronError,
+  type IssuesTransport,
+  type NativeComment,
+  type NativeCreateInput,
+  type NativeIssue,
+  type NativeQuery,
+  type NativeTarget,
+} from '@baron/core';
 import { Octokit } from 'octokit';
 
 export interface GithubTransportOptions {
@@ -101,6 +109,55 @@ export function createGithubTransport(options: GithubTransportOptions): IssuesTr
       const { data } = await octokit.rest.issues.get({ owner, repo, issue_number });
       // Echo the role-bearing token we just applied so reverse role lookup resolves immediately.
       return toNative(data, roleLabel ?? state);
+    },
+
+    async addComment(id: string, body: string): Promise<NativeComment> {
+      const { data } = await octokit.rest.issues.createComment({
+        owner,
+        repo,
+        issue_number: Number(id),
+        body,
+      });
+      return {
+        id: String(data.id),
+        body: data.body ?? body,
+        author: data.user?.login,
+        createdAt: data.created_at,
+        url: data.html_url,
+      };
+    },
+
+    async linkIssues(): Promise<void> {
+      // Unreachable: githubManifest.issues.issueLinks is false, so the core negotiates the gap
+      // (emulate via labels / degrade) and never calls this. Fail loudly if that ever changes.
+      throw new BaronError(
+        'GitHub has no native typed issue links; links are handled by the gap policy, not the ' +
+          'transport.',
+        'NOT_SUPPORTED',
+      );
+    },
+
+    async queryIssues(query: NativeQuery): Promise<readonly NativeIssue[]> {
+      const state = query.target?.[TARGET.STATE];
+      const label = query.target?.[TARGET.LABEL];
+      const { data } = await octokit.rest.issues.listForRepo({
+        owner,
+        repo,
+        // A label-only filter should still match closed issues; default to 'all' unless the target
+        // pins a state. GitHub's union enum is open | closed | all.
+        state:
+          state === GH_STATE.CLOSED
+            ? GH_STATE.CLOSED
+            : state === GH_STATE.OPEN
+              ? GH_STATE.OPEN
+              : 'all',
+        ...(label !== undefined ? { labels: label } : {}),
+        per_page: query.limit ?? 100,
+      });
+      // listForRepo also returns pull requests (GitHub models them as issues) — drop them.
+      return data
+        .filter((item) => item.pull_request === undefined)
+        .map((item) => toNative(item as unknown as IssueResponse));
     },
   };
 }
