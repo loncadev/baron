@@ -1,9 +1,8 @@
 import { BaronError } from '@baron/core';
+import { type Env, KNOWN_PROVIDERS } from '@baron/providers';
 import { runDoctor } from './doctor.js';
 import { runInit } from './init.js';
 import type { FileSystem, Prompter } from './ports.js';
-import { KNOWN_PROVIDERS } from './registry.js';
-import type { Env } from './registry.js';
 
 export interface CliPorts {
   readonly fs: FileSystem;

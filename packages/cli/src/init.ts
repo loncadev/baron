@@ -6,6 +6,7 @@ import {
   proposePolicy,
   serializePolicy,
 } from '@baron/core';
+import { type Env, type ProviderDescriptor, getProviderDescriptor } from '@baron/providers';
 import {
   BARON_DIR,
   CREDENTIALS_IGNORE_ENTRY,
@@ -14,7 +15,6 @@ import {
   policyPath,
 } from './paths.js';
 import type { FileSystem, Prompter } from './ports.js';
-import { type Env, type ProviderDescriptor, getProviderDescriptor } from './registry.js';
 
 export interface InitOptions {
   readonly root: string;

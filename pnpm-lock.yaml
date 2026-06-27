@@ -55,15 +55,12 @@ importers:
 
   packages/cli:
     dependencies:
-      '@baron/adapter-azure-devops':
-        specifier: workspace:*
-        version: link:../adapters/azure-devops
-      '@baron/adapter-github':
-        specifier: workspace:*
-        version: link:../adapters/github
       '@baron/core':
         specifier: workspace:*
         version: link:../core
+      '@baron/providers':
+        specifier: workspace:*
+        version: link:../providers
     devDependencies:
       '@baron/conformance':
         specifier: workspace:*
@@ -82,6 +79,18 @@ importers:
         version: 2.1.9(@types/node@22.20.0)
 
   packages/core: {}
+
+  packages/providers:
+    dependencies:
+      '@baron/adapter-azure-devops':
+        specifier: workspace:*
+        version: link:../adapters/azure-devops
+      '@baron/adapter-github':
+        specifier: workspace:*
+        version: link:../adapters/github
+      '@baron/core':
+        specifier: workspace:*
+        version: link:../core
 
 packages:
 

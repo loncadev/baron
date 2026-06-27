@@ -1,7 +1,7 @@
 import { BaronError, type Introspector, parsePolicy, resolveIssuesConfig } from '@baron/core';
+import { type Env, getProviderDescriptor } from '@baron/providers';
 import { policyPath } from './paths.js';
 import type { FileSystem } from './ports.js';
-import { type Env, getProviderDescriptor } from './registry.js';
 
 export interface DoctorOptions {
   readonly root: string;

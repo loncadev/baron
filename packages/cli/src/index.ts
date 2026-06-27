@@ -1,6 +1,6 @@
+export * from '@baron/providers';
 export * from './ports.js';
 export * from './paths.js';
-export * from './registry.js';
 export * from './init.js';
 export * from './doctor.js';
 export * from './cli.js';
