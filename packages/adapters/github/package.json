@@ -24,9 +24,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@baron/core": "workspace:*"
+    "@baron/core": "workspace:*",
+    "octokit": "^5.0.5"
   },
   "devDependencies": {
-    "@baron/conformance": "workspace:*"
+    "@baron/conformance": "workspace:*",
+    "@types/node": "^22.0.0"
   }
 }

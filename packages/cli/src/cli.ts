@@ -112,10 +112,13 @@ export async function runCli(argv: readonly string[], ports: CliPorts): Promise<
         return 1;
     }
   } catch (error) {
+    // Catch-all so a live provider failure (auth/network) surfaces as a clean non-zero exit rather
+    // than a raw stack trace; BaronErrors additionally carry an actionable code.
     if (error instanceof BaronError) {
       ports.err(`error [${error.code}]: ${error.message}`);
-      return 1;
+    } else {
+      ports.err(`error: ${error instanceof Error ? error.message : String(error)}`);
     }
-    throw error;
+    return 1;
   }
 }

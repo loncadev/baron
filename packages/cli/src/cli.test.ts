@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { type CliPorts, runCli } from './cli.js';
 import { memoryFileSystem, scriptedPrompter } from './fakes.js';
+import { policyPath } from './paths.js';
 
 function harness(seed: Record<string, string> = {}) {
   const out: string[] = [];
@@ -35,10 +36,11 @@ describe('runCli', () => {
   });
 
   it('surfaces a BaronError as a non-zero exit with the error code', async () => {
-    // The live introspector is a NOT_IMPLEMENTED stub, so a real init fails loudly (never silent).
-    const { ports, err } = harness();
-    expect(await runCli(['init', '--provider', 'github'], ports)).toBe(1);
-    expect(err.join('\n')).toContain('NOT_IMPLEMENTED');
+    // A malformed (but valid-JSON) policy fails validation with an actionable, coded BaronError —
+    // an offline, deterministic way to prove the error surface (no live provider call).
+    const { ports, err } = harness({ [policyPath('/repo')]: '{"version":2}' });
+    expect(await runCli(['doctor', '--root', '/repo'], ports)).toBe(1);
+    expect(err.join('\n')).toContain('POLICY_PARSE');
   });
 
   it('exits 1 on an unknown provider', async () => {
