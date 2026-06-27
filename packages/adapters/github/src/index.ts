@@ -73,4 +73,5 @@ export function defineGithubIssuesAdapter(
   );
 }
 
-export { createGithubTransport } from './transport.js';
+export { createGithubTransport, type GithubTransportOptions } from './transport.js';
+export { createGithubIntrospector } from './introspector.js';

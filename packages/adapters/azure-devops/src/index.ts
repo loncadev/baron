@@ -66,4 +66,5 @@ export function defineAzureDevOpsIssuesAdapter(
   );
 }
 
-export { createAzureDevOpsTransport } from './transport.js';
+export { createAzureDevOpsTransport, type AzureDevOpsTransportOptions } from './transport.js';
+export { createAzureDevOpsIntrospector } from './introspector.js';

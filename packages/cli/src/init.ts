@@ -1,0 +1,140 @@
+import {
+  type BaronPolicyFile,
+  type Introspector,
+  type ProviderProposal,
+  parsePolicy,
+  proposePolicy,
+  serializePolicy,
+} from '@baron/core';
+import {
+  BARON_DIR,
+  CREDENTIALS_IGNORE_ENTRY,
+  credentialsExamplePath,
+  gitignorePath,
+  policyPath,
+} from './paths.js';
+import type { FileSystem, Prompter } from './ports.js';
+import { type Env, type ProviderDescriptor, getProviderDescriptor } from './registry.js';
+
+export interface InitOptions {
+  readonly root: string;
+  /** Provider to bind to the issues port. */
+  readonly issuesProvider: string;
+  readonly fs: FileSystem;
+  readonly prompter: Prompter;
+  /** Injected introspector (tests). When absent, built from the registry + env credentials. */
+  readonly introspector?: Introspector;
+  readonly env?: Env;
+  /** Overwrite an existing policy without confirming. */
+  readonly force?: boolean;
+}
+
+export interface InitResult {
+  readonly written: boolean;
+  readonly policyPath: string;
+  readonly proposal: ProviderProposal;
+}
+
+/**
+ * Assemble a single-issues-provider policy from a proposal. The gap policy is only emitted when the
+ * provider actually has gaps, so a fully-capable provider produces a clean file.
+ */
+export function assemblePolicy(proposal: ProviderProposal): BaronPolicyFile {
+  const hasGaps = Object.keys(proposal.gapPolicy).length > 0;
+  const object = {
+    version: 1 as const,
+    providers: { issues: proposal.provider },
+    roleMap: { [proposal.provider]: proposal.roleMap },
+    typeMap: { [proposal.provider]: proposal.typeMap },
+    ...(hasGaps ? { gapPolicy: { [proposal.provider]: proposal.gapPolicy } } : {}),
+  };
+  // Round-trip through the loader so init can never emit a policy the loader would later reject.
+  return parsePolicy(JSON.parse(JSON.stringify(object)));
+}
+
+function credentialsTemplate(descriptor: ProviderDescriptor): string {
+  const header = `# Credentials for '${descriptor.id}'. Copy this file to '${BARON_DIR}/credentials'\n# (gitignored) or export these in your environment. Never commit real values.\n`;
+  const lines = descriptor.credentialEnvKeys.map((key) => `${key}=`).join('\n');
+  return `${header}${lines}\n`;
+}
+
+/** Scaffold a credentials template (if absent) and ensure the real credentials file is gitignored. */
+function scaffoldCredentials(fs: FileSystem, root: string, descriptor: ProviderDescriptor): void {
+  const examplePath = credentialsExamplePath(root);
+  if (!fs.exists(examplePath)) {
+    fs.write(examplePath, credentialsTemplate(descriptor));
+  }
+
+  const ignorePath = gitignorePath(root);
+  const current = fs.read(ignorePath) ?? '';
+  const lines = current.split('\n').map((l) => l.trim());
+  if (!lines.includes(CREDENTIALS_IGNORE_ENTRY)) {
+    const prefix = current.length === 0 || current.endsWith('\n') ? current : `${current}\n`;
+    fs.write(ignorePath, `${prefix}${CREDENTIALS_IGNORE_ENTRY}\n`);
+  }
+}
+
+function summarizeProposal(prompter: Prompter, proposal: ProviderProposal): void {
+  prompter.note(`Proposed mapping for issues provider '${proposal.provider}':`);
+  for (const [role, target] of Object.entries(proposal.roleMap.states)) {
+    prompter.note(`  role ${role} -> ${JSON.stringify(target)}`);
+  }
+  for (const [typeRole, native] of Object.entries(proposal.typeMap)) {
+    prompter.note(`  type ${typeRole} -> ${native}`);
+  }
+  for (const [capability, behavior] of Object.entries(proposal.gapPolicy)) {
+    prompter.note(`  gap ${capability} -> ${behavior}`);
+  }
+  if (proposal.notes.length > 0) {
+    prompter.note('Notes (confirm these guesses):');
+    for (const note of proposal.notes) prompter.note(`  - ${note}`);
+  }
+}
+
+/**
+ * `baron init`: introspect the issues provider, propose a role/type/gap mapping, let a human confirm
+ * it, then write `.baron/policy.json` (committed) and scaffold credentials (gitignored). All I/O
+ * goes through injected ports so the flow is exercised end-to-end without touching a real disk or
+ * network in tests.
+ */
+export async function runInit(options: InitOptions): Promise<InitResult> {
+  const descriptor = getProviderDescriptor(options.issuesProvider);
+  const path = policyPath(options.root);
+
+  if (options.fs.exists(path) && options.force !== true) {
+    const overwrite = await options.prompter.confirm(
+      `${path} already exists. Overwrite it?`,
+      false,
+    );
+    if (!overwrite) {
+      const introspection = await (
+        options.introspector ?? descriptor.createIntrospector(options.env ?? {})
+      ).introspect();
+      return {
+        written: false,
+        policyPath: path,
+        proposal: proposePolicy(introspection, descriptor.manifest),
+      };
+    }
+  }
+
+  const introspector = options.introspector ?? descriptor.createIntrospector(options.env ?? {});
+  const introspection = await introspector.introspect();
+  const proposal = proposePolicy(introspection, descriptor.manifest);
+
+  summarizeProposal(options.prompter, proposal);
+
+  const confirmed =
+    options.force === true ||
+    (await options.prompter.confirm(`Write ${path} with this mapping?`, true));
+  if (!confirmed) {
+    return { written: false, policyPath: path, proposal };
+  }
+
+  const policy = assemblePolicy(proposal);
+  options.fs.mkdirp(`${options.root}/${BARON_DIR}`);
+  options.fs.write(path, serializePolicy(policy));
+  scaffoldCredentials(options.fs, options.root, descriptor);
+
+  return { written: true, policyPath: path, proposal };
+}
