@@ -7,10 +7,10 @@ note plus [ARCHITECTURE.md](../ARCHITECTURE.md) and [CLAUDE.md](../CLAUDE.md) ca
 
 ## Where we are
 
-The foundation, the **first vertical slice**, the **config engine**, and the **live SDK
-transports + introspectors** are committed and green:
+The foundation, the **first vertical slice**, the **config engine**, the **live SDK transports +
+introspectors**, and the **MCP server** are committed and green:
 
-- `pnpm test` → 78/78 pass (+4 gated smoke skipped) · `pnpm typecheck` → clean (5 packages) ·
+- `pnpm test` → 92/92 pass (+4 gated smoke skipped) · `pnpm typecheck` → clean (7 packages) ·
   `pnpm lint` → clean.
 - Slice scope: the `issues` port across **Azure DevOps** (rich: native hierarchy, state+column)
   and **GitHub** (flat: no hierarchy, binary states), to stress the impedance bet at its hardest.
@@ -23,6 +23,11 @@ transports + introspectors** are committed and green:
 - Live transports + introspectors wired: GitHub via octokit, Azure via azure-devops-node-api. Both
   read `NativeTarget` keys verbatim (no role logic in the adapter, invariant #4); validated by
   typecheck + an adversarial multi-agent review + credential-gated smoke (not run without creds).
+- MCP server done: a stdio `@modelcontextprotocol/sdk` server exposes the three issue primitives as
+  `baron_issue_create` / `baron_issue_get` / `baron_issue_transition` (tool-input enums sourced from
+  the core role unions; `BaronError` surfaced as an `isError` result with the `.code`). Loads the
+  real `policy.json` and binds the live transport at startup; verified end-to-end over the MCP
+  protocol via the SDK's in-memory transport pair.
 
 ## What exists
 
@@ -35,7 +40,13 @@ transports + introspectors** are committed and green:
   introspection suites both adapters pass.
 - `@baron/cli` — `baron init` / `baron doctor`. Pure command logic (`runInit` / `runDoctor`) behind
   injected `FileSystem` / `Prompter` / `Introspector` ports (tested with in-memory fakes); thin
-  Node-backed shell in `bin.ts`; a provider registry + dependency-free flag parser.
+  Node-backed shell in `bin.ts`; a dependency-free flag parser.
+- `@baron/providers` — shared infrastructure both the CLI and the MCP server depend on (so they
+  don't depend on each other): the provider registry (id → manifest, credential env keys, live
+  transport + introspector factories), `buildIssuesPort(config, env)`, and the `.baron` path helpers.
+- `@baron/mcp-server` — stdio MCP server (`baron-mcp` bin) exposing the issue primitives;
+  `tools.ts` is pure/SDK-agnostic, `server.ts` is the thin SDK wiring, `load.ts` builds the port
+  from policy + env.
 - Core config-engine surface: `parsePolicy` / `serializePolicy` / `resolveIssuesConfig`
   (`policy-file.ts`); `Introspector` contract (`introspection.ts`); `proposePolicy` and friends
   (`proposal.ts`) — all impedance/translation logic, kept in core per invariant #4.
@@ -61,16 +72,20 @@ transports + introspectors** are committed and green:
 
 ## Agreed next step
 
-The config engine and the live transports/introspectors are done. Remaining queued options — not
-yet chosen; decide at the start of the next session:
+The config engine, the live transports/introspectors, and the MCP server are done — the `issues`
+port is now usable end-to-end by an agent (CLI to configure, MCP to drive). Remaining queued
+options — not yet chosen; decide at the start of the next session:
 
-- **MCP server skeleton.** Expose the issues primitives over stdio MCP, reading the real
-  `policy.json` via `resolveIssuesConfig` and binding the live transport from the provider registry.
-  This is the natural next step — it turns the wired primitives into something an agent can call.
 - **Live validation.** Point the gated smoke tests at a throwaway GitHub repo + Azure project to
-  confirm the wiring against real APIs (especially the Azure board-column WEF write).
+  confirm the wiring against real APIs (especially the Azure board-column WEF write), then drive the
+  MCP server from a real client. This is the highest-value next step — everything so far is verified
+  in-memory/by review, never against a live provider.
+- **More issue primitives.** `issue.link` / `issue.query` / `issue.comment` (ARCHITECTURE decision
+  #6) — extend `IssuesPort` + the conformance suite + the MCP tool table in one change.
 - **The `scm` port.** Branch/PR primitives — widens the contract to a second port (needs a
   conformance-suite extension in the same change, per CLAUDE.md).
+- **Recipes + knowledge-loop + the Claude Code plugin** (declarative workflow layer; the remaining
+  packages in the ARCHITECTURE layout).
 
 ## How to resume in this repo
 
