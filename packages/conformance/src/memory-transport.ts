@@ -89,6 +89,11 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
       return snapshot(rec);
     },
 
+    async addLabel(id: string, label: string): Promise<void> {
+      const rec = must(id);
+      if (!rec.labels.includes(label)) rec.labels.push(label);
+    },
+
     async addComment(id: string, body: string): Promise<NativeComment> {
       must(id);
       commentSeq += 1;

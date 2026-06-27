@@ -60,6 +60,8 @@ export interface IssuesTransport {
   createIssue(input: NativeCreateInput): Promise<NativeIssue>;
   getIssue(id: string): Promise<NativeIssue>;
   applyTarget(id: string, target: NativeTarget): Promise<NativeIssue>;
+  /** Add a label additively WITHOUT touching the role discriminator (used by link emulation). */
+  addLabel(id: string, label: string): Promise<void>;
   addComment(id: string, body: string): Promise<NativeComment>;
   /** Create a native typed link. Only called when the manifest declares `issueLinks`. */
   linkIssues(fromId: string, toId: string, nativeLinkType: string): Promise<void>;
@@ -187,8 +189,9 @@ export class BaseIssuesAdapter implements IssuesPort {
     const { behavior } = resolveGap('issueLinks', this.manifest, this.cfg.gapPolicy, this.logger);
     if (behavior.kind === 'emulate') {
       if (behavior.strategy === 'labels') {
-        // Mirror hierarchy emulation: encode the link as a label on the source issue.
-        await this.transport.applyTarget(fromId, { label: `${type}:${toId}` });
+        // Encode the link as an additive label on the source issue. Uses addLabel (not applyTarget)
+        // so it never overwrites the workflow-role discriminator on label-keyed providers.
+        await this.transport.addLabel(fromId, `${type}:${toId}`);
       } else {
         throw new BaronError(
           `Unsupported issueLinks emulation strategy '${behavior.strategy}' for provider ` +

@@ -41,6 +41,8 @@ const PARENT_REL = 'System.LinkTypes.Hierarchy-Reverse';
  */
 const TARGET = { STATE: 'state', BOARD_COLUMN: 'boardColumn' } as const;
 const KANBAN_COLUMN_SUFFIX = '_Kanban.Column';
+/** getWorkItems is server-capped at 200 ids; query results are fetched in batches of this size. */
+const GET_WORK_ITEMS_BATCH = 200;
 
 type WitApi = Awaited<ReturnType<InstanceType<typeof azdev.WebApi>['getWorkItemTrackingApi']>>;
 
@@ -172,6 +174,18 @@ export function createAzureDevOpsTransport(options: AzureDevOpsTransportOptions)
       return toNative(updated, state);
     },
 
+    async addLabel(id: string, label: string): Promise<void> {
+      const witApi = await api();
+      const current = await fetch(witApi, Number(id));
+      const tags = parseTags(current.fields?.[FIELD.TAGS]);
+      if (tags.includes(label)) return;
+      await witApi.updateWorkItem(
+        null,
+        [{ op: Operation.Add, path: fieldPath(FIELD.TAGS), value: [...tags, label].join('; ') }],
+        Number(id),
+      );
+    },
+
     async addComment(id: string, body: string): Promise<NativeComment> {
       const witApi = await api();
       const comment = await witApi.addComment({ text: body }, project, Number(id));
@@ -216,14 +230,20 @@ export function createAzureDevOpsTransport(options: AzureDevOpsTransportOptions)
         .filter((id): id is number => id !== undefined);
       if (ids.length === 0) return [];
 
-      const items = await witApi.getWorkItems(
-        ids,
-        undefined,
-        undefined,
-        WorkItemExpand.All,
-        undefined,
-        project,
-      );
+      // getWorkItems is server-capped at 200 ids; batch so a query matching more than 200 items
+      // returns them all instead of failing with an opaque 400.
+      const items: WorkItem[] = [];
+      for (let offset = 0; offset < ids.length; offset += GET_WORK_ITEMS_BATCH) {
+        const batch = await witApi.getWorkItems(
+          ids.slice(offset, offset + GET_WORK_ITEMS_BATCH),
+          undefined,
+          undefined,
+          WorkItemExpand.All,
+          undefined,
+          project,
+        );
+        items.push(...batch);
+      }
       return items.map((item) => toNative(item));
     },
   };

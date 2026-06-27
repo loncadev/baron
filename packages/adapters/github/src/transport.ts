@@ -111,6 +111,15 @@ export function createGithubTransport(options: GithubTransportOptions): IssuesTr
       return toNative(data, roleLabel ?? state);
     },
 
+    async addLabel(id: string, label: string): Promise<void> {
+      await octokit.rest.issues.addLabels({
+        owner,
+        repo,
+        issue_number: Number(id),
+        labels: [label],
+      });
+    },
+
     async addComment(id: string, body: string): Promise<NativeComment> {
       const { data } = await octokit.rest.issues.createComment({
         owner,
@@ -138,26 +147,36 @@ export function createGithubTransport(options: GithubTransportOptions): IssuesTr
     },
 
     async queryIssues(query: NativeQuery): Promise<readonly NativeIssue[]> {
-      const state = query.target?.[TARGET.STATE];
+      const stateValue = query.target?.[TARGET.STATE];
       const label = query.target?.[TARGET.LABEL];
-      const { data } = await octokit.rest.issues.listForRepo({
+      // A label-only filter should still match closed issues; default to 'all' unless the target
+      // pins a state. GitHub's union enum is open | closed | all.
+      const state =
+        stateValue === GH_STATE.CLOSED
+          ? GH_STATE.CLOSED
+          : stateValue === GH_STATE.OPEN
+            ? GH_STATE.OPEN
+            : 'all';
+      const { limit } = query;
+
+      // Paginate (per_page caps at 100) and stop once `limit` non-PR issues are collected, so a
+      // limit > 100 is honored rather than silently truncated. GitHub models PRs as issues — skip
+      // them, which also keeps `limit` counting actual issues.
+      const results: NativeIssue[] = [];
+      for await (const { data } of octokit.paginate.iterator(octokit.rest.issues.listForRepo, {
         owner,
         repo,
-        // A label-only filter should still match closed issues; default to 'all' unless the target
-        // pins a state. GitHub's union enum is open | closed | all.
-        state:
-          state === GH_STATE.CLOSED
-            ? GH_STATE.CLOSED
-            : state === GH_STATE.OPEN
-              ? GH_STATE.OPEN
-              : 'all',
+        state,
         ...(label !== undefined ? { labels: label } : {}),
-        per_page: query.limit ?? 100,
-      });
-      // listForRepo also returns pull requests (GitHub models them as issues) — drop them.
-      return data
-        .filter((item) => item.pull_request === undefined)
-        .map((item) => toNative(item as unknown as IssueResponse));
+        per_page: 100,
+      })) {
+        for (const item of data) {
+          if (item.pull_request !== undefined) continue;
+          results.push(toNative(item as unknown as IssueResponse));
+          if (limit !== undefined && results.length >= limit) return results;
+        }
+      }
+      return results;
     },
   };
 }

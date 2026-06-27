@@ -167,13 +167,19 @@ export function runIssuesConformance(target: IssuesConformanceTarget): void {
           CapabilityGapError,
         );
 
-        // Flat provider, emulate:labels -> link encoded as a label on the source + a warning.
-        const emu = target.build({ issueLinks: { kind: 'emulate', strategy: 'labels' } });
+        // Flat provider, emulate:labels -> link encoded as a label on the source + a warning, and
+        // the emulation must NOT clobber the issue's workflow-role discriminator.
+        const emu = target.build({
+          issueLinks: { kind: 'emulate', strategy: 'labels' },
+          arbitraryStates: { kind: 'emulate', strategy: 'labels' },
+        });
         const ea = await emu.adapter.create({ title: 'a', typeRole: 'task' });
         const eb = await emu.adapter.create({ title: 'b', typeRole: 'task' });
+        await emu.adapter.transition(ea.id, target.mappedMidRole);
         await emu.adapter.link(ea.id, eb.id, 'blocks');
         const fetched = await emu.adapter.get(ea.id);
         expect(fetched.labels.some((l) => l.startsWith('blocks:'))).toBe(true);
+        expect(fetched.role).toBe(target.mappedMidRole);
         expect(emu.logger.entries.some((e) => e.level === 'warn')).toBe(true);
       });
     });
