@@ -57,6 +57,15 @@ describe('parseRecipe', () => {
     ).toThrow(/choices is required/);
   });
 
+  it('rejects a step with more than one of ask/do/message', () => {
+    expect(() =>
+      parseRecipe({
+        name: 'r',
+        steps: [{ ask: { as: 'x', type: 'text', message: 'm' }, do: 'issue.create' }],
+      }),
+    ).toThrow(/exactly one of/);
+  });
+
   it('rejects a step that is none of ask/do/message', () => {
     expect(() => parseRecipe({ name: 'r', steps: [{ frob: true }] })).toThrow(
       /'ask', 'do', or 'message'/,

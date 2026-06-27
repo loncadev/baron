@@ -179,6 +179,24 @@ export function parsePolicy(raw: unknown): BaronPolicyFile {
   };
 }
 
+/**
+ * Parse policy JSON TEXT (the raw `.baron/policy.json` contents). Wraps `JSON.parse` so a
+ * syntactically corrupt file (a hand-edit typo, a truncated write) fails loudly with the same
+ * actionable `POLICY_PARSE` BaronError as a structurally-invalid policy, instead of a raw SyntaxError.
+ */
+export function parsePolicyJson(raw: string): BaronPolicyFile {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw new BaronError(
+      `Policy is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+      PARSE_CODE,
+    );
+  }
+  return parsePolicy(parsed);
+}
+
 /** Serialize a policy to the canonical on-disk form (2-space indent, trailing newline). */
 export function serializePolicy(policy: BaronPolicyFile): string {
   return `${JSON.stringify(policy, null, 2)}\n`;

@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { BaronError, parsePolicy } from '@baron/core';
+import { BaronError, parsePolicyJson } from '@baron/core';
 import { type Env, buildPorts, policyPath } from '@baron/providers';
 import type { McpPorts } from './tools.js';
 
@@ -19,7 +19,7 @@ export function loadPorts(root: string, env: Env): McpPorts {
     );
   }
 
-  const ports = buildPorts(parsePolicy(JSON.parse(raw)), env);
+  const ports = buildPorts(parsePolicyJson(raw), env);
   if (ports.issues === undefined && ports.scm === undefined) {
     throw new BaronError(
       `Policy at ${path} binds neither an issues nor an scm provider; nothing to serve.`,

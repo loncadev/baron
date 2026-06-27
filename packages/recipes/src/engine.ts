@@ -94,6 +94,15 @@ function reqLinkType(params: Params, key: string, op: string): IssueLinkType {
   return value;
 }
 
+function optNum(params: Params, key: string, op: string): number | undefined {
+  const value = params[key];
+  if (value === undefined) return undefined;
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new BaronError(`Step '${op}' argument '${key}' must be a number.`, ARGS);
+  }
+  return value;
+}
+
 function optLabels(params: Params, op: string): string[] | undefined {
   const value = params.labels;
   if (value === undefined) return undefined;
@@ -150,11 +159,13 @@ async function dispatchOp(ports: RecipePorts, op: RecipeOp, params: Params): Pro
         reqLinkType(params, 'type', op),
       );
     case RECIPE_OPS.issueQuery: {
+      const limit = optNum(params, 'limit', op);
       const query: IssueQuery = {
         ...(optStr(params, 'role', op) !== undefined ? { role: reqRole(params, 'role', op) } : {}),
         ...(optStr(params, 'typeRole', op) !== undefined
           ? { typeRole: reqTypeRole(params, 'typeRole', op) }
           : {}),
+        ...(limit !== undefined ? { limit } : {}),
       };
       return issues(ports, op).query(query);
     }

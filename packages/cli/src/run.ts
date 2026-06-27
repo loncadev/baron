@@ -1,4 +1,4 @@
-import { BaronError, parsePolicy } from '@baron/core';
+import { BaronError, parsePolicyJson } from '@baron/core';
 import { type Env, buildPorts } from '@baron/providers';
 import {
   type RecipeAsker,
@@ -34,7 +34,7 @@ export async function runRecipeFile(options: RunRecipeFileOptions): Promise<RunR
       'POLICY_NOT_FOUND',
     );
   }
-  const ports = buildPorts(parsePolicy(JSON.parse(policyRaw)), options.env);
+  const ports = buildPorts(parsePolicyJson(policyRaw), options.env);
 
   const recipeRaw = options.fs.read(options.recipePath);
   if (recipeRaw === undefined) {

@@ -1,4 +1,4 @@
-import { BaronError, type Introspector, parsePolicy, resolveIssuesConfig } from '@baron/core';
+import { BaronError, type Introspector, parsePolicyJson, resolveIssuesConfig } from '@baron/core';
 import { type Env, getProviderDescriptor } from '@baron/providers';
 import { policyPath } from './paths.js';
 import type { FileSystem } from './ports.js';
@@ -38,7 +38,7 @@ export async function runDoctor(options: DoctorOptions): Promise<DoctorReport> {
     );
   }
 
-  const policy = parsePolicy(JSON.parse(raw));
+  const policy = parsePolicyJson(raw);
   const config = resolveIssuesConfig(policy);
   const descriptor = getProviderDescriptor(config.provider);
 

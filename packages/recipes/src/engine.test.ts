@@ -121,6 +121,30 @@ steps:
     expect((context.issue as { labels: string[] }).labels).not.toContain('parent:undefined');
   });
 
+  it('forwards the query limit instead of dropping it', async () => {
+    const recipe = loadRecipe(`
+name: query-limit
+steps:
+  - do: issue.create
+    with:
+      title: a
+      typeRole: task
+      initialRole: in_review
+  - do: issue.create
+    with:
+      title: b
+      typeRole: task
+      initialRole: in_review
+  - do: issue.query
+    as: found
+    with:
+      role: in_review
+      limit: 1
+`);
+    const { context } = await runRecipe(recipe, { ports: allPorts(), asker: scriptedAsker() });
+    expect((context.found as unknown[]).length).toBe(1);
+  });
+
   it('throws PORT_UNBOUND when a recipe needs an unconfigured port', async () => {
     const recipe = loadRecipe(`
 name: needs-scm

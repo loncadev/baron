@@ -140,13 +140,18 @@ function parseDo(raw: Record<string, unknown>, where: string): DoStep {
 function parseStep(raw: unknown, index: number): Step {
   const where = `steps[${index}]`;
   if (!isRecord(raw)) fail(`${where} must be an object.`);
+  // A step must be exactly one kind; a step with e.g. both `ask` and `do` is a typo, not a silent
+  // "pick the first" — dropping the other key would run a different program than the author wrote.
+  const kinds = ['ask', 'do', 'message'].filter((kind) => kind in raw);
+  if (kinds.length !== 1) {
+    fail(
+      `${where} must have exactly one of 'ask', 'do', or 'message' (found: ${kinds.join(', ') || 'none'}).`,
+    );
+  }
   if ('ask' in raw) return parseAsk(raw, where);
   if ('do' in raw) return parseDo(raw, where);
-  if ('message' in raw) {
-    if (typeof raw.message !== 'string') fail(`${where}: 'message' must be a string.`);
-    return { message: raw.message };
-  }
-  fail(`${where} must have one of 'ask', 'do', or 'message'.`);
+  if (typeof raw.message !== 'string') fail(`${where}: 'message' must be a string.`);
+  return { message: raw.message };
 }
 
 /**

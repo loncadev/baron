@@ -34,6 +34,16 @@ describe('runRecipeFile', () => {
     ).rejects.toBeInstanceOf(BaronError);
   });
 
+  it('throws a coded POLICY_PARSE error on malformed policy JSON', async () => {
+    const fs = memoryFileSystem({
+      [policyPath(ROOT)]: '{ not valid json',
+      [RECIPE]: 'name: hi\nsteps:\n  - message: "x"',
+    });
+    await expect(
+      runRecipeFile({ root: ROOT, recipePath: RECIPE, fs, asker: scriptedAsker(), env }),
+    ).rejects.toThrow(/valid JSON/);
+  });
+
   it('throws RECIPE_NOT_FOUND when the recipe file is missing', async () => {
     const fs = memoryFileSystem({ [policyPath(ROOT)]: serializePolicy(policy) });
     await expect(
