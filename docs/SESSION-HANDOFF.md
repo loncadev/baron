@@ -10,24 +10,27 @@ note plus [ARCHITECTURE.md](../ARCHITECTURE.md) and [CLAUDE.md](../CLAUDE.md) ca
 The foundation, the **first vertical slice**, the **config engine**, the **live SDK transports +
 introspectors**, and the **MCP server** are committed and green:
 
-- `pnpm test` → 92/92 pass (+4 gated smoke skipped) · `pnpm typecheck` → clean (7 packages) ·
+- `pnpm test` → 104/104 pass (+4 gated smoke skipped) · `pnpm typecheck` → clean (7 packages) ·
   `pnpm lint` → clean.
 - Slice scope: the `issues` port across **Azure DevOps** (rich: native hierarchy, state+column)
   and **GitHub** (flat: no hierarchy, binary states), to stress the impedance bet at its hardest.
-- Proven: the same primitives (`issue.create`, `issue.transition`) produce correct-but-different
-  behavior per provider; capability gaps are handled explicitly (`error` / `emulate` / `degrade`)
-  and never silently.
+- The `issues` port exposes all six primitives (ARCHITECTURE decision #6): `issue.create` /
+  `get` / `transition` / `comment` / `link` / `query`. Same primitives produce correct-but-different
+  behavior per provider; capability gaps (hierarchy, arbitrary states, issue links) are handled
+  explicitly (`error` / `emulate` / `degrade`) and never silently. Two new capabilities — `comments`,
+  `issueLinks` — and abstract `ISSUE_LINK_TYPES` were added; link-type→native is fixed provider
+  knowledge supplied by the adapter (not `policy.json`).
 - Config engine done (`baron init` + `baron doctor`): a committed `.baron/policy.json` is parsed,
   validated, and resolved into the issues config; introspection + a manifest-aware proposal draft a
   role/type/gap map for human confirmation; `doctor` reports drift against the live provider.
 - Live transports + introspectors wired: GitHub via octokit, Azure via azure-devops-node-api. Both
   read `NativeTarget` keys verbatim (no role logic in the adapter, invariant #4); validated by
   typecheck + an adversarial multi-agent review + credential-gated smoke (not run without creds).
-- MCP server done: a stdio `@modelcontextprotocol/sdk` server exposes the three issue primitives as
-  `baron_issue_create` / `baron_issue_get` / `baron_issue_transition` (tool-input enums sourced from
-  the core role unions; `BaronError` surfaced as an `isError` result with the `.code`). Loads the
-  real `policy.json` and binds the live transport at startup; verified end-to-end over the MCP
-  protocol via the SDK's in-memory transport pair.
+- MCP server done: a stdio `@modelcontextprotocol/sdk` server exposes all six issue primitives as
+  `baron_issue_create` / `get` / `transition` / `comment` / `link` / `query` (tool-input enums
+  sourced from the core role/type/link unions; `BaronError` surfaced as an `isError` result with the
+  `.code`). Loads the real `policy.json` and binds the live transport at startup; verified end-to-end
+  over the MCP protocol via the SDK's in-memory transport pair.
 
 ## What exists
 
@@ -77,11 +80,9 @@ port is now usable end-to-end by an agent (CLI to configure, MCP to drive). Rema
 options — not yet chosen; decide at the start of the next session:
 
 - **Live validation.** Point the gated smoke tests at a throwaway GitHub repo + Azure project to
-  confirm the wiring against real APIs (especially the Azure board-column WEF write), then drive the
-  MCP server from a real client. This is the highest-value next step — everything so far is verified
-  in-memory/by review, never against a live provider.
-- **More issue primitives.** `issue.link` / `issue.query` / `issue.comment` (ARCHITECTURE decision
-  #6) — extend `IssuesPort` + the conformance suite + the MCP tool table in one change.
+  confirm the wiring against real APIs (especially the Azure board-column WEF write and the new
+  query/link paths), then drive the MCP server from a real client. This is the highest-value next
+  step — everything so far is verified in-memory/by review, never against a live provider.
 - **The `scm` port.** Branch/PR primitives — widens the contract to a second port (needs a
   conformance-suite extension in the same change, per CLAUDE.md).
 - **Recipes + knowledge-loop + the Claude Code plugin** (declarative workflow layer; the remaining
