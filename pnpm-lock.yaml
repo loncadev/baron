@@ -83,6 +83,19 @@ importers:
 
   packages/core: {}
 
+  packages/knowledge-loop:
+    dependencies:
+      '@baron/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@baron/conformance':
+        specifier: workspace:*
+        version: link:../conformance
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.0
+
   packages/mcp-server:
     dependencies:
       '@baron/core':
