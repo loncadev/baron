@@ -5,23 +5,105 @@ import {
   exampleGithubTypeMap,
   recommendedGithubGapPolicy,
 } from '@baron/adapter-github';
-import { createMemoryScmTransport, createMemoryTransport } from '@baron/conformance';
-import { type IssuesPort, type ScmPort, WORKFLOW_ROLES, WORK_ITEM_TYPE_ROLES } from '@baron/core';
+import {
+  createMemoryCiTransport,
+  createMemoryScmTransport,
+  createMemoryTransport,
+} from '@baron/conformance';
+import {
+  BaseCiAdapter,
+  type CiManifest,
+  type CiPort,
+  type CiStatusMaps,
+  type IssuesPort,
+  type ScmPort,
+  WORKFLOW_ROLES,
+  WORK_ITEM_TYPE_ROLES,
+} from '@baron/core';
 import { KnowledgeLoop, createMemoryKnowledgeStore } from '@baron/knowledge-loop';
 import { describe, expect, it } from 'vitest';
 import {
+  CI_TOOL_NAMES,
   LOOP_TOOL_NAMES,
   MCP_TOOL_NAMES,
   SCM_TOOL_NAMES,
   TOOL_DEFINITIONS,
+  activeToolDefinitions,
+  callCiTool,
   callLoopTool,
   callScmTool,
   callTool,
+  dispatchTool,
 } from './tools.js';
 
 function scmPort(): ScmPort {
   return defineGithubScmAdapter(createMemoryScmTransport());
 }
+
+const ciManifest: CiManifest = {
+  provider: 'mem',
+  ci: {
+    canTrigger: false,
+    canCancel: false,
+    hasStages: false,
+    hasApprovalGates: false,
+    providesLogs: true,
+    hasArtifacts: false,
+  },
+};
+const ciMaps: CiStatusMaps = {
+  status: { inProgress: 'running' },
+  result: { succeeded: 'succeeded' },
+};
+function ciPort(): CiPort {
+  return new BaseCiAdapter(ciManifest, ciMaps, createMemoryCiTransport());
+}
+
+describe('ci tools', () => {
+  it('lists runs with a normalized status', async () => {
+    const result = await callCiTool(ciPort(), CI_TOOL_NAMES.runs, {});
+    expect(result.isError).toBeUndefined();
+    const runs = JSON.parse(result.content[0]?.text ?? '[]') as Array<{ status: string }>;
+    expect(runs.length).toBeGreaterThan(0);
+    expect(runs.every((r) => typeof r.status === 'string')).toBe(true);
+  });
+
+  it('gets one run and fetches a size-aware log chunk', async () => {
+    const detail = await callCiTool(ciPort(), CI_TOOL_NAMES.runGet, { id: '1' });
+    expect(detail.isError).toBeUndefined();
+    const logs = await callCiTool(ciPort(), CI_TOOL_NAMES.runLogs, { runId: '1' });
+    const chunk = JSON.parse(logs.content[0]?.text ?? '{}') as { truncated: boolean };
+    expect(typeof chunk.truncated).toBe('boolean');
+  });
+
+  it('defaults the runs limit and respects an explicit one', async () => {
+    const captured: Array<number | undefined> = [];
+    const port = {
+      runs: async (q: { limit?: number }) => {
+        captured.push(q.limit);
+        return [];
+      },
+    } as unknown as CiPort;
+    await callCiTool(port, CI_TOOL_NAMES.runs, {});
+    await callCiTool(port, CI_TOOL_NAMES.runs, { limit: 5 });
+    expect(captured).toEqual([50, 5]);
+  });
+
+  it('advertises ci tools only when the ci port is bound', () => {
+    expect(activeToolDefinitions({ ci: ciPort() }).some((t) => t.name === CI_TOOL_NAMES.runs)).toBe(
+      true,
+    );
+    expect(activeToolDefinitions({}).some((t) => t.name === CI_TOOL_NAMES.runs)).toBe(false);
+  });
+
+  it('dispatches ci tools and reports PORT_UNBOUND when unbound', async () => {
+    const ok = await dispatchTool({ ci: ciPort() }, CI_TOOL_NAMES.runs, {});
+    expect(ok.isError).toBeUndefined();
+    const unbound = await dispatchTool({}, CI_TOOL_NAMES.runs, {});
+    expect(unbound.isError).toBe(true);
+    expect(unbound.structuredContent?.code).toBe('PORT_UNBOUND');
+  });
+});
 
 function loop(): KnowledgeLoop {
   return new KnowledgeLoop(createMemoryKnowledgeStore());

@@ -1,16 +1,21 @@
 import {
   BaronError,
+  type CiPort,
   ISSUE_LINK_TYPES,
   type IssueDraft,
   type IssueLinkType,
   type IssueQuery,
   type IssuesPort,
+  RUN_STATUSES,
+  type RunQuery,
+  type RunStatus,
   type ScmPort,
   WORKFLOW_ROLES,
   WORK_ITEM_TYPE_ROLES,
   type WorkItemTypeRole,
   type WorkflowRole,
   isIssueLinkType,
+  isRunStatus,
   isWorkItemTypeRole,
   isWorkflowRole,
 } from '@baron/core';
@@ -25,6 +30,7 @@ import {
 export interface McpPorts {
   readonly issues?: IssuesPort;
   readonly scm?: ScmPort;
+  readonly ci?: CiPort;
   readonly knowledge?: KnowledgeLoop;
 }
 
@@ -42,6 +48,13 @@ export const SCM_TOOL_NAMES = {
   branchCreate: 'baron_scm_branch_create',
   prCreate: 'baron_scm_pr_create',
   prThread: 'baron_scm_pr_thread',
+} as const;
+
+export const CI_TOOL_NAMES = {
+  pipelines: 'baron_ci_pipelines',
+  runs: 'baron_ci_runs',
+  runGet: 'baron_ci_run_get',
+  runLogs: 'baron_ci_run_logs',
 } as const;
 
 export const LOOP_TOOL_NAMES = {
@@ -77,6 +90,7 @@ const ROLE_ENUM = [...WORKFLOW_ROLES];
 const TYPE_ROLE_ENUM = [...WORK_ITEM_TYPE_ROLES];
 const LINK_TYPE_ENUM = [...ISSUE_LINK_TYPES];
 const FOLLOWUP_STATUS_ENUM = [...FOLLOWUP_STATUSES];
+const RUN_STATUS_ENUM = [...RUN_STATUSES];
 
 /** Default cap for `baron_issue_query` so an unbounded listing can't overflow the agent's context. */
 const DEFAULT_QUERY_LIMIT = 50;
@@ -252,6 +266,77 @@ export const SCM_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
       properties: {
         pullRequestId: { type: 'string', minLength: 1 },
         body: { type: 'string', minLength: 1 },
+      },
+    },
+  },
+];
+
+export const CI_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
+  {
+    name: CI_TOOL_NAMES.pipelines,
+    description: 'List pipeline definitions.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        limit: {
+          type: 'number',
+          minimum: 1,
+          description: 'Maximum number of pipelines to return.',
+        },
+      },
+    },
+  },
+  {
+    name: CI_TOOL_NAMES.runs,
+    description:
+      'List CI runs (filter by pipeline / branch / normalized status). Returns a lightweight ' +
+      'projection; status is the provider-agnostic run status.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        pipelineId: { type: 'string', minLength: 1, description: 'Restrict to one pipeline.' },
+        branch: { type: 'string', minLength: 1, description: 'Restrict to a source branch.' },
+        status: {
+          type: 'string',
+          enum: RUN_STATUS_ENUM,
+          description: 'Filter by normalized run status.',
+        },
+        limit: {
+          type: 'number',
+          minimum: 1,
+          description: `Maximum number of runs to return. Defaults to ${DEFAULT_QUERY_LIMIT} to keep the result within an agent's context.`,
+        },
+      },
+    },
+  },
+  {
+    name: CI_TOOL_NAMES.runGet,
+    description: 'Get one run, including its stages when the provider surfaces them.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['id'],
+      properties: { id: { type: 'string', minLength: 1 } },
+    },
+  },
+  {
+    name: CI_TOOL_NAMES.runLogs,
+    description:
+      "Fetch a run's logs. Size-aware: returns a lean tail by default (`truncated` flags omitted " +
+      'content); raise `tailLines` for more.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['runId'],
+      properties: {
+        runId: { type: 'string', minLength: 1 },
+        tailLines: {
+          type: 'number',
+          minimum: 1,
+          description: 'Max lines to return from the tail.',
+        },
       },
     },
   },
@@ -629,11 +714,65 @@ export function callLoopTool(
   }
 }
 
+function toRunQuery(args: Record<string, unknown> | undefined): RunQuery {
+  const pipelineId = optionalString(args, 'pipelineId');
+  const branch = optionalString(args, 'branch');
+  const statusRaw = optionalString(args, 'status');
+  if (statusRaw !== undefined && !isRunStatus(statusRaw)) {
+    throw new BaronError(
+      `Invalid status '${statusRaw}'. Expected one of: ${RUN_STATUSES.join(', ')}.`,
+      INVALID_ARGS,
+    );
+  }
+  const limit = args?.limit;
+  if (limit !== undefined && (typeof limit !== 'number' || !Number.isFinite(limit) || limit < 1)) {
+    throw new BaronError("Argument 'limit' must be a positive number.", INVALID_ARGS);
+  }
+  return {
+    ...(pipelineId !== undefined ? { pipelineId } : {}),
+    ...(branch !== undefined ? { branch } : {}),
+    ...(statusRaw !== undefined ? { status: statusRaw as RunStatus } : {}),
+    limit: limit !== undefined ? (limit as number) : DEFAULT_QUERY_LIMIT,
+  };
+}
+
+/** Dispatch an MCP tool call to the ci port (read-only in slice 1). Marshals + shapes errors only. */
+export function callCiTool(
+  port: CiPort,
+  name: string,
+  args: Record<string, unknown> | undefined,
+): Promise<ToolResult> {
+  switch (name) {
+    case CI_TOOL_NAMES.pipelines:
+      return run(() => {
+        const limit = optNumber(args, 'limit');
+        return port.pipelines(limit !== undefined ? { limit } : {});
+      });
+    case CI_TOOL_NAMES.runs:
+      return run(() => port.runs(toRunQuery(args)));
+    case CI_TOOL_NAMES.runGet:
+      return run(() => port.run(requireString(args, 'id')));
+    case CI_TOOL_NAMES.runLogs:
+      return run(() => {
+        const tailLines = optNumber(args, 'tailLines');
+        return port.logs(
+          requireString(args, 'runId'),
+          tailLines !== undefined ? { tailLines } : {},
+        );
+      });
+    default:
+      return run(() => {
+        throw new BaronError(`Unknown tool '${name}'.`, 'UNKNOWN_TOOL');
+      });
+  }
+}
+
 /** The tool definitions advertised for the currently-bound ports. */
 export function activeToolDefinitions(ports: McpPorts): ToolDefinition[] {
   return [
     ...(ports.issues ? TOOL_DEFINITIONS : []),
     ...(ports.scm ? SCM_TOOL_DEFINITIONS : []),
+    ...(ports.ci ? CI_TOOL_DEFINITIONS : []),
     ...(ports.knowledge ? LOOP_TOOL_DEFINITIONS : []),
   ];
 }
@@ -659,6 +798,14 @@ export function dispatchTool(
       });
     }
     return callScmTool(ports.scm, name, args);
+  }
+  if (name.startsWith('baron_ci_')) {
+    if (ports.ci === undefined) {
+      return run(() => {
+        throw new BaronError('The ci port is not configured.', 'PORT_UNBOUND');
+      });
+    }
+    return callCiTool(ports.ci, name, args);
   }
   if (name.startsWith('baron_learning_') || name.startsWith('baron_followup_')) {
     if (ports.knowledge === undefined) {
