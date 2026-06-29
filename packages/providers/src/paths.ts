@@ -14,3 +14,8 @@ export function policyPath(root: string): string {
 export function knowledgeDir(root: string): string {
   return `${root}/${BARON_DIR}/knowledge`;
 }
+
+/** The gitignored credentials file (KEY=VALUE) overlaid onto the environment at run time. */
+export function credentialsPath(root: string): string {
+  return `${root}/${BARON_DIR}/credentials`;
+}

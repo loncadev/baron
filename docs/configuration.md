@@ -57,13 +57,24 @@ A malformed or structurally-invalid policy fails loudly with a coded `POLICY_PAR
 
 ## Credentials
 
-Credentials are read from the environment (or `.baron/credentials`, which `init` gitignores) — never
-from `policy.json`.
+Credentials never live in `policy.json`. The CLI and MCP server read them from the environment,
+overlaid by a gitignored `.baron/credentials` file (`KEY=VALUE` lines; `#` comments allowed) when
+present — a real environment variable wins over the file. `baron init` scaffolds
+`.baron/credentials.example` and gitignores the real file.
 
 | Provider | Keys |
 | --- | --- |
 | Azure DevOps | `AZURE_DEVOPS_ORG`, `AZURE_DEVOPS_PROJECT`, `AZURE_DEVOPS_REPO` (scm), `AZURE_DEVOPS_TOKEN` |
 | GitHub | `GITHUB_OWNER`, `GITHUB_REPO`, `GITHUB_TOKEN` |
+
+Example `.baron/credentials` (never committed):
+
+```
+AZURE_DEVOPS_ORG=beekod
+AZURE_DEVOPS_PROJECT=BeeMaster
+AZURE_DEVOPS_REPO=BeeMaster
+AZURE_DEVOPS_TOKEN=<your-pat>
+```
 
 ## One target per install (and how to do "multi")
 

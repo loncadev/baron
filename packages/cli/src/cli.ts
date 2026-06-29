@@ -1,5 +1,5 @@
 import { BaronError } from '@baron/core';
-import { type Env, KNOWN_PROVIDERS } from '@baron/providers';
+import { type Env, KNOWN_PROVIDERS, credentialsPath, mergeCredentials } from '@baron/providers';
 import type { RecipeAsker } from '@baron/recipes';
 import { runDoctor } from './doctor.js';
 import { runInit } from './init.js';
@@ -56,6 +56,11 @@ function parseFlags(args: readonly string[]): {
   return { flags, positionals };
 }
 
+/** Overlay the gitignored `.baron/credentials` file (if any) onto the process env for this root. */
+function effectiveEnv(ports: CliPorts, root: string): Env {
+  return mergeCredentials(ports.env, ports.fs.read(credentialsPath(root)));
+}
+
 async function cmdInit(flags: Record<string, string>, ports: CliPorts): Promise<number> {
   const issuesProvider = flags.provider;
   if (issuesProvider === undefined) {
@@ -63,12 +68,13 @@ async function cmdInit(flags: Record<string, string>, ports: CliPorts): Promise<
     ports.err(USAGE);
     return 2;
   }
+  const root = flags.root ?? '.';
   const result = await runInit({
-    root: flags.root ?? '.',
+    root,
     issuesProvider,
     fs: ports.fs,
     prompter: ports.prompter,
-    env: ports.env,
+    env: effectiveEnv(ports, root),
     force: flags.force === 'true',
   });
   if (result.written) {
@@ -80,7 +86,8 @@ async function cmdInit(flags: Record<string, string>, ports: CliPorts): Promise<
 }
 
 async function cmdDoctor(flags: Record<string, string>, ports: CliPorts): Promise<number> {
-  const report = await runDoctor({ root: flags.root ?? '.', fs: ports.fs, env: ports.env });
+  const root = flags.root ?? '.';
+  const report = await runDoctor({ root, fs: ports.fs, env: effectiveEnv(ports, root) });
   if (report.ok) {
     ports.out(`OK — ${report.checks} reference(s) checked for '${report.provider}', no drift.`);
     return 0;
@@ -97,12 +104,13 @@ async function cmdRun(flags: Record<string, string>, ports: CliPorts): Promise<n
     ports.err(USAGE);
     return 2;
   }
+  const root = flags.root ?? '.';
   await runRecipeFile({
-    root: flags.root ?? '.',
+    root,
     recipePath,
     fs: ports.fs,
     asker: ports.asker,
-    env: ports.env,
+    env: effectiveEnv(ports, root),
   });
   ports.out(`Recipe ${recipePath} finished.`);
   return 0;
