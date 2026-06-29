@@ -195,6 +195,8 @@ applied to build/run status (a `RunStatus` vocabulary; per-adapter status maps s
 vendor-fixed). **Shipped:** the core contract + `BaseCiAdapter`, the conformance suite, the read
 primitives (`pipelines` / `runs` / `run.get` / `logs`, size-aware) on **both Azure Pipelines and
 GitHub Actions** (the two most divergent CI models, proving the `RunStatus` layer is cross-provider —
-Azure validated live), and the MCP read tools. **Next:** the write primitives (`trigger` / `cancel`),
-stages, then the GitLab CI adapter. The provider-native escape hatch (decision #18) follows, so
-nothing is a hard blocker in the meantime.
+Azure validated live), the MCP read tools, and the **write primitives (`trigger` / `cancel`)** on both
+providers — a real impedance modelled honestly (Azure returns the queued/cancelled build; GitHub's
+`workflow_dispatch` is fire-and-forget so `trigger` returns `{accepted, run?}` with no run id, and
+cancel re-reads the run). **Next:** stages, then the GitLab CI adapter. The provider-native escape
+hatch (decision #18) follows, so nothing is a hard blocker in the meantime.
