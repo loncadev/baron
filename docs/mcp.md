@@ -1,0 +1,59 @@
+# MCP server & plugin
+
+Baron's core is exposed as a stdio **MCP server** (`@baron/mcp-server`, bin `baron-mcp`), so any MCP
+client — Claude Code, Cursor, Codex, … — can drive work tracking and source control by calling
+tools. The Claude Code plugin is a thin wrapper that registers it.
+
+## What the server does at startup
+
+1. Loads `.baron/policy.json` from the working directory (missing ⇒ `POLICY_NOT_FOUND`; run
+   `baron init` first).
+2. Builds the live ports the policy binds (`issues` and/or `scm`) plus the always-available local
+   **knowledge loop** (markdown store under `.baron/knowledge`).
+3. Advertises only the tools for the bound ports, and routes each call to the right port.
+
+Credentials come from the environment (see [Configuration](./configuration.md)), never from the
+policy.
+
+## Tools
+
+| Tool | Port | Purpose |
+| --- | --- | --- |
+| `baron_issue_create` | issues | Create an issue from abstract terms (`typeRole`, optional `initialRole`). |
+| `baron_issue_get` | issues | Fetch a normalized issue by id. |
+| `baron_issue_transition` | issues | Move an issue to a workflow `role`. |
+| `baron_issue_comment` | issues | Comment on an issue. |
+| `baron_issue_link` | issues | Link two issues (`relates` / `blocks` / `blocked_by` / `duplicates`). |
+| `baron_issue_query` | issues | List issues filtered by `role` / `typeRole` / `limit`. |
+| `baron_scm_branch_create` | scm | Create a branch from a base branch. |
+| `baron_scm_pr_create` | scm | Open a pull request (optional `draft`). |
+| `baron_scm_pr_thread` | scm | Add a discussion thread/comment to a PR. |
+| `baron_learning_append` | loop | Record a durable learning. |
+| `baron_learning_query` | loop | Query learnings by tag / text. |
+| `baron_followup_append` | loop | Record an open follow-up. |
+| `baron_followup_list` | loop | List follow-ups by status / tag. |
+
+Tool inputs are plain JSON Schema; the `role` / `typeRole` / link-type / status fields are enums
+sourced from the core's abstract vocabulary, so they never expose provider-native states.
+
+## Errors: `isError`, not a thrown protocol error
+
+A primitive that hits a capability gap or bad input returns an **`isError` tool result** whose text
+begins with a stable code (`CAPABILITY_GAP`, `ROLE_MAPPING`, `INVALID_ARGS`, …) and which also rides
+in `structuredContent.code`. This is deliberate: an `isError` result re-enters the model's context,
+so an agent can read the gap and self-correct (retry with a different role, drop a parent), instead
+of the failure being swallowed by the protocol channel. Calling a tool for an unconfigured port
+returns `PORT_UNBOUND`.
+
+## Claude Code plugin
+
+`plugins/claude-code` registers the `baron` MCP server and ships a `baron` skill (teaches the agent
+the abstract vocabulary) and a `/baron-run` command. Install it for local development with:
+
+```bash
+claude --plugin-dir ./plugins/claude-code
+```
+
+Its `.claude-plugin/plugin.json` launches the server via `npx -y @baron/mcp-server`; before that
+package is published, point the `mcpServers.baron` command at your local build instead. See
+[plugins/claude-code/README.md](../plugins/claude-code/README.md).

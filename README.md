@@ -18,11 +18,50 @@ prompts.
 - **Cross-harness**: the core is an MCP server, so any MCP client can use it. Claude Code gets
   a richer plugin wrapper.
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full decision record.
+## Quick start
+
+```bash
+pnpm install
+pnpm build            # compile every package to dist (needed to run the CLI / MCP server)
+
+# 1. Configure: introspect a provider and write .baron/policy.json (you confirm the mapping)
+baron init --provider azure-devops      # or: --provider github
+
+# 2. Add credentials (env or .baron/credentials — never committed). For Azure DevOps:
+#    AZURE_DEVOPS_ORG, AZURE_DEVOPS_PROJECT, AZURE_DEVOPS_REPO, AZURE_DEVOPS_TOKEN
+
+# 3. Check the policy against the live provider
+baron doctor
+
+# 4. Run a workflow recipe
+baron run --recipe packages/recipes/recipes/task-start.yaml
+```
+
+Or wire the MCP server into your agent and call the tools directly
+(`baron_issue_create`, `baron_scm_pr_create`, …). See [docs/mcp.md](./docs/mcp.md).
+
+## Documentation
+
+| Guide | What it covers |
+| --- | --- |
+| [Getting started](./docs/getting-started.md) | Install, prerequisites, first `init` → `doctor` → `run`. |
+| [Concepts](./docs/concepts.md) | Ports, roles, capability gaps, the knowledge loop — the mental model. |
+| [Configuration](./docs/configuration.md) | `.baron/policy.json`, role/type/gap maps, credentials. |
+| [CLI](./docs/cli.md) | `baron init` / `doctor` / `run` reference. |
+| [Recipes](./docs/recipes.md) | Writing YAML recipes: `ask` / `do` / `message`, interpolation, the op table. |
+| [MCP server & plugin](./docs/mcp.md) | The MCP tools and the Claude Code plugin. |
+| [Providers](./docs/providers.md) | Which provider supports which port and capability. |
+
+The full design decision record is in [ARCHITECTURE.md](./ARCHITECTURE.md); the working contract
+for contributors is [CLAUDE.md](./CLAUDE.md).
 
 ## Status
 
-Pre-alpha. Building the first vertical slice: the `issues` port across Azure DevOps and GitHub.
+The planned v1 is built end-to-end: the `issues` and `scm` ports across **Azure DevOps** and
+**GitHub**, the config engine (`baron init` / `doctor`), a multi-port MCP server, the YAML recipe
+engine + `baron run`, the knowledge loop, and a Claude Code plugin. The provider transports are
+validated by a conformance suite and adversarial review but are exercised against live APIs only by
+credential-gated smoke tests — running those against a real project is the next step.
 
 ## License
 
