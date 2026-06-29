@@ -69,5 +69,20 @@ export function runCiConformance(target: CiConformanceTarget): void {
       expect(typeof chunk.content).toBe('string');
       expect(typeof chunk.truncated).toBe('boolean');
     });
+
+    it('triggers a run when supported (run, if returned, carries a RunStatus)', async () => {
+      const { adapter } = target.build();
+      if (!adapter.manifest.ci.canTrigger) return;
+      const result = await adapter.trigger({ pipelineId: 'p1' });
+      expect(typeof result.accepted).toBe('boolean');
+      if (result.run !== undefined) expect(isRunStatus(result.run.status)).toBe(true);
+    });
+
+    it('cancels a run when supported and returns a normalized run', async () => {
+      const { adapter } = target.build();
+      if (!adapter.manifest.ci.canCancel) return;
+      const cancelled = await adapter.cancel('1');
+      expect(isRunStatus(cancelled.status)).toBe(true);
+    });
   });
 }

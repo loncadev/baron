@@ -112,6 +112,25 @@ export interface LogOptions {
   readonly tailLines?: number | undefined;
 }
 
+/** Input to `ci.trigger`. */
+export interface TriggerInput {
+  readonly pipelineId: string;
+  /** Branch/tag to run on; defaults to the provider's default branch when omitted. */
+  readonly ref?: string | undefined;
+  /** Pipeline variables / workflow inputs. */
+  readonly variables?: Readonly<Record<string, string>> | undefined;
+}
+
+/**
+ * Result of `ci.trigger`. `run` is present when the provider returns the created run synchronously
+ * (Azure queueBuild); it is absent for a fire-and-forget dispatch that returns no run id (GitHub
+ * `workflow_dispatch`) — modelled honestly rather than fabricating a run.
+ */
+export interface TriggerResult {
+  readonly accepted: boolean;
+  readonly run?: Run | undefined;
+}
+
 /** Native run the transport returns — status/result are still the raw provider enums. */
 export interface NativeRun {
   readonly id: string;
@@ -143,25 +162,35 @@ export interface NativeLog {
   readonly truncated: boolean;
 }
 
+/** Native trigger result the transport returns (run still carries raw provider status). */
+export interface NativeTriggerResult {
+  readonly accepted: boolean;
+  readonly run?: NativeRun | undefined;
+}
+
 /**
- * The thin, provider-specific transport a `ci` adapter delegates I/O to. Slice 1 is read-only;
- * `triggerRun` / `cancelRun` land in the next slice. Real implementations call the vendor SDK; the
- * conformance suite passes an in-memory fake — the same separation the other ports use.
+ * The thin, provider-specific transport a `ci` adapter delegates I/O to. Real implementations call
+ * the vendor SDK; the conformance suite passes an in-memory fake — the same separation the other
+ * ports use.
  */
 export interface CiTransport {
   listPipelines(query: PipelineQuery): Promise<readonly Pipeline[]>;
   listRuns(query: RunQuery): Promise<readonly NativeRun[]>;
   getRun(id: string): Promise<NativeRunDetail>;
   fetchLogs(runId: string, options: LogOptions): Promise<NativeLog>;
+  triggerRun(input: TriggerInput): Promise<NativeTriggerResult>;
+  cancelRun(runId: string): Promise<NativeRun>;
 }
 
-/** The normalized read surface the core exposes for the `ci` port (slice 1; trigger/cancel follow). */
+/** The normalized primitive surface the core exposes for the `ci` port. */
 export interface CiPort {
   readonly manifest: CiManifest;
   pipelines(query?: PipelineQuery): Promise<readonly Pipeline[]>;
   runs(query?: RunQuery): Promise<readonly Run[]>;
   run(id: string): Promise<RunDetail>;
   logs(runId: string, options?: LogOptions): Promise<LogChunk>;
+  trigger(input: TriggerInput): Promise<TriggerResult>;
+  cancel(runId: string): Promise<Run>;
 }
 
 /**
@@ -241,5 +270,26 @@ export class BaseCiAdapter implements CiPort {
     }
     const native = await this.transport.fetchLogs(runId, options);
     return { runId, content: native.content, truncated: native.truncated };
+  }
+
+  async trigger(input: TriggerInput): Promise<TriggerResult> {
+    if (!this.manifest.ci.canTrigger) {
+      resolveCapabilityGap(
+        false,
+        'canTrigger',
+        this.manifest.provider,
+        this.gapPolicy,
+        this.logger,
+      );
+    }
+    const native = await this.transport.triggerRun(input);
+    return { accepted: native.accepted, run: native.run ? this.toRun(native.run) : undefined };
+  }
+
+  async cancel(runId: string): Promise<Run> {
+    if (!this.manifest.ci.canCancel) {
+      resolveCapabilityGap(false, 'canCancel', this.manifest.provider, this.gapPolicy, this.logger);
+    }
+    return this.toRun(await this.transport.cancelRun(runId));
   }
 }

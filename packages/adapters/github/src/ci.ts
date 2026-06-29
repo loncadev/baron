@@ -9,9 +9,11 @@ import {
   type NativeLog,
   type NativeRun,
   type NativeRunDetail,
+  type NativeTriggerResult,
   type Pipeline,
   type PipelineQuery,
   type RunQuery,
+  type TriggerInput,
 } from '@baron/core';
 import { Octokit } from 'octokit';
 import { GITHUB_PROVIDER } from './provider.js';
@@ -147,6 +149,30 @@ export function createGithubCiTransport(options: GithubTransportOptions): CiTran
       const tail = options.tailLines ?? DEFAULT_TAIL_LINES;
       const start = Math.max(0, lines.length - tail);
       return { content: lines.slice(start).join('\n'), truncated: start > 0 || list.length > 1 };
+    },
+
+    async triggerRun(input: TriggerInput): Promise<NativeTriggerResult> {
+      // workflow_dispatch returns 204 with no run id, so the created run can't be reported back.
+      const ref = input.ref ?? (await octokit.rest.repos.get({ owner, repo })).data.default_branch;
+      await octokit.rest.actions.createWorkflowDispatch({
+        owner,
+        repo,
+        workflow_id: Number(input.pipelineId),
+        ref,
+        ...(input.variables !== undefined ? { inputs: input.variables } : {}),
+      });
+      return { accepted: true };
+    },
+
+    async cancelRun(runId: string): Promise<NativeRun> {
+      // cancelWorkflowRun returns 202 with no body; re-read the run to report its updated state.
+      await octokit.rest.actions.cancelWorkflowRun({ owner, repo, run_id: Number(runId) });
+      const { data } = await octokit.rest.actions.getWorkflowRun({
+        owner,
+        repo,
+        run_id: Number(runId),
+      });
+      return toNativeRun(data);
     },
   };
 }

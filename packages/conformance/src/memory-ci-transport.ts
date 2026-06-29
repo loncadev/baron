@@ -4,9 +4,11 @@ import type {
   NativeLog,
   NativeRun,
   NativeRunDetail,
+  NativeTriggerResult,
   Pipeline,
   PipelineQuery,
   RunQuery,
+  TriggerInput,
 } from '@baron/core';
 
 export interface MemoryCiOptions {
@@ -77,6 +79,17 @@ export function createMemoryCiTransport(options: MemoryCiOptions = {}): CiTransp
 
     async fetchLogs(_runId: string, _options: LogOptions): Promise<NativeLog> {
       return { content: log, truncated: false };
+    },
+
+    async triggerRun(input: TriggerInput): Promise<NativeTriggerResult> {
+      return {
+        accepted: true,
+        run: { id: 'mem-triggered', pipelineId: input.pipelineId, status: 'inProgress' },
+      };
+    },
+
+    async cancelRun(runId: string): Promise<NativeRun> {
+      return { id: runId, pipelineId: 'p1', status: 'completed', result: 'canceled' };
     },
   };
 }

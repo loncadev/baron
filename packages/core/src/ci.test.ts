@@ -44,6 +44,12 @@ function transportWith(runs: NativeRun[], log = 'line1\nline2'): CiTransport {
     async fetchLogs() {
       return { content: log, truncated: true };
     },
+    async triggerRun(input) {
+      return { accepted: true, run: { id: 'new', pipelineId: input.pipelineId, status: 'queued' } };
+    },
+    async cancelRun(id) {
+      return { id, pipelineId: 'p1', status: 'completed', result: 'canceled' };
+    },
   };
 }
 
@@ -132,5 +138,39 @@ describe('BaseCiAdapter logs capability gap', () => {
     const chunk = await adapter.logs('1');
     expect(chunk.runId).toBe('1');
     expect(log.entries.some((e) => e.level === 'warn')).toBe(true);
+  });
+});
+
+describe('BaseCiAdapter trigger / cancel', () => {
+  const noWrite: CiManifest = {
+    ...fullManifest,
+    ci: { ...fullManifest.ci, canTrigger: false, canCancel: false },
+  };
+
+  it('triggers a run and normalizes the returned run', async () => {
+    const adapter = new BaseCiAdapter(
+      fullManifest,
+      statusMaps,
+      transportWith([run('1', 'queued')]),
+    );
+    const result = await adapter.trigger({ pipelineId: 'p1' });
+    expect(result.accepted).toBe(true);
+    expect(result.run?.status).toBe('queued');
+  });
+
+  it('cancels a run and normalizes its status', async () => {
+    const adapter = new BaseCiAdapter(
+      fullManifest,
+      statusMaps,
+      transportWith([run('1', 'queued')]),
+    );
+    const cancelled = await adapter.cancel('1');
+    expect(cancelled.status).toBe('canceled');
+  });
+
+  it('errors on trigger/cancel under the strict default policy when unsupported (never silent)', async () => {
+    const adapter = new BaseCiAdapter(noWrite, statusMaps, transportWith([run('1', 'queued')]));
+    await expect(adapter.trigger({ pipelineId: 'p1' })).rejects.toBeInstanceOf(CapabilityGapError);
+    await expect(adapter.cancel('1')).rejects.toBeInstanceOf(CapabilityGapError);
   });
 });

@@ -9,9 +9,11 @@ import {
   type NativeLog,
   type NativeRun,
   type NativeRunDetail,
+  type NativeTriggerResult,
   type Pipeline,
   type PipelineQuery,
   type RunQuery,
+  type TriggerInput,
 } from '@baron/core';
 import * as azdev from 'azure-devops-node-api';
 import {
@@ -168,6 +170,36 @@ export function createAzureDevOpsCiTransport(options: AzureDevOpsCiTransportOpti
       const start = Math.max(0, lineCount - tail);
       const lines = await build.getBuildLogLines(project, buildId, logId, start, lineCount);
       return { content: lines.join('\n'), truncated: start > 0 || logs.length > 1 };
+    },
+
+    async triggerRun(input: TriggerInput): Promise<NativeTriggerResult> {
+      const build = await api();
+      const queued = await build.queueBuild(
+        {
+          definition: { id: Number(input.pipelineId) },
+          ...(input.ref !== undefined
+            ? {
+                sourceBranch: input.ref.startsWith(REFS_HEADS)
+                  ? input.ref
+                  : `${REFS_HEADS}${input.ref}`,
+              }
+            : {}),
+          ...(input.variables !== undefined ? { parameters: JSON.stringify(input.variables) } : {}),
+        },
+        project,
+      );
+      return { accepted: true, run: toNativeRun(queued) };
+    },
+
+    async cancelRun(runId: string): Promise<NativeRun> {
+      const build = await api();
+      // Azure cancels a build by transitioning it to the Cancelling status.
+      const updated = await build.updateBuild(
+        { status: BuildStatus.Cancelling },
+        project,
+        Number(runId),
+      );
+      return toNativeRun(updated);
     },
   };
 }
