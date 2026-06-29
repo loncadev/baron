@@ -112,7 +112,19 @@ committed and green:
 ## Agreed next step
 
 The planned ARCHITECTURE is built end-to-end (config → ports → MCP → recipes → knowledge loop).
-What remains is validation and expansion — not yet chosen; decide at the start of the next session:
+What remains is validation, documentation, and expansion.
+
+**Active direction (user-chosen, 2026-06-28):**
+
+1. **Dogfood Baron on BeeMaster** (`C:\Users\empad\Desktop\Development\BeeMaster`) — the first
+   real-world trial. This is how live validation actually happens: `baron init` against BeeMaster's
+   real issue tracker + scm, then `baron run` / the MCP server / gated smoke against real providers
+   (needs that project's provider coordinates + credentials).
+2. **User-facing documentation** — setup + usage for people who will *use* Baron (install,
+   `baron init`, policy.json, credentials, recipes, MCP / Claude Code plugin wiring).
+3. **A documentation site** for the above.
+
+Then, as before:
 
 - **Live validation (highest value).** Point the gated smoke tests at a throwaway GitHub repo +
   Azure project to confirm the wiring against real APIs (especially the Azure board-column WEF write,
