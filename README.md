@@ -50,6 +50,7 @@ Or wire the MCP server into your agent and call the tools directly
 | [CLI](./docs/cli.md) | `baron init` / `doctor` / `run` reference. |
 | [Recipes](./docs/recipes.md) | Writing YAML recipes: `ask` / `do` / `message`, interpolation, the op table. |
 | [MCP server & plugin](./docs/mcp.md) | The MCP tools and the Claude Code plugin. |
+| [Trying it with Claude Code](./docs/trying-with-claude-code.md) | Hands-on: wire the MCP server to a real project + a verification checklist. |
 | [Providers](./docs/providers.md) | Which provider supports which port and capability. |
 
 The full design decision record is in [ARCHITECTURE.md](./ARCHITECTURE.md); the working contract

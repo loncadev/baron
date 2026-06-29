@@ -6,8 +6,9 @@ tools. The Claude Code plugin is a thin wrapper that registers it.
 
 ## What the server does at startup
 
-1. Loads `.baron/policy.json` from the working directory (missing ⇒ `POLICY_NOT_FOUND`; run
-   `baron init` first).
+1. Loads `.baron/policy.json` from the working directory — or from `BARON_ROOT` when set, which lets
+   a client (e.g. Claude Code) point the server at a project that isn't the server's own cwd (missing
+   ⇒ `POLICY_NOT_FOUND`; run `baron init` first).
 2. Builds the live ports the policy binds (`issues` and/or `scm`) plus the always-available local
    **knowledge loop** (markdown store under `.baron/knowledge`).
 3. Advertises only the tools for the bound ports, and routes each call to the right port.
