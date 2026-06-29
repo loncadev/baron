@@ -6,6 +6,7 @@ import {
   type IssueLinkType,
   type IssueQuery,
   type IssuesPort,
+  type NotifyPort,
   RUN_STATUSES,
   type RunQuery,
   type RunStatus,
@@ -31,6 +32,7 @@ export interface McpPorts {
   readonly issues?: IssuesPort;
   readonly scm?: ScmPort;
   readonly ci?: CiPort;
+  readonly notify?: NotifyPort;
   readonly knowledge?: KnowledgeLoop;
 }
 
@@ -57,6 +59,10 @@ export const CI_TOOL_NAMES = {
   runLogs: 'baron_ci_run_logs',
   runTrigger: 'baron_ci_run_trigger',
   runCancel: 'baron_ci_run_cancel',
+} as const;
+
+export const NOTIFY_TOOL_NAMES = {
+  send: 'baron_notify_send',
 } as const;
 
 export const LOOP_TOOL_NAMES = {
@@ -374,6 +380,33 @@ export const CI_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
       additionalProperties: false,
       required: ['runId'],
       properties: { runId: { type: 'string', minLength: 1 } },
+    },
+  },
+];
+
+export const NOTIFY_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
+  {
+    name: NOTIFY_TOOL_NAMES.send,
+    description:
+      'Send a notification. Targeting a channel or threading a reply may be degraded/errored per the ' +
+      'gap policy on providers that lack those capabilities.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['text'],
+      properties: {
+        text: { type: 'string', minLength: 1 },
+        channel: {
+          type: 'string',
+          minLength: 1,
+          description: 'Target channel (requires channels).',
+        },
+        threadKey: {
+          type: 'string',
+          minLength: 1,
+          description: 'Thread to reply under (an opaque key from a prior send; requires threads).',
+        },
+      },
     },
   },
 ];
@@ -834,12 +867,37 @@ export function callCiTool(
   }
 }
 
+/** Dispatch an MCP tool call to the notify port. Marshals + shapes errors only. */
+export function callNotifyTool(
+  port: NotifyPort,
+  name: string,
+  args: Record<string, unknown> | undefined,
+): Promise<ToolResult> {
+  switch (name) {
+    case NOTIFY_TOOL_NAMES.send:
+      return run(() => {
+        const channel = optionalString(args, 'channel');
+        const threadKey = optionalString(args, 'threadKey');
+        return port.send({
+          text: requireString(args, 'text'),
+          ...(channel !== undefined ? { channel } : {}),
+          ...(threadKey !== undefined ? { threadKey } : {}),
+        });
+      });
+    default:
+      return run(() => {
+        throw new BaronError(`Unknown tool '${name}'.`, 'UNKNOWN_TOOL');
+      });
+  }
+}
+
 /** The tool definitions advertised for the currently-bound ports. */
 export function activeToolDefinitions(ports: McpPorts): ToolDefinition[] {
   return [
     ...(ports.issues ? TOOL_DEFINITIONS : []),
     ...(ports.scm ? SCM_TOOL_DEFINITIONS : []),
     ...(ports.ci ? CI_TOOL_DEFINITIONS : []),
+    ...(ports.notify ? NOTIFY_TOOL_DEFINITIONS : []),
     ...(ports.knowledge ? LOOP_TOOL_DEFINITIONS : []),
   ];
 }
@@ -873,6 +931,14 @@ export function dispatchTool(
       });
     }
     return callCiTool(ports.ci, name, args);
+  }
+  if (name.startsWith('baron_notify_')) {
+    if (ports.notify === undefined) {
+      return run(() => {
+        throw new BaronError('The notify port is not configured.', 'PORT_UNBOUND');
+      });
+    }
+    return callNotifyTool(ports.notify, name, args);
   }
   if (name.startsWith('baron_learning_') || name.startsWith('baron_followup_')) {
     if (ports.knowledge === undefined) {

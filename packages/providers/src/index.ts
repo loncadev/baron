@@ -23,10 +23,16 @@ import {
   githubScmManifest,
 } from '@baron/adapter-github';
 import {
+  SLACK_PROVIDER,
+  createSlackNotifyTransport,
+  slackNotifyManifest,
+} from '@baron/adapter-slack';
+import {
   BaronError,
   type BaronPolicyFile,
   BaseCiAdapter,
   BaseIssuesAdapter,
+  BaseNotifyAdapter,
   BaseScmAdapter,
   type CapabilityManifest,
   type CiManifest,
@@ -40,6 +46,9 @@ import {
   type IssuesTransport,
   type LinkMap,
   type Logger,
+  type NotifyManifest,
+  type NotifyPort,
+  type NotifyTransport,
   type ScmManifest,
   type ScmPort,
   type ScmTransport,
@@ -62,22 +71,29 @@ export type Env = Record<string, string | undefined>;
  */
 export interface ProviderDescriptor {
   readonly id: string;
-  readonly manifest: CapabilityManifest;
-  readonly credentialEnvKeys: readonly string[];
+  // A provider implements SOME ports, not all (e.g. Slack is notify-only) — every port group is
+  // optional, and the matching build*Port throws *_UNSUPPORTED when its group is absent.
+  // issues port
+  readonly manifest?: CapabilityManifest;
+  readonly credentialEnvKeys?: readonly string[];
   /** Fixed abstract→native link types (provider knowledge, not policy); see {@link buildIssuesPort}. */
-  readonly linkMap: LinkMap;
-  createTransport(env: Env): IssuesTransport;
-  createIntrospector(env: Env): Introspector;
+  readonly linkMap?: LinkMap;
+  createTransport?(env: Env): IssuesTransport;
+  createIntrospector?(env: Env): Introspector;
   // scm port
-  readonly scmManifest: ScmManifest;
+  readonly scmManifest?: ScmManifest;
   /** Env keys for the scm transport (Azure adds AZURE_DEVOPS_REPO over the issues keys). */
-  readonly scmCredentialEnvKeys: readonly string[];
-  createScmTransport(env: Env): ScmTransport;
-  // ci port (optional — a provider may not have a ci adapter yet)
+  readonly scmCredentialEnvKeys?: readonly string[];
+  createScmTransport?(env: Env): ScmTransport;
+  // ci port
   readonly ciManifest?: CiManifest;
   readonly ciStatusMaps?: CiStatusMaps;
   readonly ciCredentialEnvKeys?: readonly string[];
   createCiTransport?(env: Env): CiTransport;
+  // notify port
+  readonly notifyManifest?: NotifyManifest;
+  readonly notifyCredentialEnvKeys?: readonly string[];
+  createNotifyTransport?(env: Env): NotifyTransport;
 }
 
 const DESCRIPTORS: Record<string, ProviderDescriptor> = {
@@ -165,6 +181,18 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
       });
     },
   },
+  [SLACK_PROVIDER]: {
+    id: SLACK_PROVIDER,
+    // Slack is notify-only: no issues/scm/ci groups.
+    notifyManifest: slackNotifyManifest,
+    notifyCredentialEnvKeys: ['SLACK_BOT_TOKEN', 'SLACK_CHANNEL'],
+    createNotifyTransport(env) {
+      return createSlackNotifyTransport({
+        token: env.SLACK_BOT_TOKEN ?? '',
+        ...(env.SLACK_CHANNEL !== undefined ? { defaultChannel: env.SLACK_CHANNEL } : {}),
+      });
+    },
+  },
 };
 
 export const KNOWN_PROVIDERS = Object.keys(DESCRIPTORS);
@@ -192,11 +220,17 @@ export function buildIssuesPort(
   logger?: Logger,
 ): IssuesPort {
   const descriptor = getProviderDescriptor(config.provider);
+  if (descriptor.manifest === undefined || descriptor.createTransport === undefined) {
+    throw new BaronError(
+      `Provider '${config.provider}' has no issues adapter.`,
+      'ISSUES_UNSUPPORTED',
+    );
+  }
   // The link map is fixed provider knowledge (not in policy.json), so inject the descriptor's
   // unless the caller already supplied one.
   const resolved: IssuesProviderConfig = {
     ...config,
-    linkMap: config.linkMap ?? descriptor.linkMap,
+    linkMap: config.linkMap ?? descriptor.linkMap ?? {},
   };
   return new BaseIssuesAdapter(
     descriptor.manifest,
@@ -218,6 +252,9 @@ export function buildScmPort(
   logger?: Logger,
 ): ScmPort {
   const descriptor = getProviderDescriptor(provider);
+  if (descriptor.scmManifest === undefined || descriptor.createScmTransport === undefined) {
+    throw new BaronError(`Provider '${provider}' has no scm adapter.`, 'SCM_UNSUPPORTED');
+  }
   return new BaseScmAdapter(
     descriptor.scmManifest,
     descriptor.createScmTransport(env),
@@ -254,10 +291,33 @@ export function buildCiPort(
   );
 }
 
+/**
+ * Build a live {@link NotifyPort} for a provider from environment credentials. Like scm/ci, notify
+ * has no user-configured map in policy, so it binds from the provider id + env + an optional gap policy.
+ */
+export function buildNotifyPort(
+  provider: string,
+  env: Env,
+  gapPolicy?: GapPolicy,
+  logger?: Logger,
+): NotifyPort {
+  const descriptor = getProviderDescriptor(provider);
+  if (descriptor.notifyManifest === undefined || descriptor.createNotifyTransport === undefined) {
+    throw new BaronError(`Provider '${provider}' has no notify adapter.`, 'NOTIFY_UNSUPPORTED');
+  }
+  return new BaseNotifyAdapter(
+    descriptor.notifyManifest,
+    descriptor.createNotifyTransport(env),
+    gapPolicy,
+    logger,
+  );
+}
+
 export interface BoundPorts {
   issues?: IssuesPort;
   scm?: ScmPort;
   ci?: CiPort;
+  notify?: NotifyPort;
 }
 
 /**
@@ -279,6 +339,11 @@ export function buildPorts(policy: BaronPolicyFile, env: Env, logger?: Logger): 
   if (ciProvider !== undefined) {
     const gapPolicy = parseGapPolicy(policy.gapPolicy?.[ciProvider] ?? {});
     ports.ci = buildCiPort(ciProvider, env, gapPolicy, logger);
+  }
+  const notifyProvider = policy.providers.notify;
+  if (notifyProvider !== undefined) {
+    const gapPolicy = parseGapPolicy(policy.gapPolicy?.[notifyProvider] ?? {});
+    ports.notify = buildNotifyPort(notifyProvider, env, gapPolicy, logger);
   }
   return ports;
 }

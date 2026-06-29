@@ -41,8 +41,13 @@ export async function runDoctor(options: DoctorOptions): Promise<DoctorReport> {
   const policy = parsePolicyJson(raw);
   const config = resolveIssuesConfig(policy);
   const descriptor = getProviderDescriptor(config.provider);
-
-  const introspector = options.introspector ?? descriptor.createIntrospector(options.env ?? {});
+  if (options.introspector === undefined && descriptor.createIntrospector === undefined) {
+    throw new BaronError(
+      `Provider '${config.provider}' has no issues adapter to introspect.`,
+      'ISSUES_UNSUPPORTED',
+    );
+  }
+  const introspector = options.introspector ?? descriptor.createIntrospector!(options.env ?? {});
   const introspection = await introspector.introspect();
 
   const stateNames = new Set(introspection.states.map((s) => s.name));

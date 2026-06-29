@@ -1,5 +1,5 @@
 {
-  "name": "@baron/providers",
+  "name": "@baron/adapter-slack",
   "version": "0.0.0",
   "type": "module",
   "license": "Apache-2.0",
@@ -24,9 +24,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@baron/core": "workspace:*",
-    "@baron/adapter-azure-devops": "workspace:*",
-    "@baron/adapter-github": "workspace:*",
-    "@baron/adapter-slack": "workspace:*"
+    "@baron/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@baron/conformance": "workspace:*",
+    "@types/node": "^22.0.0"
   }
 }

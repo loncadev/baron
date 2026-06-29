@@ -6,3 +6,5 @@ export * from './memory-scm-transport.js';
 export * from './scm-conformance.js';
 export * from './memory-ci-transport.js';
 export * from './ci-conformance.js';
+export * from './memory-notify-transport.js';
+export * from './notify-conformance.js';

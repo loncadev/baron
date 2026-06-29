@@ -56,6 +56,19 @@ importers:
         specifier: ^22.0.0
         version: 22.20.0
 
+  packages/adapters/slack:
+    dependencies:
+      '@baron/core':
+        specifier: workspace:*
+        version: link:../../core
+    devDependencies:
+      '@baron/conformance':
+        specifier: workspace:*
+        version: link:../../conformance
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.0
+
   packages/cli:
     dependencies:
       '@baron/core':
@@ -135,6 +148,9 @@ importers:
       '@baron/adapter-github':
         specifier: workspace:*
         version: link:../adapters/github
+      '@baron/adapter-slack':
+        specifier: workspace:*
+        version: link:../adapters/slack
       '@baron/core':
         specifier: workspace:*
         version: link:../core

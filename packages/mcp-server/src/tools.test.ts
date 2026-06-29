@@ -7,15 +7,19 @@ import {
 } from '@baron/adapter-github';
 import {
   createMemoryCiTransport,
+  createMemoryNotifyTransport,
   createMemoryScmTransport,
   createMemoryTransport,
 } from '@baron/conformance';
 import {
   BaseCiAdapter,
+  BaseNotifyAdapter,
   type CiManifest,
   type CiPort,
   type CiStatusMaps,
   type IssuesPort,
+  type NotifyManifest,
+  type NotifyPort,
   type ScmPort,
   WORKFLOW_ROLES,
   WORK_ITEM_TYPE_ROLES,
@@ -26,11 +30,13 @@ import {
   CI_TOOL_NAMES,
   LOOP_TOOL_NAMES,
   MCP_TOOL_NAMES,
+  NOTIFY_TOOL_NAMES,
   SCM_TOOL_NAMES,
   TOOL_DEFINITIONS,
   activeToolDefinitions,
   callCiTool,
   callLoopTool,
+  callNotifyTool,
   callScmTool,
   callTool,
   dispatchTool,
@@ -137,6 +143,37 @@ describe('ci tools', () => {
     });
     expect(result.isError).toBe(true);
     expect(result.structuredContent?.code).toBe('INVALID_ARGS');
+  });
+});
+
+const notifyManifest: NotifyManifest = {
+  provider: 'mem',
+  notify: { channels: true, threads: true, richText: true },
+};
+function notifyPort(): NotifyPort {
+  return new BaseNotifyAdapter(notifyManifest, createMemoryNotifyTransport());
+}
+
+describe('notify tools', () => {
+  it('sends a message and returns a normalized notification', async () => {
+    const result = await callNotifyTool(notifyPort(), NOTIFY_TOOL_NAMES.send, {
+      text: 'deploy finished',
+      channel: 'releases',
+    });
+    expect(result.isError).toBeUndefined();
+    const sent = JSON.parse(result.content[0]?.text ?? '{}') as { id: string };
+    expect(sent.id).toBeTruthy();
+  });
+
+  it('advertises + dispatches notify only when the port is bound', async () => {
+    expect(
+      activeToolDefinitions({ notify: notifyPort() }).some(
+        (t) => t.name === NOTIFY_TOOL_NAMES.send,
+      ),
+    ).toBe(true);
+    expect(activeToolDefinitions({}).some((t) => t.name === NOTIFY_TOOL_NAMES.send)).toBe(false);
+    const unbound = await dispatchTool({}, NOTIFY_TOOL_NAMES.send, { text: 'x' });
+    expect(unbound.structuredContent?.code).toBe('PORT_UNBOUND');
   });
 });
 

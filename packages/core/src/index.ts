@@ -13,3 +13,4 @@ export * from './issue.js';
 export * from './ports.js';
 export * from './scm.js';
 export * from './ci.js';
+export * from './notify.js';

@@ -1,4 +1,5 @@
 import {
+  BaronError,
   type BaronPolicyFile,
   type Introspector,
   type ProviderProposal,
@@ -54,7 +55,7 @@ export function assemblePolicy(proposal: ProviderProposal): BaronPolicyFile {
 
 function credentialsTemplate(descriptor: ProviderDescriptor): string {
   const header = `# Credentials for '${descriptor.id}'. Copy this file to '${BARON_DIR}/credentials'\n# (gitignored) or export these in your environment. Never commit real values.\n`;
-  const lines = descriptor.credentialEnvKeys.map((key) => `${key}=`).join('\n');
+  const lines = (descriptor.credentialEnvKeys ?? []).map((key) => `${key}=`).join('\n');
   return `${header}${lines}\n`;
 }
 
@@ -99,6 +100,13 @@ function summarizeProposal(prompter: Prompter, proposal: ProviderProposal): void
  */
 export async function runInit(options: InitOptions): Promise<InitResult> {
   const descriptor = getProviderDescriptor(options.issuesProvider);
+  const { createIntrospector, manifest } = descriptor;
+  if (createIntrospector === undefined || manifest === undefined) {
+    throw new BaronError(
+      `Provider '${options.issuesProvider}' has no issues adapter to initialize.`,
+      'ISSUES_UNSUPPORTED',
+    );
+  }
   const path = policyPath(options.root);
 
   if (options.fs.exists(path) && options.force !== true) {
@@ -108,19 +116,19 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
     );
     if (!overwrite) {
       const introspection = await (
-        options.introspector ?? descriptor.createIntrospector(options.env ?? {})
+        options.introspector ?? createIntrospector(options.env ?? {})
       ).introspect();
       return {
         written: false,
         policyPath: path,
-        proposal: proposePolicy(introspection, descriptor.manifest),
+        proposal: proposePolicy(introspection, manifest),
       };
     }
   }
 
-  const introspector = options.introspector ?? descriptor.createIntrospector(options.env ?? {});
+  const introspector = options.introspector ?? createIntrospector(options.env ?? {});
   const introspection = await introspector.introspect();
-  const proposal = proposePolicy(introspection, descriptor.manifest);
+  const proposal = proposePolicy(introspection, manifest);
 
   summarizeProposal(options.prompter, proposal);
 
