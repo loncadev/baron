@@ -36,11 +36,20 @@ const COLUMN_KEYWORDS: Partial<Record<WorkflowRole, RegExp>> = {
 /** Keyword probes for matching a native work-item type to a type role. */
 const TYPE_KEYWORDS: Record<WorkItemTypeRole, RegExp> = {
   initiative: /initiative|theme/i,
-  epic: /epic/i,
-  story: /story|backlog item|pbi|feature|requirement/i,
+  // 'Feature' is a portfolio level above the story-level backlog item — treat it as epic, NOT story,
+  // so Scrum's 'Product Backlog Item' wins the story role instead of losing it to 'Feature'.
+  epic: /epic|feature/i,
+  story: /story|backlog item|pbi|requirement/i,
   task: /^task$|task|to-?do/i,
   subtask: /sub-?task/i,
 };
+
+/**
+ * Name probe for an `in_review` state when the provider has no `resolved`-category state. Many Azure
+ * processes (e.g. a customized Scrum with a 'Test' state) put review in an InProgress-category state,
+ * which the category-only match would miss.
+ */
+const REVIEW_STATE_NAME = /test|review|qa|verif/i;
 
 function firstStateByCategory(
   states: readonly IntrospectedState[],
@@ -68,15 +77,35 @@ export function proposeRoleMap(
 
   if (manifest.issues.arbitraryStates) {
     const stateKey = introspection.stateKey;
+    const used = new Set<string>();
     for (const [role, category] of Object.entries(ROLE_CATEGORY) as [
       WorkflowRole,
       StateCategory,
     ][]) {
-      const stateName = firstStateByCategory(introspection.states, category);
+      let stateName = firstStateByCategory(introspection.states, category);
+      // Fallback for in_review: a process may have no 'resolved'-category state but a review state
+      // (e.g. 'Test') in the InProgress category — match it by name, not reusing another role's state.
+      if (stateName === undefined && role === 'in_review') {
+        const named = introspection.states.find(
+          (s) =>
+            !used.has(s.name) &&
+            s.category !== 'completed' &&
+            s.category !== 'removed' &&
+            REVIEW_STATE_NAME.test(s.name),
+        );
+        if (named !== undefined) {
+          stateName = named.name;
+          notes.push(
+            `Mapped role 'in_review' to state '${named.name}' by name (no 'resolved'-category ` +
+              'state found); confirm it.',
+          );
+        }
+      }
       if (stateName === undefined) {
         notes.push(`No '${category}'-category state found for role '${role}'; left unmapped.`);
         continue;
       }
+      used.add(stateName);
       const target: NativeTarget = { [stateKey]: stateName };
       if (manifest.issues.separateBoardColumn && introspection.boardColumns) {
         const probe = COLUMN_KEYWORDS[role];

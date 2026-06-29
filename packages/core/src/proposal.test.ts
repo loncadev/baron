@@ -55,6 +55,49 @@ const flatIntrospection: ProviderIntrospection = {
   ],
 };
 
+// A customized Scrum process (BeeMaster-shaped): the review state is 'Test' in the InProgress
+// category (no 'resolved'-category state), and the portfolio types include both Feature and PBI.
+const scrumIntrospection: ProviderIntrospection = {
+  provider: 'azure-devops',
+  stateKey: 'state',
+  workItemTypes: [
+    { name: 'Epic' },
+    { name: 'Feature' },
+    { name: 'Product Backlog Item' },
+    { name: 'Task' },
+  ],
+  states: [
+    { name: 'New', category: 'proposed' },
+    { name: 'Active', category: 'in_progress' },
+    { name: 'Test', category: 'in_progress' },
+    { name: 'Closed', category: 'completed' },
+  ],
+};
+
+describe('proposeRoleMap (customized Scrum: in_review by state name)', () => {
+  it("maps in_review to a 'Test' state by name when no resolved-category state exists", () => {
+    const { entry } = proposeRoleMap(scrumIntrospection, richManifest);
+    expect(entry.states.backlog).toEqual({ state: 'New' });
+    expect(entry.states.in_progress).toEqual({ state: 'Active' });
+    expect(entry.states.in_review).toEqual({ state: 'Test' });
+    expect(entry.states.done).toEqual({ state: 'Closed' });
+  });
+
+  it('does not reuse the in_progress state for in_review', () => {
+    const { entry } = proposeRoleMap(scrumIntrospection, richManifest);
+    expect(entry.states.in_review?.state).not.toBe(entry.states.in_progress?.state);
+  });
+});
+
+describe('proposeTypeMap (Feature vs Product Backlog Item)', () => {
+  it('maps story to the backlog item, not Feature, and Feature-as-epic', () => {
+    const { typeMap } = proposeTypeMap(scrumIntrospection);
+    expect(typeMap.story).toBe('Product Backlog Item');
+    expect(typeMap.epic).toBe('Epic');
+    expect(typeMap.task).toBe('Task');
+  });
+});
+
 describe('proposeRoleMap (rich provider)', () => {
   it('draws each role from a native state by category and attaches matching board columns', () => {
     const { entry } = proposeRoleMap(richIntrospection, richManifest);
