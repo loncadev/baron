@@ -195,13 +195,17 @@ async function dispatchOp(ports: RecipePorts, op: RecipeOp, params: Params): Pro
     case RECIPE_OPS.scmBranchCreate:
       return scm(ports, op).createBranch({
         name: reqStr(params, 'name', op),
-        fromBranch: reqStr(params, 'fromBranch', op),
+        ...(optStr(params, 'fromBranch', op) !== undefined
+          ? { fromBranch: optStr(params, 'fromBranch', op) }
+          : {}),
       });
     case RECIPE_OPS.scmPrCreate:
       return scm(ports, op).createPullRequest({
         title: reqStr(params, 'title', op),
         sourceBranch: reqStr(params, 'sourceBranch', op),
-        targetBranch: reqStr(params, 'targetBranch', op),
+        ...(optStr(params, 'targetBranch', op) !== undefined
+          ? { targetBranch: optStr(params, 'targetBranch', op) }
+          : {}),
         ...(optStr(params, 'body', op) !== undefined ? { body: optStr(params, 'body', op) } : {}),
         ...(params.draft !== undefined ? { draft: params.draft === true } : {}),
       });

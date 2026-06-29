@@ -10,8 +10,9 @@ steps:
   - do: scm.branch.create
     as: branch
     with:
+      # fromBranch omitted on purpose — defaults to the repo's default branch (main/release/master),
+      # so this recipe is portable across repos instead of assuming 'main'.
       name: feature/${issue.id}
-      fromBranch: main
   - do: issue.transition
     as: issue
     with:

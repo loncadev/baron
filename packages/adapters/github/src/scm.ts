@@ -72,6 +72,11 @@ export function createGithubScmTransport(options: GithubTransportOptions): ScmTr
       });
       return { id: String(data.id), url: data.html_url };
     },
+
+    async defaultBranch(): Promise<string> {
+      const { data } = await octokit.rest.repos.get({ owner, repo });
+      return data.default_branch;
+    },
   };
 }
 

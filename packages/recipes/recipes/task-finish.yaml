@@ -7,9 +7,9 @@ steps:
   - do: scm.pr.create
     as: pr
     with:
+      # targetBranch omitted — defaults to the repo's default branch, keeping the recipe portable.
       title: ${title}
       sourceBranch: ${branch}
-      targetBranch: main
       draft: true
   - do: issue.transition
     with:

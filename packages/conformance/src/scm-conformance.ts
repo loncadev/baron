@@ -45,6 +45,21 @@ export function runScmConformance(target: ScmConformanceTarget): void {
       }
     });
 
+    it('defaults the base branch to the repo default when fromBranch/targetBranch are omitted', async () => {
+      const { adapter } = target.build();
+      // Omitting the base must not throw — the port resolves it from the provider's default branch,
+      // so recipes never hardcode 'main'.
+      const branch = await adapter.createBranch({ name: 'feature/defaulted' });
+      expect(branch.name).toBe('feature/defaulted');
+      expect(branch.sha).toBeTruthy();
+
+      const pr = await adapter.createPullRequest({
+        title: 'PR',
+        sourceBranch: 'feature/defaulted',
+      });
+      expect(pr.targetBranch).toBeTruthy();
+    });
+
     it('addPullRequestThread returns a thread reference', async () => {
       const { adapter } = target.build();
       const pr = await adapter.createPullRequest({

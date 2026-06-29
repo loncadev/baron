@@ -53,6 +53,9 @@ export function createAzureDevOpsScmTransport(
     return gitApi;
   };
 
+  const REFS_HEADS = 'refs/heads/';
+  let cachedDefaultBranch: Promise<string> | undefined;
+
   const prWebUrl = (id: string): string =>
     `${orgUrl}/${encodeURIComponent(project)}/_git/${encodeURIComponent(repository)}/pullrequest/${id}`;
 
@@ -120,6 +123,22 @@ export function createAzureDevOpsScmTransport(
         project,
       );
       return { id: String(thread.id ?? '') };
+    },
+
+    defaultBranch(): Promise<string> {
+      cachedDefaultBranch ??= (async () => {
+        const git = await api();
+        const repo = await git.getRepository(repository, project);
+        const ref = repo.defaultBranch; // e.g. 'refs/heads/release'
+        if (ref === undefined || ref.length === 0) {
+          throw new BaronError(
+            `Repository '${repository}' has no default branch; pass an explicit branch.`,
+            'DEFAULT_BRANCH_UNKNOWN',
+          );
+        }
+        return ref.startsWith(REFS_HEADS) ? ref.slice(REFS_HEADS.length) : ref;
+      })();
+      return cachedDefaultBranch;
     },
   };
 }

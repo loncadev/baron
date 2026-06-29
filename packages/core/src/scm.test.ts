@@ -4,8 +4,9 @@ import { RecordingLogger } from './logger.js';
 import { BaseScmAdapter, type ScmManifest, type ScmTransport } from './scm.js';
 
 const transport: ScmTransport = {
-  async createBranch(name: string) {
-    return { name, sha: 'sha1' };
+  // echo fromBranch into sha so a test can assert which base the port resolved
+  async createBranch(name: string, fromBranch: string) {
+    return { name, sha: `sha:${fromBranch}` };
   },
   async createPullRequest(input) {
     return {
@@ -18,6 +19,9 @@ const transport: ScmTransport = {
   },
   async addPullRequestThread() {
     return { id: 'thread1' };
+  },
+  async defaultBranch() {
+    return 'release';
   },
 };
 
@@ -36,6 +40,26 @@ const prDraft = {
   targetBranch: 'main',
   draft: true,
 } as const;
+
+describe('BaseScmAdapter default-branch resolution', () => {
+  it('falls back to the provider default branch when fromBranch is omitted', async () => {
+    const adapter = new BaseScmAdapter(withDraft, transport);
+    const branch = await adapter.createBranch({ name: 'feature/y' });
+    expect(branch.sha).toBe('sha:release');
+  });
+
+  it('falls back to the provider default branch when targetBranch is omitted', async () => {
+    const adapter = new BaseScmAdapter(withDraft, transport);
+    const pr = await adapter.createPullRequest({ title: 't', sourceBranch: 'feature/y' });
+    expect(pr.targetBranch).toBe('release');
+  });
+
+  it('uses the explicit branch when one is provided', async () => {
+    const adapter = new BaseScmAdapter(withDraft, transport);
+    const branch = await adapter.createBranch({ name: 'feature/y', fromBranch: 'dev' });
+    expect(branch.sha).toBe('sha:dev');
+  });
+});
 
 describe('BaseScmAdapter draft-PR gap', () => {
   it('opens a draft PR when the provider supports it', async () => {

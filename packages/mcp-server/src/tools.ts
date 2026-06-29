@@ -201,18 +201,22 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
 export const SCM_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   {
     name: SCM_TOOL_NAMES.branchCreate,
-    description: 'Create a branch from an existing base branch.',
+    description: 'Create a branch from a base branch (defaults to the repository default branch).',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
-      required: ['name', 'fromBranch'],
+      required: ['name'],
       properties: {
         name: {
           type: 'string',
           minLength: 1,
           description: 'New branch name (without refs/heads/).',
         },
-        fromBranch: { type: 'string', minLength: 1, description: 'Existing branch to fork from.' },
+        fromBranch: {
+          type: 'string',
+          minLength: 1,
+          description: "Branch to fork from. Defaults to the repository's default branch.",
+        },
       },
     },
   },
@@ -224,12 +228,16 @@ export const SCM_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       additionalProperties: false,
-      required: ['title', 'sourceBranch', 'targetBranch'],
+      required: ['title', 'sourceBranch'],
       properties: {
         title: { type: 'string', minLength: 1 },
         body: { type: 'string' },
         sourceBranch: { type: 'string', minLength: 1 },
-        targetBranch: { type: 'string', minLength: 1 },
+        targetBranch: {
+          type: 'string',
+          minLength: 1,
+          description: "Branch to merge into. Defaults to the repository's default branch.",
+        },
         draft: { type: 'boolean', description: 'Open as a draft PR when supported.' },
       },
     },
@@ -499,20 +507,22 @@ export function callScmTool(
 ): Promise<ToolResult> {
   switch (name) {
     case SCM_TOOL_NAMES.branchCreate:
-      return run(() =>
-        port.createBranch({
+      return run(() => {
+        const fromBranch = optionalString(args, 'fromBranch');
+        return port.createBranch({
           name: requireString(args, 'name'),
-          fromBranch: requireString(args, 'fromBranch'),
-        }),
-      );
+          ...(fromBranch !== undefined ? { fromBranch } : {}),
+        });
+      });
     case SCM_TOOL_NAMES.prCreate:
       return run(() => {
         const draft = optionalBoolean(args, 'draft');
         const body = optionalString(args, 'body');
+        const targetBranch = optionalString(args, 'targetBranch');
         return port.createPullRequest({
           title: requireString(args, 'title'),
           sourceBranch: requireString(args, 'sourceBranch'),
-          targetBranch: requireString(args, 'targetBranch'),
+          ...(targetBranch !== undefined ? { targetBranch } : {}),
           ...(body !== undefined ? { body } : {}),
           ...(draft !== undefined ? { draft } : {}),
         });

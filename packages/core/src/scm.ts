@@ -49,8 +49,8 @@ export interface PullRequestThread {
 /** Input to `scm.branch.create`. */
 export interface BranchDraft {
   readonly name: string;
-  /** Existing branch to fork from. */
-  readonly fromBranch: string;
+  /** Existing branch to fork from. Defaults to the repository's default branch when omitted. */
+  readonly fromBranch?: string | undefined;
 }
 
 /** Input to `scm.pr.create`. */
@@ -58,7 +58,8 @@ export interface PullRequestDraft {
   readonly title: string;
   readonly body?: string | undefined;
   readonly sourceBranch: string;
-  readonly targetBranch: string;
+  /** Branch to merge into. Defaults to the repository's default branch when omitted. */
+  readonly targetBranch?: string | undefined;
   readonly draft?: boolean | undefined;
 }
 
@@ -101,6 +102,8 @@ export interface ScmTransport {
   createBranch(name: string, fromBranch: string): Promise<NativeBranch>;
   createPullRequest(input: NativePullRequestInput): Promise<NativePullRequest>;
   addPullRequestThread(pullRequestId: string, body: string): Promise<NativeThread>;
+  /** The repository's default branch (e.g. 'main', 'release'), without a refs/heads/ prefix. */
+  defaultBranch(): Promise<string>;
 }
 
 /** The normalized primitive surface the core exposes for the `scm` port. */
@@ -126,7 +129,10 @@ export class BaseScmAdapter implements ScmPort {
   ) {}
 
   async createBranch(draft: BranchDraft): Promise<BranchRef> {
-    const native = await this.transport.createBranch(draft.name, draft.fromBranch);
+    // A recipe should never have to hardcode the base branch (it varies per repo: main / release /
+    // master); fall back to the provider's default branch so recipes stay portable (decision #4).
+    const fromBranch = draft.fromBranch ?? (await this.transport.defaultBranch());
+    const native = await this.transport.createBranch(draft.name, fromBranch);
     return { name: native.name, sha: native.sha, url: native.url };
   }
 
@@ -145,11 +151,12 @@ export class BaseScmAdapter implements ScmPort {
       draftState = false;
     }
 
+    const targetBranch = draft.targetBranch ?? (await this.transport.defaultBranch());
     const native = await this.transport.createPullRequest({
       title: draft.title,
       body: draft.body,
       sourceBranch: draft.sourceBranch,
-      targetBranch: draft.targetBranch,
+      targetBranch,
       draft: draftState,
     });
 

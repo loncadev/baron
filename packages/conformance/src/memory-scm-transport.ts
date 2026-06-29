@@ -40,5 +40,9 @@ export function createMemoryScmTransport(): ScmTransport {
         url: `mem://pr/${pullRequestId}/thread/${threadSeq}`,
       };
     },
+
+    async defaultBranch(): Promise<string> {
+      return 'main';
+    },
   };
 }
