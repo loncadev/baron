@@ -23,10 +23,10 @@ The listed target platforms are **not one category**. They map to independent ca
 | -------------------------- | ---------------------------------------------------------------- |
 | `issues`                   | Azure Boards, Jira, Linear, GitHub Issues, GitLab Issues, Asana  |
 | `scm`                      | Azure Repos, GitHub, GitLab                                      |
-| `ci` / `pipelines`         | Azure Pipelines + GitHub Actions *(read-only shipped)*; GitLab CI *(planned, see #17)* |
-| `deployments` / `environments` | Azure Environments, GitHub Environments *(planned, see #17)* |
-| `notify`                   | Slack                                                            |
-| `docs`                     | Notion, Confluence                                              |
+| `ci` / `pipelines`         | Azure Pipelines + GitHub Actions *(shipped: read + trigger/cancel + stages)*; GitLab CI *(v2)* |
+| `deploy` / `environments`  | Azure Environments + GitHub Environments *(read shipped)* |
+| `notify`                   | Slack *(shipped)*                                                |
+| `docs`                     | Notion, Confluence *(v2 — declared but unimplemented; binding it errors)* |
 
 A real org mixes them (e.g. Linear issues + GitHub PRs + Slack notify + Notion docs), so each
 port binds to a provider independently. The audience — full-stack developers and **solopreneurs**
@@ -39,12 +39,12 @@ deployment, not just work tracking (decision #17).
 | -- | ----------------- | ----------------------------------------------------------------------------------------- |
 | 1  | Substrate         | Deterministic **TypeScript** core, exposed as an **MCP server + CLI**                      |
 | 2  | Harness           | Cross-harness via MCP; Claude Code gets a rich **plugin** wrapper                          |
-| 3  | Capability model  | Independent **ports** (`issues` / `scm` / `notify` / `docs`), mix-and-match providers      |
+| 3  | Capability model  | Independent **ports** (`issues` / `scm` / `ci` / `deploy` / `notify` / `docs`), mix-and-match providers |
 | 4  | Provider impedance| **Semantic role layer**, introspected + **human-confirmed** mapping                        |
 | 5  | Adapters          | **Capability manifest** + explicit **degrade / emulate / error** policy, never silent      |
 | 6  | API grain         | Core exposes **primitives**; workflows are **portable declarative recipes** (YAML)         |
 | 7  | Interactivity     | Recipes use typed **`ask` steps**, rendered per harness (CC `AskUserQuestion`, CLI prompt) |
-| 8  | P0 providers      | **Azure DevOps + GitHub** (`issues`+`scm`), **Slack** (`notify`)                           |
+| 8  | P0 providers      | **Azure DevOps + GitHub** (`issues`+`scm`+`ci`+`deploy`), **Slack** (`notify`) — all shipped |
 | 9  | Config            | `policy` (committed) / `credentials` (gitignored) split; `baron init` + `baron doctor`     |
 | 10 | Auth              | Static tokens via env; **pluggable secret-manager hook**; OAuth apps deferred to v2        |
 | 11 | Knowledge loop    | v1: `learning` / `followup` primitives + recipes + **pluggable store** (local-md default)  |
@@ -200,5 +200,18 @@ providers — a real impedance modelled honestly (Azure returns the queued/cance
 `workflow_dispatch` is fire-and-forget so `trigger` returns `{accepted, run?}` with no run id, and
 cancel re-reads the run), and **per-stage status** in run detail (Azure build timeline → Stage/Job
 records; GitHub run jobs — both normalized onto `RunStatus`, validated live on a multi-stage Azure
-pipeline). **Next:** the GitLab CI adapter, then the provider-native escape hatch (decision #18) — so
-nothing is a hard blocker in the meantime.
+pipeline).
+
+**Slice 3 — shipped (single pane of glass, #17/#18).** The remaining ports + the escape hatch, each
+with the conformance suite + per-adapter status maps:
+- **`notify`** (decision #8 P0): core port + the **Slack** adapter (`chat.postMessage`, channels +
+  threads); `baron_notify_send`.
+- **`deploy` / environments** (#17): Azure Environments + GitHub Environments, normalized
+  `DeployStatus`; `baron_deploy_environments` / `deployments`.
+- **`scm` monitoring** (#17): `scm.pr.status` → normalized state / review decision / mergeability /
+  checks rollup.
+- **Provider-native escape hatch** (#18): `baron_native_request`, scoped to policy-bound providers.
+- Recipe ops for all of the above (`recipes/ship.yaml` composes scm + issues + ci + notify).
+
+**Next (v2):** the GitLab / Jira / Linear / Notion adapters and the `docs` port. The ci/deploy/notify/
+escape-hatch surfaces are conformance-tested; only the Azure ci read path has been validated live so far.
