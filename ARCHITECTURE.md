@@ -198,5 +198,7 @@ GitHub Actions** (the two most divergent CI models, proving the `RunStatus` laye
 Azure validated live), the MCP read tools, and the **write primitives (`trigger` / `cancel`)** on both
 providers — a real impedance modelled honestly (Azure returns the queued/cancelled build; GitHub's
 `workflow_dispatch` is fire-and-forget so `trigger` returns `{accepted, run?}` with no run id, and
-cancel re-reads the run). **Next:** stages, then the GitLab CI adapter. The provider-native escape
-hatch (decision #18) follows, so nothing is a hard blocker in the meantime.
+cancel re-reads the run), and **per-stage status** in run detail (Azure build timeline → Stage/Job
+records; GitHub run jobs — both normalized onto `RunStatus`, validated live on a multi-stage Azure
+pipeline). **Next:** the GitLab CI adapter, then the provider-native escape hatch (decision #18) — so
+nothing is a hard blocker in the meantime.
