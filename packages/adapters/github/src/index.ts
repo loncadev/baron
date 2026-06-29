@@ -88,3 +88,9 @@ export {
   defineGithubScmAdapter,
   githubScmManifest,
 } from './scm.js';
+export {
+  createGithubCiTransport,
+  defineGithubCiAdapter,
+  githubCiManifest,
+  githubCiStatusMaps,
+} from './ci.js';

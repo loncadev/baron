@@ -12,10 +12,13 @@ import {
 } from '@baron/adapter-azure-devops';
 import {
   GITHUB_PROVIDER,
+  createGithubCiTransport,
   createGithubIntrospector,
   createGithubScmTransport,
   createGithubTransport,
   exampleGithubLinkMap,
+  githubCiManifest,
+  githubCiStatusMaps,
   githubManifest,
   githubScmManifest,
 } from '@baron/adapter-github';
@@ -146,6 +149,16 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
     scmCredentialEnvKeys: ['GITHUB_OWNER', 'GITHUB_REPO', 'GITHUB_TOKEN'],
     createScmTransport(env) {
       return createGithubScmTransport({
+        owner: env.GITHUB_OWNER ?? '',
+        repo: env.GITHUB_REPO ?? '',
+        token: env.GITHUB_TOKEN ?? '',
+      });
+    },
+    ciManifest: githubCiManifest,
+    ciStatusMaps: githubCiStatusMaps,
+    ciCredentialEnvKeys: ['GITHUB_OWNER', 'GITHUB_REPO', 'GITHUB_TOKEN'],
+    createCiTransport(env) {
+      return createGithubCiTransport({
         owner: env.GITHUB_OWNER ?? '',
         repo: env.GITHUB_REPO ?? '',
         token: env.GITHUB_TOKEN ?? '',
