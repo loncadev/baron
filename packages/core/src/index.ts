@@ -12,3 +12,4 @@ export * from './role-resolver.js';
 export * from './issue.js';
 export * from './ports.js';
 export * from './scm.js';
+export * from './ci.js';

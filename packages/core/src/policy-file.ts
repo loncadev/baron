@@ -7,7 +7,7 @@ import { isWorkItemTypeRole, isWorkflowRole } from './roles.js';
  * Capability ports a policy can bind to a provider. Each binds independently — a real install
  * mixes providers (Linear issues + GitHub scm + Slack notify), so this is a map, not one provider.
  */
-export const PORT_NAMES = ['issues', 'scm', 'notify', 'docs'] as const;
+export const PORT_NAMES = ['issues', 'scm', 'ci', 'notify', 'docs'] as const;
 export type PortName = (typeof PORT_NAMES)[number];
 
 /** Per-provider role map as it appears on disk (the in-code {@link ProviderRoleMap} verbatim). */
