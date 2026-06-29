@@ -23,7 +23,7 @@ The listed target platforms are **not one category**. They map to independent ca
 | -------------------------- | ---------------------------------------------------------------- |
 | `issues`                   | Azure Boards, Jira, Linear, GitHub Issues, GitLab Issues, Asana  |
 | `scm`                      | Azure Repos, GitHub, GitLab                                      |
-| `ci` / `pipelines`         | Azure Pipelines *(read-only shipped)*; GitHub Actions, GitLab CI *(planned, see #17)* |
+| `ci` / `pipelines`         | Azure Pipelines + GitHub Actions *(read-only shipped)*; GitLab CI *(planned, see #17)* |
 | `deployments` / `environments` | Azure Environments, GitHub Environments *(planned, see #17)* |
 | `notify`                   | Slack                                                            |
 | `docs`                     | Notion, Confluence                                              |
@@ -193,7 +193,8 @@ server + CLI + recipe engine + knowledge loop, and a live dogfood against a real
 **Slice 2 — in progress (decision #17).** The `ci` / `pipelines` port: the same semantic-layer pattern
 applied to build/run status (a `RunStatus` vocabulary; per-adapter status maps since CI statuses are
 vendor-fixed). **Shipped:** the core contract + `BaseCiAdapter`, the conformance suite, the read
-primitives (`pipelines` / `runs` / `run.get` / `logs`, size-aware) on **Azure Pipelines**, and the MCP
-read tools — validated live against a real project. **Next:** the write primitives (`trigger` /
-`cancel`), stages, and the GitHub Actions adapter. The provider-native escape hatch (decision #18)
-follows, so nothing is a hard blocker in the meantime.
+primitives (`pipelines` / `runs` / `run.get` / `logs`, size-aware) on **both Azure Pipelines and
+GitHub Actions** (the two most divergent CI models, proving the `RunStatus` layer is cross-provider —
+Azure validated live), and the MCP read tools. **Next:** the write primitives (`trigger` / `cancel`),
+stages, then the GitLab CI adapter. The provider-native escape hatch (decision #18) follows, so
+nothing is a hard blocker in the meantime.
