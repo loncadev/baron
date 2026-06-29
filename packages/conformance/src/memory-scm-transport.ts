@@ -44,5 +44,16 @@ export function createMemoryScmTransport(): ScmTransport {
     async defaultBranch(): Promise<string> {
       return 'main';
     },
+
+    async getPullRequestStatus(pullRequestId: string) {
+      return {
+        id: pullRequestId,
+        state: 'open' as const,
+        reviewDecision: 'review_required' as const,
+        mergeable: true,
+        checks: { total: 1, succeeded: 1, failed: 0, pending: 0, rollup: 'succeeded' as const },
+        url: `mem://pr/${pullRequestId}`,
+      };
+    },
   };
 }

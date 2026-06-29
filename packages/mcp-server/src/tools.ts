@@ -58,6 +58,7 @@ export const SCM_TOOL_NAMES = {
   branchCreate: 'baron_scm_branch_create',
   prCreate: 'baron_scm_pr_create',
   prThread: 'baron_scm_pr_thread',
+  prStatus: 'baron_scm_pr_status',
 } as const;
 
 export const CI_TOOL_NAMES = {
@@ -292,6 +293,18 @@ export const SCM_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
         pullRequestId: { type: 'string', minLength: 1 },
         body: { type: 'string', minLength: 1 },
       },
+    },
+  },
+  {
+    name: SCM_TOOL_NAMES.prStatus,
+    description:
+      "Read a pull request's normalized status: state, review decision, mergeability, and a checks " +
+      'rollup — the "is it ready to merge?" view.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['pullRequestId'],
+      properties: { pullRequestId: { type: 'string', minLength: 1 } },
     },
   },
 ];
@@ -753,6 +766,8 @@ export function callScmTool(
           ...(draft !== undefined ? { draft } : {}),
         });
       });
+    case SCM_TOOL_NAMES.prStatus:
+      return run(() => port.prStatus(requireString(args, 'pullRequestId')));
     case SCM_TOOL_NAMES.prThread:
       return run(() =>
         port.addPullRequestThread(

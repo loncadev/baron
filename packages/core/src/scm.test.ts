@@ -23,6 +23,15 @@ const transport: ScmTransport = {
   async defaultBranch() {
     return 'release';
   },
+  async getPullRequestStatus(pullRequestId: string) {
+    return {
+      id: pullRequestId,
+      state: 'open' as const,
+      reviewDecision: 'approved' as const,
+      mergeable: true,
+      checks: { total: 2, succeeded: 2, failed: 0, pending: 0, rollup: 'succeeded' as const },
+    };
+  },
 };
 
 const noDraft: ScmManifest = {
@@ -58,6 +67,17 @@ describe('BaseScmAdapter default-branch resolution', () => {
     const adapter = new BaseScmAdapter(withDraft, transport);
     const branch = await adapter.createBranch({ name: 'feature/y', fromBranch: 'dev' });
     expect(branch.sha).toBe('sha:dev');
+  });
+});
+
+describe('BaseScmAdapter prStatus', () => {
+  it('delegates a normalized pull-request status from the transport', async () => {
+    const adapter = new BaseScmAdapter(withDraft, transport);
+    const status = await adapter.prStatus('5');
+    expect(status.id).toBe('5');
+    expect(status.state).toBe('open');
+    expect(status.reviewDecision).toBe('approved');
+    expect(status.checks.rollup).toBe('succeeded');
   });
 });
 

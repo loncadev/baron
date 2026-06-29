@@ -1,11 +1,14 @@
 import {
   BaseScmAdapter,
+  type CheckRollup,
   type GapPolicy,
   type Logger,
   type NativeBranch,
   type NativePullRequest,
   type NativePullRequestInput,
   type NativeThread,
+  type PullRequestStatus,
+  type ReviewDecision,
   type ScmManifest,
   type ScmTransport,
 } from '@baron/core';
@@ -76,6 +79,72 @@ export function createGithubScmTransport(options: GithubTransportOptions): ScmTr
     async defaultBranch(): Promise<string> {
       const { data } = await octokit.rest.repos.get({ owner, repo });
       return data.default_branch;
+    },
+
+    async getPullRequestStatus(pullRequestId: string): Promise<PullRequestStatus> {
+      const prNum = Number(pullRequestId);
+      const { data: pr } = await octokit.rest.pulls.get({ owner, repo, pull_number: prNum });
+      const state = pr.merged
+        ? 'merged'
+        : pr.state === 'closed'
+          ? 'closed'
+          : pr.state === 'open'
+            ? 'open'
+            : 'unknown';
+
+      // Latest decisive review per author → an aggregate decision.
+      const { data: reviews } = await octokit.rest.pulls.listReviews({
+        owner,
+        repo,
+        pull_number: prNum,
+        per_page: 100,
+      });
+      const latest = new Map<string, string>();
+      for (const r of reviews) {
+        const login = r.user?.login;
+        if (login !== undefined && (r.state === 'APPROVED' || r.state === 'CHANGES_REQUESTED')) {
+          latest.set(login, r.state);
+        }
+      }
+      const states = [...latest.values()];
+      const reviewDecision: ReviewDecision = states.includes('CHANGES_REQUESTED')
+        ? 'changes_requested'
+        : states.includes('APPROVED')
+          ? 'approved'
+          : 'review_required';
+
+      // Check runs on the PR head → a rollup.
+      const { data: checks } = await octokit.rest.checks.listForRef({
+        owner,
+        repo,
+        ref: pr.head.sha,
+        per_page: 100,
+      });
+      let succeeded = 0;
+      let failed = 0;
+      let pending = 0;
+      for (const c of checks.check_runs) {
+        if (c.status !== 'completed') pending += 1;
+        else if (
+          c.conclusion === 'success' ||
+          c.conclusion === 'neutral' ||
+          c.conclusion === 'skipped'
+        )
+          succeeded += 1;
+        else failed += 1;
+      }
+      const total = checks.check_runs.length;
+      const rollup: CheckRollup =
+        total === 0 ? 'none' : failed > 0 ? 'failed' : pending > 0 ? 'pending' : 'succeeded';
+
+      return {
+        id: String(pr.number),
+        state,
+        reviewDecision,
+        ...(pr.mergeable != null ? { mergeable: pr.mergeable } : {}),
+        checks: { total, succeeded, failed, pending, rollup },
+        url: pr.html_url,
+      };
     },
   };
 }

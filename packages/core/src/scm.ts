@@ -98,12 +98,55 @@ export interface NativeThread {
  * the vendor SDK; tests pass an in-memory fake — the same separation that keeps the conformance
  * suite network-free.
  */
+/** Normalized PR lifecycle state. */
+export const PR_STATES = ['open', 'merged', 'closed', 'unknown'] as const;
+export type PrState = (typeof PR_STATES)[number];
+
+/** Normalized review decision across providers (Azure reviewer votes / GitHub review states). */
+export const REVIEW_DECISIONS = [
+  'approved',
+  'changes_requested',
+  'review_required',
+  'pending',
+  'unknown',
+] as const;
+export type ReviewDecision = (typeof REVIEW_DECISIONS)[number];
+
+/** Normalized rollup of a PR's checks (CI/policy validations). */
+export const CHECK_ROLLUPS = ['succeeded', 'failed', 'pending', 'none'] as const;
+export type CheckRollup = (typeof CHECK_ROLLUPS)[number];
+
+export interface CheckSummary {
+  readonly total: number;
+  readonly succeeded: number;
+  readonly failed: number;
+  readonly pending: number;
+  readonly rollup: CheckRollup;
+}
+
+/**
+ * A normalized pull-request status — the "is this PR ready to merge?" view (scm monitoring). The
+ * review/check aggregation is irreducibly provider-specific (Azure reviewer votes + policy vs GitHub
+ * review states + checks), so each adapter computes it; the shape is uniform.
+ */
+export interface PullRequestStatus {
+  readonly id: string;
+  readonly state: PrState;
+  readonly reviewDecision: ReviewDecision;
+  /** Whether the PR can merge cleanly; undefined when the provider hasn't computed it. */
+  readonly mergeable?: boolean | undefined;
+  readonly checks: CheckSummary;
+  readonly url?: string | undefined;
+}
+
 export interface ScmTransport {
   createBranch(name: string, fromBranch: string): Promise<NativeBranch>;
   createPullRequest(input: NativePullRequestInput): Promise<NativePullRequest>;
   addPullRequestThread(pullRequestId: string, body: string): Promise<NativeThread>;
   /** The repository's default branch (e.g. 'main', 'release'), without a refs/heads/ prefix. */
   defaultBranch(): Promise<string>;
+  /** Normalized PR status (state + review decision + mergeability + checks rollup). */
+  getPullRequestStatus(pullRequestId: string): Promise<PullRequestStatus>;
 }
 
 /** The normalized primitive surface the core exposes for the `scm` port. */
@@ -112,6 +155,8 @@ export interface ScmPort {
   createBranch(draft: BranchDraft): Promise<BranchRef>;
   createPullRequest(draft: PullRequestDraft): Promise<PullRequest>;
   addPullRequestThread(pullRequestId: string, body: string): Promise<PullRequestThread>;
+  /** Read a PR's normalized status (scm monitoring): state, review decision, mergeability, checks. */
+  prStatus(pullRequestId: string): Promise<PullRequestStatus>;
 }
 
 /**
@@ -169,6 +214,12 @@ export class BaseScmAdapter implements ScmPort {
       targetBranch: native.targetBranch,
       draft: native.draft,
     };
+  }
+
+  async prStatus(pullRequestId: string): Promise<PullRequestStatus> {
+    // Aggregation is provider-specific (votes/policy vs reviews/checks), so the transport computes
+    // the normalized status; the base simply delegates.
+    return this.transport.getPullRequestStatus(pullRequestId);
   }
 
   async addPullRequestThread(pullRequestId: string, body: string): Promise<PullRequestThread> {

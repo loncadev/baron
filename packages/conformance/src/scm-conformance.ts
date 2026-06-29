@@ -60,6 +60,17 @@ export function runScmConformance(target: ScmConformanceTarget): void {
       expect(pr.targetBranch).toBeTruthy();
     });
 
+    it('reports a normalized pull-request status (state + review decision + checks rollup)', async () => {
+      const { adapter } = target.build();
+      const pr = await adapter.createPullRequest({ title: 'PR', sourceBranch: 'feature/x' });
+      const status = await adapter.prStatus(pr.id);
+      expect(['open', 'merged', 'closed', 'unknown']).toContain(status.state);
+      expect(['approved', 'changes_requested', 'review_required', 'pending', 'unknown']).toContain(
+        status.reviewDecision,
+      );
+      expect(['succeeded', 'failed', 'pending', 'none']).toContain(status.checks.rollup);
+    });
+
     it('addPullRequestThread returns a thread reference', async () => {
       const { adapter } = target.build();
       const pr = await adapter.createPullRequest({

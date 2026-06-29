@@ -7,13 +7,17 @@ import {
   type NativePullRequest,
   type NativePullRequestInput,
   type NativeThread,
+  type PullRequestStatus,
+  type ReviewDecision,
   type ScmManifest,
   type ScmTransport,
 } from '@baron/core';
 import * as azdev from 'azure-devops-node-api';
 import {
+  PullRequestStatus as AzurePrStatus,
   type GitPullRequest,
   GitRefUpdateStatus,
+  PullRequestAsyncStatus,
 } from 'azure-devops-node-api/interfaces/GitInterfaces.js';
 import { AZURE_DEVOPS_PROVIDER } from './provider.js';
 
@@ -123,6 +127,47 @@ export function createAzureDevOpsScmTransport(
         project,
       );
       return { id: String(thread.id ?? '') };
+    },
+
+    async getPullRequestStatus(pullRequestId: string): Promise<PullRequestStatus> {
+      const git = await api();
+      const pr = await git.getPullRequestById(Number(pullRequestId), project);
+      const state =
+        pr.status === AzurePrStatus.Completed
+          ? 'merged'
+          : pr.status === AzurePrStatus.Abandoned
+            ? 'closed'
+            : pr.status === AzurePrStatus.Active
+              ? 'open'
+              : 'unknown';
+      // Azure reviewer votes: 10/5 approve, 0 none, -5 waiting-for-author, -10 rejected.
+      const votes = (pr.reviewers ?? []).map((r) => r.vote ?? 0);
+      const hasReject = votes.some((v) => v <= -10);
+      const hasApprove = votes.some((v) => v >= 5);
+      const hasWaiting = votes.some((v) => v === -5);
+      const reviewDecision: ReviewDecision = hasReject
+        ? 'changes_requested'
+        : hasApprove && !hasWaiting
+          ? 'approved'
+          : hasApprove || hasWaiting
+            ? 'pending'
+            : 'review_required';
+      const mergeable =
+        pr.mergeStatus === PullRequestAsyncStatus.Succeeded
+          ? true
+          : pr.mergeStatus === PullRequestAsyncStatus.Conflicts
+            ? false
+            : undefined;
+      const id = String(pr.pullRequestId ?? pullRequestId);
+      return {
+        id,
+        state,
+        reviewDecision,
+        ...(mergeable !== undefined ? { mergeable } : {}),
+        // Azure PR checks are policy evaluations (a separate Policy API) — not surfaced in this slice.
+        checks: { total: 0, succeeded: 0, failed: 0, pending: 0, rollup: 'none' },
+        url: prWebUrl(id),
+      };
     },
 
     defaultBranch(): Promise<string> {
