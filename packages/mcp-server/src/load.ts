@@ -5,11 +5,12 @@ import {
   type Env,
   buildPorts,
   credentialsPath,
+  executeNativeRequest,
   knowledgeDir,
   mergeCredentials,
   policyPath,
 } from '@baron/providers';
-import type { McpPorts } from './tools.js';
+import type { McpPorts, NativeAccess } from './tools.js';
 
 function readIfPresent(path: string): string | undefined {
   return existsSync(path) ? readFileSync(path, 'utf8') : undefined;
@@ -32,8 +33,23 @@ export function loadPorts(root: string, env: Env): McpPorts {
   }
 
   const effectiveEnv = mergeCredentials(env, readIfPresent(credentialsPath(root)));
+  const policy = parsePolicyJson(raw);
+  // The escape hatch reaches only providers this policy actually binds — never an arbitrary one.
+  const boundProviders = new Set(
+    Object.values(policy.providers).filter((p): p is string => typeof p === 'string'),
+  );
+  const nativeAccess: NativeAccess = (provider, request) => {
+    if (!boundProviders.has(provider)) {
+      throw new BaronError(
+        `Provider '${provider}' is not bound in this policy; the escape hatch only reaches bound providers.`,
+        'NATIVE_UNSUPPORTED',
+      );
+    }
+    return executeNativeRequest(provider, effectiveEnv, request);
+  };
   return {
-    ...buildPorts(parsePolicyJson(raw), effectiveEnv),
+    ...buildPorts(policy, effectiveEnv),
+    nativeAccess,
     knowledge: createLocalKnowledgeLoop(knowledgeDir(root)),
   };
 }

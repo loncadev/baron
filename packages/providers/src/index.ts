@@ -55,9 +55,17 @@ import {
   parseGapPolicy,
   resolveIssuesConfig,
 } from '@baron/core';
+import {
+  type NativeHttp,
+  type NativeRequest,
+  type NativeResponse,
+  azureBasicAuth,
+  runNativeRequest,
+} from './native.js';
 
 export * from './paths.js';
 export * from './credentials.js';
+export * from './native.js';
 
 /** A read-only view of process environment (credentials live here, never in committed policy). */
 export type Env = Record<string, string | undefined>;
@@ -94,6 +102,8 @@ export interface ProviderDescriptor {
   readonly notifyManifest?: NotifyManifest;
   readonly notifyCredentialEnvKeys?: readonly string[];
   createNotifyTransport?(env: Env): NotifyTransport;
+  // provider-native escape hatch (decision #18): raw authenticated REST, last resort, non-portable
+  readonly nativeHttp?: NativeHttp;
 }
 
 const DESCRIPTORS: Record<string, ProviderDescriptor> = {
@@ -141,6 +151,10 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
         token: env.AZURE_DEVOPS_TOKEN ?? '',
       });
     },
+    nativeHttp: {
+      baseUrl: (env) => `https://dev.azure.com/${env.AZURE_DEVOPS_ORG ?? ''}`,
+      authHeader: (env) => azureBasicAuth(env.AZURE_DEVOPS_TOKEN ?? ''),
+    },
   },
   [GITHUB_PROVIDER]: {
     id: GITHUB_PROVIDER,
@@ -180,6 +194,10 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
         token: env.GITHUB_TOKEN ?? '',
       });
     },
+    nativeHttp: {
+      baseUrl: () => 'https://api.github.com',
+      authHeader: (env) => `Bearer ${env.GITHUB_TOKEN ?? ''}`,
+    },
   },
   [SLACK_PROVIDER]: {
     id: SLACK_PROVIDER,
@@ -191,6 +209,10 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
         token: env.SLACK_BOT_TOKEN ?? '',
         ...(env.SLACK_CHANNEL !== undefined ? { defaultChannel: env.SLACK_CHANNEL } : {}),
       });
+    },
+    nativeHttp: {
+      baseUrl: () => 'https://slack.com/api',
+      authHeader: (env) => `Bearer ${env.SLACK_BOT_TOKEN ?? ''}`,
     },
   },
 };
@@ -311,6 +333,27 @@ export function buildNotifyPort(
     gapPolicy,
     logger,
   );
+}
+
+/**
+ * Execute a provider-native escape-hatch request (decision #18). Looks up the provider's raw-HTTP
+ * descriptor and runs the request with its base URL + auth; throws NATIVE_UNSUPPORTED if the provider
+ * exposes no escape hatch. This is the last-resort, non-portable path — callers (e.g. the MCP server)
+ * should restrict it to providers the active policy actually binds.
+ */
+export function executeNativeRequest(
+  provider: string,
+  env: Env,
+  request: NativeRequest,
+): Promise<NativeResponse> {
+  const descriptor = getProviderDescriptor(provider);
+  if (descriptor.nativeHttp === undefined) {
+    throw new BaronError(
+      `Provider '${provider}' has no native escape hatch.`,
+      'NATIVE_UNSUPPORTED',
+    );
+  }
+  return runNativeRequest(descriptor.nativeHttp, env, request);
 }
 
 export interface BoundPorts {

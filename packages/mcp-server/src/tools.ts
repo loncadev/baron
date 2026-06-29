@@ -26,6 +26,10 @@ import {
   type KnowledgeLoop,
   isFollowupStatus,
 } from '@baron/knowledge-loop';
+import type { NativeRequest, NativeResponse } from '@baron/providers';
+
+/** The provider-native escape hatch (decision #18), restricted by the caller to bound providers. */
+export type NativeAccess = (provider: string, request: NativeRequest) => Promise<NativeResponse>;
 
 /** The ports the MCP server serves. issues/scm bind from policy; knowledge is always available. */
 export interface McpPorts {
@@ -34,6 +38,8 @@ export interface McpPorts {
   readonly ci?: CiPort;
   readonly notify?: NotifyPort;
   readonly knowledge?: KnowledgeLoop;
+  /** Provider-native escape hatch (decision #18); set by the loader, scoped to bound providers. */
+  readonly nativeAccess?: NativeAccess;
 }
 
 /** Tool names: snake_case, `baron_` (product) namespace, singular noun to mirror the primitives. */
@@ -63,6 +69,10 @@ export const CI_TOOL_NAMES = {
 
 export const NOTIFY_TOOL_NAMES = {
   send: 'baron_notify_send',
+} as const;
+
+export const NATIVE_TOOL_NAMES = {
+  request: 'baron_native_request',
 } as const;
 
 export const LOOP_TOOL_NAMES = {
@@ -406,6 +416,34 @@ export const NOTIFY_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
           minLength: 1,
           description: 'Thread to reply under (an opaque key from a prior send; requires threads).',
         },
+      },
+    },
+  },
+];
+
+export const NATIVE_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
+  {
+    name: NATIVE_TOOL_NAMES.request,
+    description:
+      'ESCAPE HATCH — a raw, authenticated, NON-PORTABLE provider REST call. Last resort for when no ' +
+      'normalized tool (issue/scm/ci/notify) covers the need. You supply the provider-native ' +
+      'method + path (+ query/body); Baron only attaches the base URL + auth and returns the ' +
+      '(size-capped) response. Prefer the normalized tools — this is provider-specific and will not ' +
+      'port to another provider. Only providers bound in the active policy are reachable.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['provider', 'method', 'path'],
+      properties: {
+        provider: { type: 'string', minLength: 1, description: 'A provider bound in the policy.' },
+        method: { type: 'string', minLength: 1, description: 'HTTP method (GET/POST/PATCH/…).' },
+        path: {
+          type: 'string',
+          minLength: 1,
+          description: 'Provider-relative path, including any required api-version query.',
+        },
+        query: { type: 'object', additionalProperties: { type: 'string' } },
+        body: { description: 'JSON request body (any shape).' },
       },
     },
   },
@@ -891,6 +929,31 @@ export function callNotifyTool(
   }
 }
 
+/** Dispatch the escape-hatch tool to the native access fn. Marshals + shapes errors only. */
+export function callNativeTool(
+  access: NativeAccess,
+  name: string,
+  args: Record<string, unknown> | undefined,
+): Promise<ToolResult> {
+  switch (name) {
+    case NATIVE_TOOL_NAMES.request:
+      return run(() => {
+        const query = optionalStringRecord(args, 'query');
+        const body = args?.body;
+        return access(requireString(args, 'provider'), {
+          method: requireString(args, 'method'),
+          path: requireString(args, 'path'),
+          ...(query !== undefined ? { query } : {}),
+          ...(body !== undefined ? { body } : {}),
+        });
+      });
+    default:
+      return run(() => {
+        throw new BaronError(`Unknown tool '${name}'.`, 'UNKNOWN_TOOL');
+      });
+  }
+}
+
 /** The tool definitions advertised for the currently-bound ports. */
 export function activeToolDefinitions(ports: McpPorts): ToolDefinition[] {
   return [
@@ -898,6 +961,7 @@ export function activeToolDefinitions(ports: McpPorts): ToolDefinition[] {
     ...(ports.scm ? SCM_TOOL_DEFINITIONS : []),
     ...(ports.ci ? CI_TOOL_DEFINITIONS : []),
     ...(ports.notify ? NOTIFY_TOOL_DEFINITIONS : []),
+    ...(ports.nativeAccess ? NATIVE_TOOL_DEFINITIONS : []),
     ...(ports.knowledge ? LOOP_TOOL_DEFINITIONS : []),
   ];
 }
@@ -939,6 +1003,14 @@ export function dispatchTool(
       });
     }
     return callNotifyTool(ports.notify, name, args);
+  }
+  if (name.startsWith('baron_native_')) {
+    if (ports.nativeAccess === undefined) {
+      return run(() => {
+        throw new BaronError('The provider-native escape hatch is not available.', 'PORT_UNBOUND');
+      });
+    }
+    return callNativeTool(ports.nativeAccess, name, args);
   }
   if (name.startsWith('baron_learning_') || name.startsWith('baron_followup_')) {
     if (ports.knowledge === undefined) {

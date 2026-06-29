@@ -30,7 +30,9 @@ import {
   CI_TOOL_NAMES,
   LOOP_TOOL_NAMES,
   MCP_TOOL_NAMES,
+  NATIVE_TOOL_NAMES,
   NOTIFY_TOOL_NAMES,
+  type NativeAccess,
   SCM_TOOL_NAMES,
   TOOL_DEFINITIONS,
   activeToolDefinitions,
@@ -174,6 +176,61 @@ describe('notify tools', () => {
     expect(activeToolDefinitions({}).some((t) => t.name === NOTIFY_TOOL_NAMES.send)).toBe(false);
     const unbound = await dispatchTool({}, NOTIFY_TOOL_NAMES.send, { text: 'x' });
     expect(unbound.structuredContent?.code).toBe('PORT_UNBOUND');
+  });
+});
+
+describe('native escape hatch', () => {
+  const okAccess: NativeAccess = async () => ({
+    status: 200,
+    ok: true,
+    body: { ok: true },
+    truncated: false,
+  });
+
+  it('marshals the native request (provider + method + path + query/body) to the access fn', async () => {
+    const calls: Array<{ provider: string; req: unknown }> = [];
+    const access: NativeAccess = async (provider, req) => {
+      calls.push({ provider, req });
+      return { status: 201, ok: true, body: {}, truncated: false };
+    };
+    const result = await dispatchTool({ nativeAccess: access }, NATIVE_TOOL_NAMES.request, {
+      provider: 'azure-devops',
+      method: 'POST',
+      path: '/_apis/wit/workitems',
+      query: { 'api-version': '7.1' },
+      body: { title: 'x' },
+    });
+    expect(result.isError).toBeUndefined();
+    expect(calls).toEqual([
+      {
+        provider: 'azure-devops',
+        req: {
+          method: 'POST',
+          path: '/_apis/wit/workitems',
+          query: { 'api-version': '7.1' },
+          body: { title: 'x' },
+        },
+      },
+    ]);
+  });
+
+  it('advertises the escape hatch only when nativeAccess is wired', () => {
+    expect(
+      activeToolDefinitions({ nativeAccess: okAccess }).some(
+        (t) => t.name === NATIVE_TOOL_NAMES.request,
+      ),
+    ).toBe(true);
+    expect(activeToolDefinitions({}).some((t) => t.name === NATIVE_TOOL_NAMES.request)).toBe(false);
+  });
+
+  it('reports unavailable when no escape hatch is wired', async () => {
+    const result = await dispatchTool({}, NATIVE_TOOL_NAMES.request, {
+      provider: 'x',
+      method: 'GET',
+      path: '/',
+    });
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent?.code).toBe('PORT_UNBOUND');
   });
 });
 
