@@ -7,16 +7,21 @@ import {
 } from '@baron/adapter-github';
 import {
   createMemoryCiTransport,
+  createMemoryDeployTransport,
   createMemoryNotifyTransport,
   createMemoryScmTransport,
   createMemoryTransport,
 } from '@baron/conformance';
 import {
   BaseCiAdapter,
+  BaseDeployAdapter,
   BaseNotifyAdapter,
   type CiManifest,
   type CiPort,
   type CiStatusMaps,
+  type DeployManifest,
+  type DeployPort,
+  type DeployStatusMaps,
   type IssuesPort,
   type NotifyManifest,
   type NotifyPort,
@@ -28,6 +33,7 @@ import { KnowledgeLoop, createMemoryKnowledgeStore } from '@baron/knowledge-loop
 import { describe, expect, it } from 'vitest';
 import {
   CI_TOOL_NAMES,
+  DEPLOY_TOOL_NAMES,
   LOOP_TOOL_NAMES,
   MCP_TOOL_NAMES,
   NATIVE_TOOL_NAMES,
@@ -37,6 +43,7 @@ import {
   TOOL_DEFINITIONS,
   activeToolDefinitions,
   callCiTool,
+  callDeployTool,
   callLoopTool,
   callNotifyTool,
   callScmTool,
@@ -231,6 +238,43 @@ describe('native escape hatch', () => {
     });
     expect(result.isError).toBe(true);
     expect(result.structuredContent?.code).toBe('PORT_UNBOUND');
+  });
+});
+
+const deployManifest: DeployManifest = {
+  provider: 'mem',
+  deploy: { environments: true, deployments: true, canTrigger: false },
+};
+const deployMaps: DeployStatusMaps = {
+  status: { InProgress: 'running' },
+  result: { Succeeded: 'succeeded' },
+};
+function deployPort(): DeployPort {
+  return new BaseDeployAdapter(deployManifest, deployMaps, createMemoryDeployTransport());
+}
+
+describe('deploy tools', () => {
+  it('lists environments and deployments with a normalized status', async () => {
+    const envs = await callDeployTool(deployPort(), DEPLOY_TOOL_NAMES.environments, {});
+    expect(envs.isError).toBeUndefined();
+    const deps = await callDeployTool(deployPort(), DEPLOY_TOOL_NAMES.deployments, {});
+    expect(deps.isError).toBeUndefined();
+    const list = JSON.parse(deps.content[0]?.text ?? '[]') as Array<{ status: string }>;
+    expect(list.length).toBeGreaterThan(0);
+    expect(list.every((d) => typeof d.status === 'string')).toBe(true);
+  });
+
+  it('advertises + dispatches deploy only when the port is bound', async () => {
+    expect(
+      activeToolDefinitions({ deploy: deployPort() }).some(
+        (t) => t.name === DEPLOY_TOOL_NAMES.deployments,
+      ),
+    ).toBe(true);
+    expect(activeToolDefinitions({}).some((t) => t.name === DEPLOY_TOOL_NAMES.deployments)).toBe(
+      false,
+    );
+    const unbound = await dispatchTool({}, DEPLOY_TOOL_NAMES.deployments, {});
+    expect(unbound.structuredContent?.code).toBe('PORT_UNBOUND');
   });
 });
 

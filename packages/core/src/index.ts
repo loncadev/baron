@@ -14,3 +14,4 @@ export * from './ports.js';
 export * from './scm.js';
 export * from './ci.js';
 export * from './notify.js';
+export * from './deploy.js';

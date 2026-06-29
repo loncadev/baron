@@ -2,9 +2,12 @@ import {
   AZURE_DEVOPS_PROVIDER,
   azureDevOpsCiManifest,
   azureDevOpsCiStatusMaps,
+  azureDevOpsDeployManifest,
+  azureDevOpsDeployStatusMaps,
   azureDevOpsManifest,
   azureDevOpsScmManifest,
   createAzureDevOpsCiTransport,
+  createAzureDevOpsDeployTransport,
   createAzureDevOpsIntrospector,
   createAzureDevOpsScmTransport,
   createAzureDevOpsTransport,
@@ -13,12 +16,15 @@ import {
 import {
   GITHUB_PROVIDER,
   createGithubCiTransport,
+  createGithubDeployTransport,
   createGithubIntrospector,
   createGithubScmTransport,
   createGithubTransport,
   exampleGithubLinkMap,
   githubCiManifest,
   githubCiStatusMaps,
+  githubDeployManifest,
+  githubDeployStatusMaps,
   githubManifest,
   githubScmManifest,
 } from '@baron/adapter-github';
@@ -31,6 +37,7 @@ import {
   BaronError,
   type BaronPolicyFile,
   BaseCiAdapter,
+  BaseDeployAdapter,
   BaseIssuesAdapter,
   BaseNotifyAdapter,
   BaseScmAdapter,
@@ -39,6 +46,10 @@ import {
   type CiPort,
   type CiStatusMaps,
   type CiTransport,
+  type DeployManifest,
+  type DeployPort,
+  type DeployStatusMaps,
+  type DeployTransport,
   type GapPolicy,
   type Introspector,
   type IssuesPort,
@@ -102,6 +113,11 @@ export interface ProviderDescriptor {
   readonly notifyManifest?: NotifyManifest;
   readonly notifyCredentialEnvKeys?: readonly string[];
   createNotifyTransport?(env: Env): NotifyTransport;
+  // deploy port
+  readonly deployManifest?: DeployManifest;
+  readonly deployStatusMaps?: DeployStatusMaps;
+  readonly deployCredentialEnvKeys?: readonly string[];
+  createDeployTransport?(env: Env): DeployTransport;
   // provider-native escape hatch (decision #18): raw authenticated REST, last resort, non-portable
   readonly nativeHttp?: NativeHttp;
 }
@@ -151,6 +167,16 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
         token: env.AZURE_DEVOPS_TOKEN ?? '',
       });
     },
+    deployManifest: azureDevOpsDeployManifest,
+    deployStatusMaps: azureDevOpsDeployStatusMaps,
+    deployCredentialEnvKeys: ['AZURE_DEVOPS_ORG', 'AZURE_DEVOPS_PROJECT', 'AZURE_DEVOPS_TOKEN'],
+    createDeployTransport(env) {
+      return createAzureDevOpsDeployTransport({
+        organization: env.AZURE_DEVOPS_ORG ?? '',
+        project: env.AZURE_DEVOPS_PROJECT ?? '',
+        token: env.AZURE_DEVOPS_TOKEN ?? '',
+      });
+    },
     nativeHttp: {
       baseUrl: (env) => `https://dev.azure.com/${env.AZURE_DEVOPS_ORG ?? ''}`,
       authHeader: (env) => azureBasicAuth(env.AZURE_DEVOPS_TOKEN ?? ''),
@@ -189,6 +215,16 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
     ciCredentialEnvKeys: ['GITHUB_OWNER', 'GITHUB_REPO', 'GITHUB_TOKEN'],
     createCiTransport(env) {
       return createGithubCiTransport({
+        owner: env.GITHUB_OWNER ?? '',
+        repo: env.GITHUB_REPO ?? '',
+        token: env.GITHUB_TOKEN ?? '',
+      });
+    },
+    deployManifest: githubDeployManifest,
+    deployStatusMaps: githubDeployStatusMaps,
+    deployCredentialEnvKeys: ['GITHUB_OWNER', 'GITHUB_REPO', 'GITHUB_TOKEN'],
+    createDeployTransport(env) {
+      return createGithubDeployTransport({
         owner: env.GITHUB_OWNER ?? '',
         repo: env.GITHUB_REPO ?? '',
         token: env.GITHUB_TOKEN ?? '',
@@ -356,11 +392,36 @@ export function executeNativeRequest(
   return runNativeRequest(descriptor.nativeHttp, env, request);
 }
 
+/**
+ * Build a live {@link DeployPort} for a provider from environment credentials. Like ci/notify, the
+ * deploy port has no user-configured map in policy (deploy statuses are vendor-fixed), so it binds
+ * from the provider id + env + an optional gap policy.
+ */
+export function buildDeployPort(
+  provider: string,
+  env: Env,
+  gapPolicy?: GapPolicy,
+  logger?: Logger,
+): DeployPort {
+  const descriptor = getProviderDescriptor(provider);
+  if (descriptor.deployManifest === undefined || descriptor.createDeployTransport === undefined) {
+    throw new BaronError(`Provider '${provider}' has no deploy adapter.`, 'DEPLOY_UNSUPPORTED');
+  }
+  return new BaseDeployAdapter(
+    descriptor.deployManifest,
+    descriptor.deployStatusMaps ?? { status: {}, result: {} },
+    descriptor.createDeployTransport(env),
+    gapPolicy,
+    logger,
+  );
+}
+
 export interface BoundPorts {
   issues?: IssuesPort;
   scm?: ScmPort;
   ci?: CiPort;
   notify?: NotifyPort;
+  deploy?: DeployPort;
 }
 
 /**
@@ -387,6 +448,11 @@ export function buildPorts(policy: BaronPolicyFile, env: Env, logger?: Logger): 
   if (notifyProvider !== undefined) {
     const gapPolicy = parseGapPolicy(policy.gapPolicy?.[notifyProvider] ?? {});
     ports.notify = buildNotifyPort(notifyProvider, env, gapPolicy, logger);
+  }
+  const deployProvider = policy.providers.deploy;
+  if (deployProvider !== undefined) {
+    const gapPolicy = parseGapPolicy(policy.gapPolicy?.[deployProvider] ?? {});
+    ports.deploy = buildDeployPort(deployProvider, env, gapPolicy, logger);
   }
   return ports;
 }

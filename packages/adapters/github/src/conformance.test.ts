@@ -1,10 +1,12 @@
 import {
   createMemoryCiTransport,
+  createMemoryDeployTransport,
   createMemoryIntrospector,
   createMemoryScmTransport,
   createMemoryTransport,
   githubIntrospectionFixture,
   runCiConformance,
+  runDeployConformance,
   runIntrospectionConformance,
   runIssuesConformance,
   runScmConformance,
@@ -12,6 +14,7 @@ import {
 import { RecordingLogger } from '@baron/core';
 import {
   defineGithubCiAdapter,
+  defineGithubDeployAdapter,
   defineGithubIssuesAdapter,
   defineGithubScmAdapter,
   exampleGithubRoleMap,
@@ -67,6 +70,22 @@ runCiConformance({
       ],
     });
     const adapter = defineGithubCiAdapter(transport, gapPolicy, logger);
+    return { adapter, logger };
+  },
+});
+
+runDeployConformance({
+  label: 'github',
+  build(gapPolicy) {
+    const logger = new RecordingLogger();
+    // GitHub-native sample so the github deploy status maps drive real normalization.
+    const transport = createMemoryDeployTransport({
+      deployments: [
+        { id: '1', environment: 'production', status: 'success', ref: 'main', sha: 'abc' },
+        { id: '2', environment: 'staging', status: 'in_progress', ref: 'main' },
+      ],
+    });
+    const adapter = defineGithubDeployAdapter(transport, gapPolicy, logger);
     return { adapter, logger };
   },
 });

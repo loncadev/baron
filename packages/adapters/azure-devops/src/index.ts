@@ -93,3 +93,10 @@ export {
   azureDevOpsCiStatusMaps,
   type AzureDevOpsCiTransportOptions,
 } from './ci.js';
+export {
+  createAzureDevOpsDeployTransport,
+  defineAzureDevOpsDeployAdapter,
+  azureDevOpsDeployManifest,
+  azureDevOpsDeployStatusMaps,
+  type AzureDevOpsDeployTransportOptions,
+} from './deploy.js';

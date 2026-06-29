@@ -94,3 +94,9 @@ export {
   githubCiManifest,
   githubCiStatusMaps,
 } from './ci.js';
+export {
+  createGithubDeployTransport,
+  defineGithubDeployAdapter,
+  githubDeployManifest,
+  githubDeployStatusMaps,
+} from './deploy.js';

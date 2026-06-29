@@ -1,6 +1,7 @@
 import {
   BaronError,
   type CiPort,
+  type DeployPort,
   ISSUE_LINK_TYPES,
   type IssueDraft,
   type IssueLinkType,
@@ -37,6 +38,7 @@ export interface McpPorts {
   readonly scm?: ScmPort;
   readonly ci?: CiPort;
   readonly notify?: NotifyPort;
+  readonly deploy?: DeployPort;
   readonly knowledge?: KnowledgeLoop;
   /** Provider-native escape hatch (decision #18); set by the loader, scoped to bound providers. */
   readonly nativeAccess?: NativeAccess;
@@ -69,6 +71,11 @@ export const CI_TOOL_NAMES = {
 
 export const NOTIFY_TOOL_NAMES = {
   send: 'baron_notify_send',
+} as const;
+
+export const DEPLOY_TOOL_NAMES = {
+  environments: 'baron_deploy_environments',
+  deployments: 'baron_deploy_deployments',
 } as const;
 
 export const NATIVE_TOOL_NAMES = {
@@ -416,6 +423,33 @@ export const NOTIFY_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
           minLength: 1,
           description: 'Thread to reply under (an opaque key from a prior send; requires threads).',
         },
+      },
+    },
+  },
+];
+
+export const DEPLOY_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
+  {
+    name: DEPLOY_TOOL_NAMES.environments,
+    description: 'List deployment environments (e.g. dev / staging / prod).',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        limit: { type: 'number', minimum: 1, description: 'Maximum number to return.' },
+      },
+    },
+  },
+  {
+    name: DEPLOY_TOOL_NAMES.deployments,
+    description:
+      'List recent deployments with a normalized status (optionally filtered to one environment).',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        environment: { type: 'string', minLength: 1, description: 'Restrict to one environment.' },
+        limit: { type: 'number', minimum: 1, description: 'Maximum number to return.' },
       },
     },
   },
@@ -929,6 +963,34 @@ export function callNotifyTool(
   }
 }
 
+/** Dispatch an MCP tool call to the deploy port. Marshals + shapes errors only. */
+export function callDeployTool(
+  port: DeployPort,
+  name: string,
+  args: Record<string, unknown> | undefined,
+): Promise<ToolResult> {
+  switch (name) {
+    case DEPLOY_TOOL_NAMES.environments:
+      return run(() => {
+        const limit = optNumber(args, 'limit');
+        return port.environments(limit !== undefined ? { limit } : {});
+      });
+    case DEPLOY_TOOL_NAMES.deployments:
+      return run(() => {
+        const environment = optionalString(args, 'environment');
+        const limit = optNumber(args, 'limit');
+        return port.deployments({
+          ...(environment !== undefined ? { environment } : {}),
+          ...(limit !== undefined ? { limit } : {}),
+        });
+      });
+    default:
+      return run(() => {
+        throw new BaronError(`Unknown tool '${name}'.`, 'UNKNOWN_TOOL');
+      });
+  }
+}
+
 /** Dispatch the escape-hatch tool to the native access fn. Marshals + shapes errors only. */
 export function callNativeTool(
   access: NativeAccess,
@@ -961,6 +1023,7 @@ export function activeToolDefinitions(ports: McpPorts): ToolDefinition[] {
     ...(ports.scm ? SCM_TOOL_DEFINITIONS : []),
     ...(ports.ci ? CI_TOOL_DEFINITIONS : []),
     ...(ports.notify ? NOTIFY_TOOL_DEFINITIONS : []),
+    ...(ports.deploy ? DEPLOY_TOOL_DEFINITIONS : []),
     ...(ports.nativeAccess ? NATIVE_TOOL_DEFINITIONS : []),
     ...(ports.knowledge ? LOOP_TOOL_DEFINITIONS : []),
   ];
@@ -1003,6 +1066,14 @@ export function dispatchTool(
       });
     }
     return callNotifyTool(ports.notify, name, args);
+  }
+  if (name.startsWith('baron_deploy_')) {
+    if (ports.deploy === undefined) {
+      return run(() => {
+        throw new BaronError('The deploy port is not configured.', 'PORT_UNBOUND');
+      });
+    }
+    return callDeployTool(ports.deploy, name, args);
   }
   if (name.startsWith('baron_native_')) {
     if (ports.nativeAccess === undefined) {
