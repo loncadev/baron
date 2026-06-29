@@ -34,4 +34,21 @@ describe('azure-devops ci status maps', () => {
       '6': 'queued',
     });
   });
+
+  it('also normalizes the timeline (stage) enums, which share the same maps', async () => {
+    // Stages come from the build timeline (TimelineRecordState / TaskResult); these merge into the
+    // same status maps as the build axes, so the extra members must resolve too.
+    const adapter = defineAzureDevOpsCiAdapter(
+      createMemoryCiTransport({
+        runs: [
+          run('1', 'Completed', 'Skipped'),
+          run('2', 'Completed', 'SucceededWithIssues'),
+          run('3', 'Completed', 'Abandoned'),
+          run('4', 'Pending'),
+        ],
+      }),
+    );
+    const byId = Object.fromEntries((await adapter.runs()).map((r) => [r.id, r.status]));
+    expect(byId).toEqual({ '1': 'skipped', '2': 'failed', '3': 'canceled', '4': 'queued' });
+  });
 });

@@ -9,6 +9,7 @@ import {
   type NativeLog,
   type NativeRun,
   type NativeRunDetail,
+  type NativeRunStage,
   type NativeTriggerResult,
   type Pipeline,
   type PipelineQuery,
@@ -19,13 +20,13 @@ import { Octokit } from 'octokit';
 import { GITHUB_PROVIDER } from './provider.js';
 import type { GithubTransportOptions } from './transport.js';
 
-/** GitHub Actions capabilities. Jobs (≈ stages) are not surfaced as stages in slice 1. */
+/** GitHub Actions capabilities. A run's jobs are surfaced as stages in run detail. */
 export const githubCiManifest: CiManifest = {
   provider: GITHUB_PROVIDER,
   ci: {
     canTrigger: true,
     canCancel: true,
-    hasStages: false,
+    hasStages: true,
     hasApprovalGates: true,
     providesLogs: true,
     hasArtifacts: true,
@@ -127,7 +128,19 @@ export function createGithubCiTransport(options: GithubTransportOptions): CiTran
         repo,
         run_id: Number(id),
       });
-      return { ...toNativeRun(data), stages: [] };
+      // A run's jobs are its stages; they carry the same status/conclusion enums as the run.
+      const jobsResp = await octokit.rest.actions.listJobsForWorkflowRun({
+        owner,
+        repo,
+        run_id: Number(id),
+        per_page: 100,
+      });
+      const stages: NativeRunStage[] = jobsResp.data.jobs.map((j) => ({
+        name: j.name,
+        status: j.status,
+        result: j.conclusion ?? undefined,
+      }));
+      return { ...toNativeRun(data), stages };
     },
 
     async fetchLogs(runId: string, options: LogOptions): Promise<NativeLog> {

@@ -9,6 +9,7 @@ import {
   type NativeLog,
   type NativeRun,
   type NativeRunDetail,
+  type NativeRunStage,
   type NativeTriggerResult,
   type Pipeline,
   type PipelineQuery,
@@ -20,6 +21,8 @@ import {
   type Build,
   BuildResult,
   BuildStatus,
+  TaskResult,
+  TimelineRecordState,
 } from 'azure-devops-node-api/interfaces/BuildInterfaces.js';
 import { AZURE_DEVOPS_PROVIDER } from './provider.js';
 
@@ -29,16 +32,13 @@ export interface AzureDevOpsCiTransportOptions {
   readonly token: string;
 }
 
-/**
- * Azure Pipelines capabilities. `hasStages` is false in slice 1: the read surface does not yet
- * surface per-stage records (the build timeline uses different native enums — a later slice).
- */
+/** Azure Pipelines capabilities. Stages come from the build timeline (run detail). */
 export const azureDevOpsCiManifest: CiManifest = {
   provider: AZURE_DEVOPS_PROVIDER,
   ci: {
     canTrigger: true,
     canCancel: true,
-    hasStages: false,
+    hasStages: true,
     hasApprovalGates: true,
     providesLogs: true,
     hasArtifacts: true,
@@ -46,9 +46,11 @@ export const azureDevOpsCiManifest: CiManifest = {
 };
 
 /**
- * Azure's fixed build enums → normalized RunStatus. A finished build is decided by `result`; an
- * in-flight build by `status`. 'Completed' is intentionally absent from the status map so a finished
- * build is always classified by its result (the transport omits `result` until it is meaningful).
+ * Azure's fixed enums → normalized RunStatus. A finished unit is decided by its `result`, an in-flight
+ * one by its `status`; 'Completed' is intentionally absent so a finished unit is always classified by
+ * its result. Covers BOTH the build axes (BuildStatus / BuildResult) and the timeline axes
+ * (TimelineRecordState / TaskResult) for stages — the enums overlap (Succeeded/Failed/Canceled/
+ * InProgress) and the few extras are added here.
  */
 export const azureDevOpsCiStatusMaps: CiStatusMaps = {
   status: {
@@ -56,6 +58,7 @@ export const azureDevOpsCiStatusMaps: CiStatusMaps = {
     Cancelling: 'running',
     Postponed: 'queued',
     NotStarted: 'queued',
+    Pending: 'queued', // TimelineRecordState
     None: 'unknown',
   },
   result: {
@@ -63,6 +66,9 @@ export const azureDevOpsCiStatusMaps: CiStatusMaps = {
     PartiallySucceeded: 'failed',
     Failed: 'failed',
     Canceled: 'canceled',
+    Skipped: 'skipped', // TaskResult
+    SucceededWithIssues: 'failed', // TaskResult
+    Abandoned: 'canceled', // TaskResult
   },
 };
 
@@ -99,9 +105,9 @@ function toNativeRun(b: Build): NativeRun {
 }
 
 /**
- * Live `ci` transport over the Azure DevOps REST API (azure-devops-node-api BuildApi). Read-only in
- * slice 1: pipelines, runs, run detail, and a size-aware log tail. The BuildApi client is built
- * lazily and cached.
+ * Live `ci` transport over the Azure DevOps REST API (azure-devops-node-api BuildApi): pipelines,
+ * runs, run detail (with timeline stages), a size-aware log tail, plus trigger (queueBuild) and
+ * cancel (updateBuild → Cancelling). The BuildApi client is built lazily and cached.
  */
 export function createAzureDevOpsCiTransport(options: AzureDevOpsCiTransportOptions): CiTransport {
   const { organization, project, token } = options;
@@ -152,9 +158,24 @@ export function createAzureDevOpsCiTransport(options: AzureDevOpsCiTransportOpti
 
     async getRun(id: string): Promise<NativeRunDetail> {
       const build = await api();
-      const b = await build.getBuild(project, Number(id));
-      // Stages not surfaced in slice 1 (hasStages: false) — the timeline uses different native enums.
-      return { ...toNativeRun(b), stages: [] };
+      const buildId = Number(id);
+      const b = await build.getBuild(project, buildId);
+      const timeline = await build.getBuildTimeline(project, buildId).catch(() => undefined);
+      const records = timeline?.records ?? [];
+      // Surface top-level Stage records; a classic single-stage pipeline exposes Jobs instead.
+      const stageRecords = records.filter((r) => r.type === 'Stage');
+      const chosen =
+        stageRecords.length > 0 ? stageRecords : records.filter((r) => r.type === 'Job');
+      const stages: NativeRunStage[] = chosen
+        .slice()
+        .sort((a, c) => (a.order ?? 0) - (c.order ?? 0))
+        .map((r) => ({
+          name: r.name ?? '',
+          status: r.state !== undefined ? (TimelineRecordState[r.state] ?? 'Pending') : 'Pending',
+          // TaskResult.Succeeded is 0, so test against null/undefined, not falsiness.
+          result: r.result != null ? TaskResult[r.result] : undefined,
+        }));
+      return { ...toNativeRun(b), stages };
     },
 
     async fetchLogs(runId: string, options: LogOptions): Promise<NativeLog> {
