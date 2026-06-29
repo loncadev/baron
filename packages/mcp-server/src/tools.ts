@@ -55,6 +55,8 @@ export const CI_TOOL_NAMES = {
   runs: 'baron_ci_runs',
   runGet: 'baron_ci_run_get',
   runLogs: 'baron_ci_run_logs',
+  runTrigger: 'baron_ci_run_trigger',
+  runCancel: 'baron_ci_run_cancel',
 } as const;
 
 export const LOOP_TOOL_NAMES = {
@@ -338,6 +340,40 @@ export const CI_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
           description: 'Max lines to return from the tail.',
         },
       },
+    },
+  },
+  {
+    name: CI_TOOL_NAMES.runTrigger,
+    description:
+      'Queue a new run of a pipeline. Returns { accepted, run? } — `run` is present only when the ' +
+      'provider returns it synchronously (some providers dispatch asynchronously with no run id).',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['pipelineId'],
+      properties: {
+        pipelineId: { type: 'string', minLength: 1 },
+        ref: {
+          type: 'string',
+          minLength: 1,
+          description: "Branch/tag to run on. Defaults to the repository's default branch.",
+        },
+        variables: {
+          type: 'object',
+          additionalProperties: { type: 'string' },
+          description: 'Pipeline variables / workflow inputs.',
+        },
+      },
+    },
+  },
+  {
+    name: CI_TOOL_NAMES.runCancel,
+    description: 'Cancel a run; returns the run with its updated status.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['runId'],
+      properties: { runId: { type: 'string', minLength: 1 } },
     },
   },
 ];
@@ -736,7 +772,26 @@ function toRunQuery(args: Record<string, unknown> | undefined): RunQuery {
   };
 }
 
-/** Dispatch an MCP tool call to the ci port (read-only in slice 1). Marshals + shapes errors only. */
+function optionalStringRecord(
+  args: Record<string, unknown> | undefined,
+  key: string,
+): Record<string, string> | undefined {
+  const value = args?.[key];
+  if (value === undefined) return undefined;
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new BaronError(`Argument '${key}' must be an object of string values.`, INVALID_ARGS);
+  }
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(value)) {
+    if (typeof v !== 'string') {
+      throw new BaronError(`Argument '${key}.${k}' must be a string.`, INVALID_ARGS);
+    }
+    out[k] = v;
+  }
+  return out;
+}
+
+/** Dispatch an MCP tool call to the ci port. Marshals + shapes errors only. */
 export function callCiTool(
   port: CiPort,
   name: string,
@@ -760,6 +815,18 @@ export function callCiTool(
           tailLines !== undefined ? { tailLines } : {},
         );
       });
+    case CI_TOOL_NAMES.runTrigger:
+      return run(() => {
+        const ref = optionalString(args, 'ref');
+        const variables = optionalStringRecord(args, 'variables');
+        return port.trigger({
+          pipelineId: requireString(args, 'pipelineId'),
+          ...(ref !== undefined ? { ref } : {}),
+          ...(variables !== undefined ? { variables } : {}),
+        });
+      });
+    case CI_TOOL_NAMES.runCancel:
+      return run(() => port.cancel(requireString(args, 'runId')));
     default:
       return run(() => {
         throw new BaronError(`Unknown tool '${name}'.`, 'UNKNOWN_TOOL');

@@ -103,6 +103,41 @@ describe('ci tools', () => {
     expect(unbound.isError).toBe(true);
     expect(unbound.structuredContent?.code).toBe('PORT_UNBOUND');
   });
+
+  it('triggers a run (marshals pipelineId/ref/variables) and cancels a run', async () => {
+    const calls: Array<{ tool: string; args: unknown }> = [];
+    const port = {
+      trigger: async (input: unknown) => {
+        calls.push({ tool: 'trigger', args: input });
+        return { accepted: true };
+      },
+      cancel: async (id: string) => {
+        calls.push({ tool: 'cancel', args: id });
+        return { id, status: 'canceled' };
+      },
+    } as unknown as CiPort;
+    const triggered = await callCiTool(port, CI_TOOL_NAMES.runTrigger, {
+      pipelineId: 'p1',
+      ref: 'release',
+      variables: { env: 'prod' },
+    });
+    expect(triggered.isError).toBeUndefined();
+    const cancelled = await callCiTool(port, CI_TOOL_NAMES.runCancel, { runId: '9' });
+    expect(cancelled.isError).toBeUndefined();
+    expect(calls).toEqual([
+      { tool: 'trigger', args: { pipelineId: 'p1', ref: 'release', variables: { env: 'prod' } } },
+      { tool: 'cancel', args: '9' },
+    ]);
+  });
+
+  it('rejects non-string trigger variables as INVALID_ARGS', async () => {
+    const result = await callCiTool(ciPort(), CI_TOOL_NAMES.runTrigger, {
+      pipelineId: 'p1',
+      variables: { bad: 5 },
+    });
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent?.code).toBe('INVALID_ARGS');
+  });
 });
 
 function loop(): KnowledgeLoop {
