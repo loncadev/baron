@@ -23,7 +23,7 @@ The listed target platforms are **not one category**. They map to independent ca
 | -------------------------- | ---------------------------------------------------------------- |
 | `issues`                   | Azure Boards, Jira, Linear, GitHub Issues, GitLab Issues, Asana  |
 | `scm`                      | Azure Repos, GitHub, GitLab                                      |
-| `ci` / `pipelines`         | Azure Pipelines, GitHub Actions, GitLab CI *(planned, see #17)*  |
+| `ci` / `pipelines`         | Azure Pipelines *(read-only shipped)*; GitHub Actions, GitLab CI *(planned, see #17)* |
 | `deployments` / `environments` | Azure Environments, GitHub Environments *(planned, see #17)* |
 | `notify`                   | Slack                                                            |
 | `docs`                     | Notion, Confluence                                              |
@@ -190,8 +190,10 @@ point: `issue.create/transition/...` primitives, both adapters with manifests + 
 policy (GitHub hierarchy → emulate via labels), the conformance suite both adapters pass, the MCP
 server + CLI + recipe engine + knowledge loop, and a live dogfood against a real Azure DevOps project.
 
-**Slice 2 — next (decision #17).** The `ci` / `pipelines` port: the same role-layer pattern applied to
-build/run status, on Azure Pipelines and GitHub Actions, with `trigger` / `cancel` / `logs` primitives
-and a conformance suite. This is the first step toward the single-pane-of-glass coverage; the
-provider-native escape hatch (decision #18) lands alongside or just after, so nothing is a hard blocker
-in the meantime.
+**Slice 2 — in progress (decision #17).** The `ci` / `pipelines` port: the same semantic-layer pattern
+applied to build/run status (a `RunStatus` vocabulary; per-adapter status maps since CI statuses are
+vendor-fixed). **Shipped:** the core contract + `BaseCiAdapter`, the conformance suite, the read
+primitives (`pipelines` / `runs` / `run.get` / `logs`, size-aware) on **Azure Pipelines**, and the MCP
+read tools — validated live against a real project. **Next:** the write primitives (`trigger` /
+`cancel`), stages, and the GitHub Actions adapter. The provider-native escape hatch (decision #18)
+follows, so nothing is a hard blocker in the meantime.
