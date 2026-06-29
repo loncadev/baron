@@ -62,7 +62,7 @@ With BeeMaster's policy (issues bound, knowledge loop always on), Claude will se
 ### Phase 1 — While running (read-only, safe)
 
 - [ ] Claude Code lists the `baron_*` tools (issue + learning + followup).
-- [ ] "List BeeMaster's backlog" returns the real New PBIs (e.g. *Master UI*, *API*, *Deployment*) — proves the live WIQL query path.
+- [ ] "List BeeMaster's backlog" returns the real New items (e.g. *Master UI*, *API*, *Deployment*) — proves the live WIQL query path. The query is scoped to the project and returns a lean projection (no body) capped at 50 by default; pass a higher `limit` for more.
 - [ ] "Get issue 117" returns a normalized issue with `role: backlog`, `nativeType: Product Backlog Item`.
 - [ ] `baron_learning_append` then `baron_learning_query` round-trips a note (writes a markdown file under `BeeMaster/.baron/knowledge/` — local, safe).
 
