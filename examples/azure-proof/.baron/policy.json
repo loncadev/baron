@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "providers": {
+    "issues": "azure-devops",
+    "scm": "azure-devops",
+    "ci": "azure-devops",
+    "deploy": "azure-devops",
+    "notify": "slack"
+  },
+  "roleMap": {
+    "azure-devops": {
+      "stateKey": "state",
+      "states": {
+        "backlog": { "state": "New" },
+        "in_progress": { "state": "Active", "boardColumn": "Active" },
+        "in_review": { "state": "Test", "boardColumn": "Test" },
+        "done": { "state": "Closed" }
+      }
+    }
+  },
+  "typeMap": {
+    "azure-devops": {
+      "epic": "Epic",
+      "story": "Product Backlog Item",
+      "task": "Task",
+      "subtask": "Task"
+    }
+  },
+  "gapPolicy": {
+    "azure-devops": {
+      "subIssues": "degrade"
+    }
+  },
+  "language": {
+    "interaction": "en",
+    "artifacts": "en"
+  }
+}

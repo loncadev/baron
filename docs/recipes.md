@@ -85,8 +85,13 @@ to text.
 | `issue.link` | `fromId`, `toId`, `type` | — |
 | `issue.query` | `role?`, `typeRole?`, `limit?` | issue list |
 | `scm.branch.create` | `name`, `fromBranch` | the branch |
-| `scm.pr.create` | `title`, `sourceBranch`, `targetBranch`, `body?`, `draft?` | the PR |
+| `scm.pr.create` | `title`, `sourceBranch`, `targetBranch?`, `body?`, `draft?` | the PR |
 | `scm.pr.thread` | `pullRequestId`, `body` | the thread |
+| `scm.pr.status` | `pullRequestId` | normalized PR status (state, reviewDecision, mergeable, checks) |
+| `ci.run.trigger` | `pipelineId`, `ref?`, `variables?` | the triggered run |
+| `ci.run.cancel` | `runId` | the canceled run |
+| `deploy.deployments` | `environment?`, `limit?` | deployment list |
+| `notify.send` | `text`, `channel?`, `threadKey?` | the sent message |
 | `learning.append` | `title`, `body`, `tags?` | the learning |
 | `learning.query` | `tag?`, `text?`, `limit?` | learning list |
 | `followup.append` | `title`, `body?`, `tags?` | the follow-up |
@@ -99,4 +104,5 @@ isn't configured fails with `PORT_UNBOUND`.
 ## Shipped examples
 
 `packages/recipes/recipes/` ships `task-start.yaml` and `task-finish.yaml`. Copy them as a starting
-point.
+point. `ship.yaml` is a multi-port example — it opens a draft PR (`scm`), moves the issue to
+`in_review` (`issues`), triggers the CI pipeline (`ci`), and notifies the team (`notify`) in one run.

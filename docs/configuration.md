@@ -11,7 +11,13 @@ Policy only — **never secrets**. A full example:
 ```json
 {
   "version": 1,
-  "providers": { "issues": "azure-devops", "scm": "azure-devops" },
+  "providers": {
+    "issues": "azure-devops",
+    "scm": "azure-devops",
+    "ci": "azure-devops",
+    "deploy": "azure-devops",
+    "notify": "slack"
+  },
   "roleMap": {
     "azure-devops": {
       "stateKey": "state",
@@ -36,8 +42,11 @@ Policy only — **never secrets**. A full example:
 ### Fields
 
 - **`version`** — schema version (currently `1`).
-- **`providers`** — binds each port to a provider id: `issues`, `scm`, `notify`, `docs`. A port you
-  don't bind simply isn't available.
+- **`providers`** — binds each port to a provider id: `issues`, `scm`, `ci`, `deploy`, `notify`,
+  `docs`. A port you don't bind simply isn't available. `ci` and `deploy` reuse the
+  `issues`/`scm` credentials and coordinates — no extra env keys and no `baron init` step, because
+  their status maps are vendor-fixed adapter knowledge, not user-confirmed. Binding `docs` is not yet
+  supported (v2) and throws `DOCS_UNSUPPORTED`.
 - **`roleMap`** — keyed by provider id. Each entry has a `stateKey` (which native target key the
   reverse role lookup is keyed on — Azure `state`, GitHub `label`) and `states`: a map of workflow
   role → native target (a flat string map, e.g. `{ "state": "Active", "boardColumn": "In Progress" }`
@@ -66,6 +75,7 @@ present — a real environment variable wins over the file. `baron init` scaffol
 | --- | --- |
 | Azure DevOps | `AZURE_DEVOPS_ORG`, `AZURE_DEVOPS_PROJECT`, `AZURE_DEVOPS_REPO` (scm), `AZURE_DEVOPS_TOKEN` |
 | GitHub | `GITHUB_OWNER`, `GITHUB_REPO`, `GITHUB_TOKEN` |
+| Slack (notify) | `SLACK_BOT_TOKEN`, `SLACK_CHANNEL` |
 
 Example `.baron/credentials` (never committed):
 

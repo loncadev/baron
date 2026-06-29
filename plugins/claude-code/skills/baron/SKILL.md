@@ -27,7 +27,29 @@ Baron translates these to each provider's native states/types/links and negotiat
 Issues port: `baron_issue_create`, `baron_issue_get`, `baron_issue_transition`,
 `baron_issue_comment`, `baron_issue_link`, `baron_issue_query`.
 
-Scm port: `baron_scm_branch_create`, `baron_scm_pr_create`, `baron_scm_pr_thread`.
+Scm port: `baron_scm_branch_create`, `baron_scm_pr_create`, `baron_scm_pr_thread`,
+`baron_scm_pr_status`. `branch_create`/`pr_create` default the base branch to the repo default when
+omitted. `pr_status` returns a normalized `PullRequestStatus`: `state`
+(`open|merged|closed|unknown`), `reviewDecision`
+(`approved|changes_requested|review_required|pending|unknown`), `mergeable`, and a `checks` rollup
+(`succeeded|failed|pending|none`) — reach for it to gate "is this PR ready to merge?".
+
+Ci / pipelines port: `baron_ci_pipelines`, `baron_ci_runs`, `baron_ci_run_get`,
+`baron_ci_run_logs`, `baron_ci_run_trigger`, `baron_ci_run_cancel`. Run state is the normalized
+`RunStatus` = `queued|running|succeeded|failed|canceled|skipped|waiting|unknown` (collapsed from each
+provider's native phase + result; per-stage status appears in `run_get`; `run_logs` is a size-aware
+tail). `runs` defaults `limit` 50. Use these to list/trigger/cancel CI and inspect why a run failed.
+
+Deploy / environments port: `baron_deploy_environments`, `baron_deploy_deployments`. Deployment
+state is the normalized `DeployStatus` = `pending|running|succeeded|failed|canceled|skipped|unknown`.
+Use these to see environments and what's deployed where.
+
+Notify port: `baron_notify_send` (`text`, optional `channel`, optional `threadKey` for threaded
+replies). Use to ping a human or post status to Slack.
+
+Escape hatch (LAST RESORT, non-portable): `baron_native_request` makes a raw authenticated provider
+REST call and only reaches providers the policy binds. Prefer the normalized tools above; reach for
+this only when no port covers what you need, and expect the result to be vendor-specific.
 
 A tool that hits a capability gap returns an `isError` result whose text begins with a stable code
 (e.g. `CAPABILITY_GAP`, `ROLE_MAPPING`) — read it and adjust (retry with a different role, drop a

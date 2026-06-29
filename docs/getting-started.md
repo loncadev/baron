@@ -74,6 +74,20 @@ baron run --recipe packages/recipes/recipes/task-start.yaml
 `ask` steps prompt you for inputs; `do` steps create the issue, open the branch, transition it, etc.
 See [Recipes](./recipes.md) to write your own.
 
+## Optional: the `ci`, `deploy`, and `notify` ports
+
+Beyond `issues` and `scm`, Baron also exposes `ci` / pipelines
+(`baron_ci_pipelines` / `runs` / `run_get` / `run_logs` / `run_trigger` / `run_cancel`), `deploy` /
+environments (`baron_deploy_environments` / `deployments`), and `notify` (`baron_notify_send`).
+
+- **`ci` and `deploy`** reuse the *same* provider credentials and coordinates as `issues`/`scm` —
+  no extra env keys and **no `baron init` step**, since their status maps are vendor-fixed adapter
+  knowledge, not a human-confirmed mapping. Bind the provider once and they work.
+- **`notify`** (Slack) needs its own credentials: `SLACK_BOT_TOKEN` and `SLACK_CHANNEL`.
+
+`recipes/ship.yaml` shows them together: open a draft PR → move to `in_review` → trigger CI →
+notify.
+
 ## Or: drive it from an agent
 
 Instead of the CLI, register Baron's MCP server with your agent and call the tools

@@ -81,6 +81,27 @@ With BeeMaster's policy (issues bound, knowledge loop always on), Claude will se
 - [ ] Review `BeeMaster/.baron/knowledge/` — the learning/followup markdown files are human-readable.
 - [ ] Decide what to commit in BeeMaster: `.baron/policy.json` (yes, committed), `.baron/credentials` (never — gitignored).
 
+### Phase 4 — CI / deploy / notify (optional)
+
+`ci` and `deploy` reuse the **same** Azure DevOps credentials/coordinates as issues/scm — no extra env
+keys and **no `baron init` step** (CI/deploy status maps are vendor-fixed adapter knowledge, not
+user-confirmed). `notify` (Slack) is separate: set `SLACK_BOT_TOKEN` + `SLACK_CHANNEL` and bind
+`providers.notify` to use it.
+
+- [ ] `baron_ci_pipelines` lists BeeMaster's pipelines; `baron_ci_runs { pipeline }` returns recent runs (defaults to the last 50) with a normalized `status` (`queued|running|succeeded|failed|canceled|skipped|waiting|unknown`).
+- [ ] `baron_ci_run_get { id }` returns run detail incl. per-stage status; `baron_ci_run_logs { id }` returns a size-aware tail of the logs.
+- [ ] `baron_deploy_environments` lists environments; `baron_deploy_deployments { environment }` returns deployments with a normalized `status` (`pending|running|succeeded|failed|canceled|skipped|unknown`).
+- [ ] `baron_notify_send { text: "BeeMaster CI green" }` posts to the configured Slack channel (add `threadKey` to reply in a thread).
+- [ ] **Opt-in (writes/triggers):** `baron_ci_run_trigger { pipeline }` queues a run; `baron_ci_run_cancel { id }` cancels one. Only run these if you mean to.
+
+**Example prompts to Claude**
+
+- "Using Baron, show me BeeMaster's pipelines and the status of the latest run." → `baron_ci_pipelines` + `baron_ci_runs`
+- "Fetch the logs for run 4821 and tell me why it failed." → `baron_ci_run_logs`
+- "List BeeMaster's environments and their latest deployments." → `baron_deploy_environments` + `baron_deploy_deployments`
+- "Post 'CI is green on main' to Slack via Baron." → `baron_notify_send`
+- "Trigger the CI pipeline for BeeMaster." → `baron_ci_run_trigger` *(opt-in write)*
+
 ---
 
 ## What works vs. what's known-limited (today)

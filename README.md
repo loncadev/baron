@@ -3,12 +3,12 @@
 **Platform-agnostic work-orchestration layer for AI coding agents.**
 
 Baron lets a coding agent (Claude Code, Cursor, Codex, any MCP client) or a CI pipeline drive
-work tracking, source control, and notifications across many providers through one normalized
-contract — instead of hardwiring a single vendor's API and one team's process template into
-prompts.
+work tracking, source control, CI/pipelines, deployments, and notifications across many providers
+through one normalized contract — instead of hardwiring a single vendor's API and one team's
+process template into prompts. One pane of glass from backlog to deploy.
 
-- **Capability ports**, not "a tracker": `issues` / `scm` / `notify` / `docs`, each bound to a
-  provider independently. Mix Linear issues with GitHub PRs and Slack notifications.
+- **Capability ports**, not "a tracker": `issues` / `scm` / `ci` / `deploy` / `notify`, each bound
+  to a provider independently. Mix Linear issues with GitHub PRs and Slack notifications.
 - **Semantic role layer**: providers model work too differently for a universal schema. Baron
   introspects each provider's real states and maps them to abstract roles
   (`backlog → ready → in_progress → in_review → done`). You confirm the mapping once.
@@ -37,8 +37,9 @@ baron doctor
 baron run --recipe packages/recipes/recipes/task-start.yaml
 ```
 
-Or wire the MCP server into your agent and call the tools directly
-(`baron_issue_create`, `baron_scm_pr_create`, …). See [docs/mcp.md](./docs/mcp.md).
+Or wire the MCP server into your agent and call the tools directly across every port —
+`baron_issue_create`, `baron_scm_pr_create`, `baron_ci_runs`, `baron_deploy_deployments`,
+`baron_notify_send`, … See [docs/mcp.md](./docs/mcp.md).
 
 ## Documentation
 
@@ -58,9 +59,10 @@ for contributors is [CLAUDE.md](./CLAUDE.md).
 
 ## Status
 
-The planned v1 is built end-to-end: the `issues` and `scm` ports across **Azure DevOps** and
-**GitHub**, the config engine (`baron init` / `doctor`), a multi-port MCP server, the YAML recipe
-engine + `baron run`, the knowledge loop, and a Claude Code plugin. The provider transports are
+The planned v1 is built end-to-end: the `issues`, `scm`, `ci`, and `deploy` ports across
+**Azure DevOps** and **GitHub** plus `notify` via **Slack**, the config engine
+(`baron init` / `doctor`), a multi-port MCP server, the YAML recipe engine + `baron run`, the
+knowledge loop, and a Claude Code plugin. The provider transports are
 validated by a conformance suite and adversarial review but are exercised against live APIs only by
 credential-gated smoke tests — running those against a real project is the next step.
 
