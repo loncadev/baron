@@ -86,3 +86,10 @@ export {
   azureDevOpsScmManifest,
   type AzureDevOpsScmTransportOptions,
 } from './scm.js';
+export {
+  createAzureDevOpsCiTransport,
+  defineAzureDevOpsCiAdapter,
+  azureDevOpsCiManifest,
+  azureDevOpsCiStatusMaps,
+  type AzureDevOpsCiTransportOptions,
+} from './ci.js';

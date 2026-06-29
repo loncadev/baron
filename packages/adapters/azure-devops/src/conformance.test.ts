@@ -1,8 +1,10 @@
 import {
   azureIntrospectionFixture,
+  createMemoryCiTransport,
   createMemoryIntrospector,
   createMemoryScmTransport,
   createMemoryTransport,
+  runCiConformance,
   runIntrospectionConformance,
   runIssuesConformance,
   runScmConformance,
@@ -10,6 +12,7 @@ import {
 import { RecordingLogger } from '@baron/core';
 import {
   azureDevOpsManifest,
+  defineAzureDevOpsCiAdapter,
   defineAzureDevOpsIssuesAdapter,
   defineAzureDevOpsScmAdapter,
   exampleAzureDevOpsRoleMap,
@@ -47,6 +50,15 @@ runScmConformance({
   build(gapPolicy) {
     const logger = new RecordingLogger();
     const adapter = defineAzureDevOpsScmAdapter(createMemoryScmTransport(), gapPolicy, logger);
+    return { adapter, logger };
+  },
+});
+
+runCiConformance({
+  label: 'azure-devops',
+  build(gapPolicy) {
+    const logger = new RecordingLogger();
+    const adapter = defineAzureDevOpsCiAdapter(createMemoryCiTransport(), gapPolicy, logger);
     return { adapter, logger };
   },
 });

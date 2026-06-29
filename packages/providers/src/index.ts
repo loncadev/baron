@@ -1,7 +1,10 @@
 import {
   AZURE_DEVOPS_PROVIDER,
+  azureDevOpsCiManifest,
+  azureDevOpsCiStatusMaps,
   azureDevOpsManifest,
   azureDevOpsScmManifest,
+  createAzureDevOpsCiTransport,
   createAzureDevOpsIntrospector,
   createAzureDevOpsScmTransport,
   createAzureDevOpsTransport,
@@ -19,9 +22,14 @@ import {
 import {
   BaronError,
   type BaronPolicyFile,
+  BaseCiAdapter,
   BaseIssuesAdapter,
   BaseScmAdapter,
   type CapabilityManifest,
+  type CiManifest,
+  type CiPort,
+  type CiStatusMaps,
+  type CiTransport,
   type GapPolicy,
   type Introspector,
   type IssuesPort,
@@ -62,6 +70,11 @@ export interface ProviderDescriptor {
   /** Env keys for the scm transport (Azure adds AZURE_DEVOPS_REPO over the issues keys). */
   readonly scmCredentialEnvKeys: readonly string[];
   createScmTransport(env: Env): ScmTransport;
+  // ci port (optional — a provider may not have a ci adapter yet)
+  readonly ciManifest?: CiManifest;
+  readonly ciStatusMaps?: CiStatusMaps;
+  readonly ciCredentialEnvKeys?: readonly string[];
+  createCiTransport?(env: Env): CiTransport;
 }
 
 const DESCRIPTORS: Record<string, ProviderDescriptor> = {
@@ -96,6 +109,16 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
         organization: env.AZURE_DEVOPS_ORG ?? '',
         project: env.AZURE_DEVOPS_PROJECT ?? '',
         repository: env.AZURE_DEVOPS_REPO ?? '',
+        token: env.AZURE_DEVOPS_TOKEN ?? '',
+      });
+    },
+    ciManifest: azureDevOpsCiManifest,
+    ciStatusMaps: azureDevOpsCiStatusMaps,
+    ciCredentialEnvKeys: ['AZURE_DEVOPS_ORG', 'AZURE_DEVOPS_PROJECT', 'AZURE_DEVOPS_TOKEN'],
+    createCiTransport(env) {
+      return createAzureDevOpsCiTransport({
+        organization: env.AZURE_DEVOPS_ORG ?? '',
+        project: env.AZURE_DEVOPS_PROJECT ?? '',
         token: env.AZURE_DEVOPS_TOKEN ?? '',
       });
     },
@@ -190,9 +213,38 @@ export function buildScmPort(
   );
 }
 
+/**
+ * Build a live {@link CiPort} for a provider from environment credentials. Like scm, the ci port has
+ * no user-configured map to resolve from policy (CI statuses are vendor-fixed and normalized by the
+ * adapter), so it binds from the provider id + env + an optional gap policy.
+ */
+export function buildCiPort(
+  provider: string,
+  env: Env,
+  gapPolicy?: GapPolicy,
+  logger?: Logger,
+): CiPort {
+  const descriptor = getProviderDescriptor(provider);
+  if (
+    descriptor.ciManifest === undefined ||
+    descriptor.ciStatusMaps === undefined ||
+    descriptor.createCiTransport === undefined
+  ) {
+    throw new BaronError(`Provider '${provider}' has no ci adapter.`, 'CI_UNSUPPORTED');
+  }
+  return new BaseCiAdapter(
+    descriptor.ciManifest,
+    descriptor.ciStatusMaps,
+    descriptor.createCiTransport(env),
+    gapPolicy,
+    logger,
+  );
+}
+
 export interface BoundPorts {
   issues?: IssuesPort;
   scm?: ScmPort;
+  ci?: CiPort;
 }
 
 /**
@@ -209,6 +261,11 @@ export function buildPorts(policy: BaronPolicyFile, env: Env, logger?: Logger): 
   if (scmProvider !== undefined) {
     const gapPolicy = parseGapPolicy(policy.gapPolicy?.[scmProvider] ?? {});
     ports.scm = buildScmPort(scmProvider, env, gapPolicy, logger);
+  }
+  const ciProvider = policy.providers.ci;
+  if (ciProvider !== undefined) {
+    const gapPolicy = parseGapPolicy(policy.gapPolicy?.[ciProvider] ?? {});
+    ports.ci = buildCiPort(ciProvider, env, gapPolicy, logger);
   }
   return ports;
 }
