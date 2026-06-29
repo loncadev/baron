@@ -8,8 +8,9 @@ import {
   type ProviderRoleMap,
   type TypeMap,
 } from '@baron/core';
+import { AZURE_DEVOPS_PROVIDER } from './provider.js';
 
-export const AZURE_DEVOPS_PROVIDER = 'azure-devops';
+export { AZURE_DEVOPS_PROVIDER } from './provider.js';
 
 /**
  * Azure Boards has rich, native modelling: parent/child hierarchy, a board column distinct from

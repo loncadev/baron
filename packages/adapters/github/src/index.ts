@@ -9,8 +9,9 @@ import {
   type ProviderRoleMap,
   type TypeMap,
 } from '@baron/core';
+import { GITHUB_PROVIDER } from './provider.js';
 
-export const GITHUB_PROVIDER = 'github';
+export { GITHUB_PROVIDER } from './provider.js';
 
 /**
  * GitHub Issues is deliberately flat: no native parent/child hierarchy (sub-issues exist but are

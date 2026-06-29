@@ -1,8 +1,8 @@
 # CLI
 
 The `baron` command has three subcommands. All side effects go through the policy in the current
-directory's `.baron/` (override the root with `--root`). Run from this repo with
-`pnpm dlx tsx packages/cli/src/bin.ts …` until the package is published.
+directory's `.baron/` (override the root with `--root`). Run from this repo with `pnpm baron …`
+(a `tsx` runner is wired up) until the package is published.
 
 ```
 baron init --provider <id> [--root <dir>] [--force]

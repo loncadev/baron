@@ -15,11 +15,14 @@
     "test:watch": "vitest",
     "typecheck": "pnpm -r --filter \"./packages/**\" run typecheck",
     "lint": "biome check .",
-    "lint:fix": "biome check --write ."
+    "lint:fix": "biome check --write .",
+    "baron": "tsx packages/cli/src/bin.ts",
+    "baron:mcp": "tsx packages/mcp-server/src/bin.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
     "tsup": "^8.3.5",
+    "tsx": "^4.19.0",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   }

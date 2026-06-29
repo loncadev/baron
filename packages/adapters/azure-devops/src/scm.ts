@@ -15,7 +15,7 @@ import {
   type GitPullRequest,
   GitRefUpdateStatus,
 } from 'azure-devops-node-api/interfaces/GitInterfaces.js';
-import { AZURE_DEVOPS_PROVIDER } from './index.js';
+import { AZURE_DEVOPS_PROVIDER } from './provider.js';
 
 export interface AzureDevOpsScmTransportOptions {
   readonly organization: string;

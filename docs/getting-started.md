@@ -20,15 +20,15 @@ pnpm test       # optional: 170 tests, all network-free
 
 ### Running the CLI
 
-Once Baron is published, `pnpm build` exposes a `baron` binary (and `baron-mcp` for the server). To
-run from this monorepo **before publishing**, use a TypeScript runner so workspace packages resolve
-to source:
+Once Baron is published, `baron` (and `baron-mcp`) are on your PATH. To run from this monorepo
+**before publishing**, use the wired-up workspace script (it runs the TypeScript source via `tsx`):
 
 ```bash
-pnpm dlx tsx packages/cli/src/bin.ts <command> [flags]
+pnpm baron <command> [flags]        # e.g. pnpm baron init --provider azure-devops
+pnpm baron:mcp                      # the MCP server over stdio
 ```
 
-The examples below write `baron <command>`; substitute the `tsx …` form when running from source.
+The examples below write `baron <command>`; from this repo, substitute `pnpm baron <command>`.
 
 ## 1. Configure — `baron init`
 

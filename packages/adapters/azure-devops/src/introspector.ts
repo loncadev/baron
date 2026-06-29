@@ -7,7 +7,7 @@ import type {
 } from '@baron/core';
 import * as azdev from 'azure-devops-node-api';
 import type { TeamContext } from 'azure-devops-node-api/interfaces/CoreInterfaces.js';
-import { AZURE_DEVOPS_PROVIDER } from './index.js';
+import { AZURE_DEVOPS_PROVIDER } from './provider.js';
 import type { AzureDevOpsTransportOptions } from './transport.js';
 
 /** Map Azure's state metaState category onto Baron's StateCategory vocabulary. */
