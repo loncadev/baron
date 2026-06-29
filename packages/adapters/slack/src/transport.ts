@@ -50,7 +50,14 @@ export function createSlackNotifyTransport(options: SlackNotifyTransportOptions)
           'NOTIFY_SEND_FAILED',
         );
       }
-      const ts = data.ts ?? '';
+      // ok:true must carry a message ts; an empty threadKey would later send thread_ts:'' (invalid).
+      const ts = data.ts;
+      if (ts === undefined || ts.length === 0) {
+        throw new BaronError(
+          'Slack returned ok:true but no message ts; cannot form a valid thread key.',
+          'NOTIFY_MALFORMED_RESPONSE',
+        );
+      }
       return { id: ts, threadKey: ts };
     },
   };

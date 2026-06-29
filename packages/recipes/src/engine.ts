@@ -111,6 +111,15 @@ function optNum(params: Params, key: string, op: string): number | undefined {
   return value;
 }
 
+function optBool(params: Params, key: string, op: string): boolean | undefined {
+  const value = params[key];
+  if (value === undefined) return undefined;
+  if (typeof value !== 'boolean') {
+    throw new BaronError(`Step '${op}' argument '${key}' must be a boolean.`, ARGS);
+  }
+  return value;
+}
+
 function optStrArray(params: Params, key: string, op: string): string[] | undefined {
   const value = params[key];
   if (value === undefined) return undefined;
@@ -259,7 +268,9 @@ async function dispatchOp(ports: RecipePorts, op: RecipeOp, params: Params): Pro
           ? { targetBranch: optStr(params, 'targetBranch', op) }
           : {}),
         ...(optStr(params, 'body', op) !== undefined ? { body: optStr(params, 'body', op) } : {}),
-        ...(params.draft !== undefined ? { draft: params.draft === true } : {}),
+        ...(optBool(params, 'draft', op) !== undefined
+          ? { draft: optBool(params, 'draft', op) }
+          : {}),
       });
     case RECIPE_OPS.scmPrThread:
       return scm(ports, op).addPullRequestThread(

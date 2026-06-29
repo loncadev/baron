@@ -404,12 +404,18 @@ export function buildDeployPort(
   logger?: Logger,
 ): DeployPort {
   const descriptor = getProviderDescriptor(provider);
-  if (descriptor.deployManifest === undefined || descriptor.createDeployTransport === undefined) {
+  if (
+    descriptor.deployManifest === undefined ||
+    descriptor.deployStatusMaps === undefined ||
+    descriptor.createDeployTransport === undefined
+  ) {
+    // Require the status maps too — an empty-map fallback would silently normalize every deployment
+    // to 'unknown' (a silent gap, invariant #5). Mirrors buildCiPort's requirement.
     throw new BaronError(`Provider '${provider}' has no deploy adapter.`, 'DEPLOY_UNSUPPORTED');
   }
   return new BaseDeployAdapter(
     descriptor.deployManifest,
-    descriptor.deployStatusMaps ?? { status: {}, result: {} },
+    descriptor.deployStatusMaps,
     descriptor.createDeployTransport(env),
     gapPolicy,
     logger,

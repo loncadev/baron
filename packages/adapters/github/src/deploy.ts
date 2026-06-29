@@ -62,27 +62,29 @@ export function createGithubDeployTransport(options: GithubTransportOptions): De
         ...(query.environment !== undefined ? { environment: query.environment } : {}),
         per_page: query.limit ?? DEFAULT_LIMIT,
       });
-      // GitHub keeps a deployment's status separate; fetch the latest status per deployment (capped).
-      const out: NativeDeployment[] = [];
-      for (const d of data) {
-        const statuses = await octokit.rest.repos.listDeploymentStatuses({
-          owner,
-          repo,
-          deployment_id: d.id,
-          per_page: 1,
-        });
-        const latest = statuses.data[0];
-        out.push({
-          id: String(d.id),
-          environment: typeof d.environment === 'string' ? d.environment : '',
-          ...(latest !== undefined ? { status: latest.state } : {}),
-          ref: typeof d.ref === 'string' ? d.ref : undefined,
-          sha: d.sha,
-          ...(typeof d.created_at === 'string' ? { createdAt: d.created_at } : {}),
-          ...(latest?.created_at !== undefined ? { finishedAt: latest.created_at } : {}),
-        });
-      }
-      return out;
+      // GitHub keeps a deployment's status separate; fetch the latest status per deployment in
+      // PARALLEL (bounded by the page size) so the list isn't N sequential blocking round-trips.
+      return Promise.all(
+        data.map(async (d) => {
+          const statuses = await octokit.rest.repos.listDeploymentStatuses({
+            owner,
+            repo,
+            deployment_id: d.id,
+            per_page: 1,
+          });
+          const latest = statuses.data[0];
+          return {
+            id: String(d.id),
+            environment: typeof d.environment === 'string' ? d.environment : '',
+            ...(latest !== undefined ? { status: latest.state } : {}),
+            ref: typeof d.ref === 'string' ? d.ref : undefined,
+            sha: d.sha,
+            ...(typeof d.created_at === 'string' ? { createdAt: d.created_at } : {}),
+            // The deployment's own updated_at is its finish time — not the status record's created_at.
+            ...(typeof d.updated_at === 'string' ? { finishedAt: d.updated_at } : {}),
+          };
+        }),
+      );
     },
   };
 }

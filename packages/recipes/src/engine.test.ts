@@ -157,6 +157,18 @@ steps:
     expect((context.msg as { id: string }).id).toBeTruthy();
   });
 
+  it('rejects a non-boolean draft on scm.pr.create (no silent coercion)', async () => {
+    const recipe = loadRecipe(`
+name: bad-draft
+steps:
+  - do: scm.pr.create
+    with: { title: "t", sourceBranch: "feature/x", draft: "yes" }
+`);
+    await expect(
+      runRecipe(recipe, { ports: allPorts(), asker: scriptedAsker() }),
+    ).rejects.toThrow();
+  });
+
   it('skips an ask whose variable is pre-seeded via inputs', async () => {
     // No text answers queued; if the ask were not skipped, title would be undefined and create fails.
     const asker = scriptedAsker([]);

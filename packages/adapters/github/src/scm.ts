@@ -100,18 +100,24 @@ export function createGithubScmTransport(options: GithubTransportOptions): ScmTr
         per_page: 100,
       });
       const latest = new Map<string, string>();
+      let hadComment = false;
       for (const r of reviews) {
         const login = r.user?.login;
-        if (login !== undefined && (r.state === 'APPROVED' || r.state === 'CHANGES_REQUESTED')) {
-          latest.set(login, r.state);
-        }
+        if (login === undefined) continue;
+        if (r.state === 'APPROVED' || r.state === 'CHANGES_REQUESTED') latest.set(login, r.state);
+        // A dismissed review no longer counts — drop the author's prior decisive review.
+        else if (r.state === 'DISMISSED') latest.delete(login);
+        else if (r.state === 'COMMENTED') hadComment = true;
       }
       const states = [...latest.values()];
       const reviewDecision: ReviewDecision = states.includes('CHANGES_REQUESTED')
         ? 'changes_requested'
         : states.includes('APPROVED')
           ? 'approved'
-          : 'review_required';
+          : // engaged (commented) but undecided → pending; no engagement at all → review_required.
+            hadComment
+            ? 'pending'
+            : 'review_required';
 
       // Check runs on the PR head → a rollup.
       const { data: checks } = await octokit.rest.checks.listForRef({
