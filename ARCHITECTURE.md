@@ -19,15 +19,19 @@ hardcoded policy. Baron extracts the mechanism and turns the policy into configu
 
 The listed target platforms are **not one category**. They map to independent capability ports:
 
-| Port      | Providers                                                         |
-| --------- | ---------------------------------------------------------------- |
-| `issues`  | Azure Boards, Jira, Linear, GitHub Issues, GitLab Issues, Asana  |
-| `scm`     | Azure Repos, GitHub, GitLab                                      |
-| `notify`  | Slack                                                            |
-| `docs`    | Notion, Confluence                                              |
+| Port                       | Providers                                                         |
+| -------------------------- | ---------------------------------------------------------------- |
+| `issues`                   | Azure Boards, Jira, Linear, GitHub Issues, GitLab Issues, Asana  |
+| `scm`                      | Azure Repos, GitHub, GitLab                                      |
+| `ci` / `pipelines`         | Azure Pipelines, GitHub Actions, GitLab CI *(planned, see #17)*  |
+| `deployments` / `environments` | Azure Environments, GitHub Environments *(planned, see #17)* |
+| `notify`                   | Slack                                                            |
+| `docs`                     | Notion, Confluence                                              |
 
 A real org mixes them (e.g. Linear issues + GitHub PRs + Slack notify + Notion docs), so each
-port binds to a provider independently.
+port binds to a provider independently. The audience — full-stack developers and **solopreneurs**
+who want to run their whole loop from one place — is why the port set grows to cover CI/CD and
+deployment, not just work tracking (decision #17).
 
 ## Decisions
 
@@ -49,6 +53,8 @@ port binds to a provider independently.
 | 14 | i18n              | `language.interaction` vs `language.artifacts` + per-artifact override; translatable templates |
 | 15 | Testing           | Per-adapter **capability conformance suite** + recorded fixtures (CI) + gated live smoke   |
 | 16 | Proof             | A second Azure DevOps project; Beetegre V2 ships as a reference policy example             |
+| 17 | Scope & audience  | **Single pane of glass** for full-stack devs & **solopreneurs**: grow ports across the dev lifecycle — `ci`/`pipelines`, `deployments`/`environments`, `scm` monitoring — so the agent need not fall back to a raw provider tool |
+| 18 | Coverage principle| **Normalize, don't raw-proxy.** New capabilities become ports with a semantic status layer (like roles); a **labeled provider-native escape hatch** is the explicit last resort, never the default path |
 
 ## The semantic role layer (decision #4)
 
@@ -98,6 +104,37 @@ lives in **declarative recipes** outside the core, so teams can edit it. The det
 guarantees we want (role↔native translation, atomic state+column patch, idempotent transition)
 live inside the primitive.
 
+## Coverage roadmap: the single pane of glass (decisions #17–#18)
+
+The first audience is full-stack developers and **solopreneurs** who want to run their entire loop —
+plan work, write code, ship, watch it — from one agent-driven layer, without dropping to a raw
+provider tool (a vendor MCP, a web console). So the port set deliberately grows beyond work tracking
+to the rest of the developer lifecycle:
+
+- **`ci` / `pipelines`** — `ci.runs(query)`, `ci.run.get`, `ci.run.trigger`, `ci.run.cancel`,
+  `ci.logs` (size-aware — a lean projection by default; full logs on request). Build/run status is a
+  **semantic layer just like workflow roles**: `queued | running | succeeded | failed | canceled |
+  skipped` (+ `waiting` for approval gates), mapped onto Azure Pipelines (`state` + `result`), GitHub
+  Actions (`status` + `conclusion`), GitLab CI, etc. Manifest capabilities: `canTrigger`, `canCancel`,
+  `hasStages`, `hasApprovalGates`, `providesLogs`, `hasArtifacts`.
+- **`deployments` / `environments`** — environment status, deployment history, approval gates.
+- **`scm` monitoring** — PR checks / review state / mergeability (the code side of "developer
+  monitoring").
+
+### The coverage principle: normalize, don't raw-proxy (decision #18)
+
+Mirroring a provider's REST surface 1:1 would forfeit the one thing that justifies Baron — portability
+of the same recipes/prompts across providers — and reduce it to a fatter vendor MCP. So every new
+capability is brought in as a **normalized port** with its own semantic status mapping and capability
+manifest, exactly as `issues` did with workflow roles. Read primitives carry the query-size discipline
+learned in dogfooding: lean projections by default, full detail on explicit fetch.
+
+A **provider-native escape hatch** exists for the solopreneur's "never be blocked" need: when a needed
+API is not yet normalized, a single, **clearly-labeled** passthrough capability can reach it. It is the
+**last resort, not the default** — using it is an explicit, non-portable action (consistent with
+invariant #5: gaps are never silent). The normalized ports are always the first-class path; the escape
+hatch is what keeps the tool usable at the edges while normalization catches up.
+
 ## Repository layout
 
 ```
@@ -145,11 +182,16 @@ never committed.
 - Additional adapters: Jira, Linear, GitLab, Asana, Notion
 - Commercial tier features: SSO, secret-manager integrations, multi-team governance
 
-## First vertical slice (in progress)
+## Vertical slices
 
-The `issues` port across **Azure DevOps and GitHub** — the two most divergent providers — to
-stress the central bet (impedance via role layer + manifest) at its hardest point:
+**Slice 1 — shipped.** The `issues` + `scm` ports across **Azure DevOps and GitHub** — the two most
+divergent providers — proving the central bet (impedance via role layer + manifest) at its hardest
+point: `issue.create/transition/...` primitives, both adapters with manifests + role mapping + gap
+policy (GitHub hierarchy → emulate via labels), the conformance suite both adapters pass, the MCP
+server + CLI + recipe engine + knowledge loop, and a live dogfood against a real Azure DevOps project.
 
-- `issue.create` and `issue.transition` primitives
-- both adapters with manifests + role mapping + gap policy (GitHub hierarchy → emulate via labels)
-- a conformance suite both adapters pass (pure mapping logic with fixtures; live smoke gated by creds)
+**Slice 2 — next (decision #17).** The `ci` / `pipelines` port: the same role-layer pattern applied to
+build/run status, on Azure Pipelines and GitHub Actions, with `trigger` / `cancel` / `logs` primitives
+and a conformance suite. This is the first step toward the single-pane-of-glass coverage; the
+provider-native escape hatch (decision #18) lands alongside or just after, so nothing is a hard blocker
+in the meantime.
