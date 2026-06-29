@@ -172,6 +172,19 @@ describe('callTool', () => {
     expect(issues.some((i) => i.id === created.id)).toBe(true);
   });
 
+  it('defaults the query limit and respects an explicit one', async () => {
+    const captured: Array<number | undefined> = [];
+    const port = {
+      query: async (q: { limit?: number }) => {
+        captured.push(q.limit);
+        return [];
+      },
+    } as unknown as IssuesPort;
+    await callTool(port, MCP_TOOL_NAMES.query, {});
+    await callTool(port, MCP_TOOL_NAMES.query, { limit: 7 });
+    expect(captured).toEqual([50, 7]);
+  });
+
   it('links issues via label emulation on a flat provider and returns ok', async () => {
     const port = githubPort();
     const a = parse(

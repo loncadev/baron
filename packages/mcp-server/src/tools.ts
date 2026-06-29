@@ -78,6 +78,9 @@ const TYPE_ROLE_ENUM = [...WORK_ITEM_TYPE_ROLES];
 const LINK_TYPE_ENUM = [...ISSUE_LINK_TYPES];
 const FOLLOWUP_STATUS_ENUM = [...FOLLOWUP_STATUSES];
 
+/** Default cap for `baron_issue_query` so an unbounded listing can't overflow the agent's context. */
+const DEFAULT_QUERY_LIMIT = 50;
+
 export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   {
     name: MCP_TOOL_NAMES.create,
@@ -177,14 +180,19 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   {
     name: MCP_TOOL_NAMES.query,
     description:
-      'List issues filtered by workflow role and/or type role (filters are AND-combined).',
+      'List issues filtered by workflow role and/or type role (filters are AND-combined). Returns a ' +
+      'lightweight projection (no body); fetch an issue with get for full detail.',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
       properties: {
         role: { type: 'string', enum: ROLE_ENUM, description: 'Filter by workflow role.' },
         typeRole: { type: 'string', enum: TYPE_ROLE_ENUM, description: 'Filter by type role.' },
-        limit: { type: 'number', minimum: 1, description: 'Maximum number of issues to return.' },
+        limit: {
+          type: 'number',
+          minimum: 1,
+          description: `Maximum number of issues to return. Defaults to ${DEFAULT_QUERY_LIMIT} to keep the result within an agent's context; pass a higher value for more.`,
+        },
       },
     },
   },
@@ -370,10 +378,12 @@ function toQuery(args: Record<string, unknown> | undefined): IssueQuery {
   if (limit !== undefined && (typeof limit !== 'number' || !Number.isFinite(limit) || limit < 1)) {
     throw new BaronError("Argument 'limit' must be a positive number.", INVALID_ARGS);
   }
+  // Default the cap so an unbounded query (e.g. an early-project backlog spanning hundreds of items)
+  // can't overflow the agent's context. The default is documented in the tool schema, not silent.
   return {
     ...(roleRaw !== undefined ? { role: roleRaw as WorkflowRole } : {}),
     ...(typeRoleRaw !== undefined ? { typeRole: typeRoleRaw as WorkItemTypeRole } : {}),
-    ...(limit !== undefined ? { limit: limit as number } : {}),
+    limit: limit !== undefined ? (limit as number) : DEFAULT_QUERY_LIMIT,
   };
 }
 

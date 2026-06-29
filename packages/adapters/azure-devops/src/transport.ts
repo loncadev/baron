@@ -23,12 +23,21 @@ export interface AzureDevOpsTransportOptions {
 
 /** Work-item field reference names this transport reads/writes (provider-native, not role concepts). */
 const FIELD = {
+  ID: 'System.Id',
+  TEAM_PROJECT: 'System.TeamProject',
   TITLE: 'System.Title',
   DESCRIPTION: 'System.Description',
   STATE: 'System.State',
   TYPE: 'System.WorkItemType',
   TAGS: 'System.Tags',
 } as const;
+
+/**
+ * Fields fetched for a query/list. Deliberately lean — a listing needs identity, role, type-role,
+ * and labels, NOT the (potentially huge) Description body or the relations graph. `get` fetches the
+ * full item; query is a lightweight projection so a large result can't blow the caller's context.
+ */
+const QUERY_FIELDS: readonly string[] = [FIELD.TITLE, FIELD.STATE, FIELD.TYPE, FIELD.TAGS];
 
 /** The relation that points to the PARENT in Azure's native hierarchy. */
 const PARENT_REL = 'System.LinkTypes.Hierarchy-Reverse';
@@ -53,6 +62,18 @@ function fieldPath(refName: string): string {
 /** Escape a value for embedding in a single-quoted WIQL string literal. */
 function escapeWiql(value: string): string {
   return value.replace(/'/g, "''");
+}
+
+/**
+ * Build the WIQL for a query. The project clause is ALWAYS present: a teamContext passed to
+ * `queryByWiql` does NOT constrain `FROM WorkItems`, which otherwise spans the entire organization —
+ * the source of a query leaking every project's items. Exported for unit testing without the SDK.
+ */
+export function buildWorkItemsWiql(project: string, state?: string, nativeType?: string): string {
+  const clauses = [`[${FIELD.TEAM_PROJECT}] = '${escapeWiql(project)}'`];
+  if (state !== undefined) clauses.push(`[${FIELD.STATE}] = '${escapeWiql(state)}'`);
+  if (nativeType !== undefined) clauses.push(`[${FIELD.TYPE}] = '${escapeWiql(nativeType)}'`);
+  return `SELECT [${FIELD.ID}] FROM WorkItems WHERE ${clauses.join(' AND ')}`;
 }
 
 function parseTrailingId(url: string | undefined): string | undefined {
@@ -215,14 +236,7 @@ export function createAzureDevOpsTransport(options: AzureDevOpsTransportOptions)
 
     async queryIssues(query: NativeQuery): Promise<readonly NativeIssue[]> {
       const witApi = await api();
-      const clauses: string[] = [];
-      const state = query.target?.[TARGET.STATE];
-      if (state !== undefined) clauses.push(`[System.State] = '${escapeWiql(state)}'`);
-      if (query.nativeType !== undefined) {
-        clauses.push(`[System.WorkItemType] = '${escapeWiql(query.nativeType)}'`);
-      }
-      const where = clauses.length > 0 ? ` WHERE ${clauses.join(' AND ')}` : '';
-      const wiql = `SELECT [System.Id] FROM WorkItems${where}`;
+      const wiql = buildWorkItemsWiql(project, query.target?.[TARGET.STATE], query.nativeType);
 
       const result = await witApi.queryByWiql({ query: wiql }, { project }, undefined, query.limit);
       const ids = (result.workItems ?? [])
@@ -231,14 +245,15 @@ export function createAzureDevOpsTransport(options: AzureDevOpsTransportOptions)
       if (ids.length === 0) return [];
 
       // getWorkItems is server-capped at 200 ids; batch so a query matching more than 200 items
-      // returns them all instead of failing with an opaque 400.
+      // returns them all instead of failing with an opaque 400. A lean field set (no body/relations)
+      // is requested so a large listing stays small — `get` is the full-fidelity read.
       const items: WorkItem[] = [];
       for (let offset = 0; offset < ids.length; offset += GET_WORK_ITEMS_BATCH) {
         const batch = await witApi.getWorkItems(
           ids.slice(offset, offset + GET_WORK_ITEMS_BATCH),
+          [...QUERY_FIELDS],
           undefined,
           undefined,
-          WorkItemExpand.All,
           undefined,
           project,
         );
