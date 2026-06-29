@@ -454,5 +454,13 @@ export function buildPorts(policy: BaronPolicyFile, env: Env, logger?: Logger): 
     const gapPolicy = parseGapPolicy(policy.gapPolicy?.[deployProvider] ?? {});
     ports.deploy = buildDeployPort(deployProvider, env, gapPolicy, logger);
   }
+  // 'docs' is a declared port (PORT_NAMES) but has no adapter yet (v2). Binding it must fail loudly,
+  // not silently no-op — a bound port that does nothing is exactly the kind of silent gap #5 forbids.
+  if (policy.providers.docs !== undefined) {
+    throw new BaronError(
+      "The 'docs' port is declared but not implemented yet (planned for a future release); remove it from policy.providers.",
+      'DOCS_UNSUPPORTED',
+    );
+  }
   return ports;
 }

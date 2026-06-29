@@ -1,0 +1,27 @@
+name: ship
+description: Open a draft PR for a branch, move the issue to review, trigger its CI pipeline, and notify the team — a single-pane "ship it" across scm + issues + ci + notify.
+steps:
+  - ask: { as: issueId, type: text, message: "Issue id?" }
+  - ask: { as: branch, type: text, message: "Source branch?" }
+  - ask: { as: title, type: text, message: "Pull request title?" }
+  - ask: { as: pipelineId, type: text, message: "CI pipeline id to run?" }
+  - do: scm.pr.create
+    as: pr
+    with:
+      # targetBranch omitted — defaults to the repo's default branch (portable).
+      title: ${title}
+      sourceBranch: ${branch}
+      draft: true
+  - do: issue.transition
+    with:
+      id: ${issueId}
+      role: in_review
+  - do: ci.run.trigger
+    as: run
+    with:
+      pipelineId: ${pipelineId}
+      ref: ${branch}
+  - do: notify.send
+    with:
+      text: "PR ${pr.url} opened for issue ${issueId}; CI pipeline ${pipelineId} triggered."
+  - message: "Shipped ${issueId}: PR ${pr.url}, CI run accepted, team notified."

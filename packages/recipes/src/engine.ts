@@ -1,9 +1,12 @@
 import {
   BaronError,
+  type CiPort,
+  type DeployPort,
   ISSUE_LINK_TYPES,
   type IssueLinkType,
   type IssueQuery,
   type IssuesPort,
+  type NotifyPort,
   type ScmPort,
   WORKFLOW_ROLES,
   WORK_ITEM_TYPE_ROLES,
@@ -28,6 +31,9 @@ import {
 export interface RecipePorts {
   readonly issues?: IssuesPort;
   readonly scm?: ScmPort;
+  readonly ci?: CiPort;
+  readonly deploy?: DeployPort;
+  readonly notify?: NotifyPort;
   readonly knowledge?: KnowledgeLoop;
 }
 
@@ -153,6 +159,52 @@ function knowledge(ports: RecipePorts, op: string): KnowledgeLoop {
   return ports.knowledge;
 }
 
+function ci(ports: RecipePorts, op: string): CiPort {
+  if (ports.ci === undefined) {
+    throw new BaronError(
+      `Step '${op}' needs the ci port, which is not configured.`,
+      'PORT_UNBOUND',
+    );
+  }
+  return ports.ci;
+}
+
+function deploy(ports: RecipePorts, op: string): DeployPort {
+  if (ports.deploy === undefined) {
+    throw new BaronError(
+      `Step '${op}' needs the deploy port, which is not configured.`,
+      'PORT_UNBOUND',
+    );
+  }
+  return ports.deploy;
+}
+
+function notify(ports: RecipePorts, op: string): NotifyPort {
+  if (ports.notify === undefined) {
+    throw new BaronError(
+      `Step '${op}' needs the notify port, which is not configured.`,
+      'PORT_UNBOUND',
+    );
+  }
+  return ports.notify;
+}
+
+function optStrRecord(params: Params, key: string, op: string): Record<string, string> | undefined {
+  const value = params[key];
+  if (value === undefined) return undefined;
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new BaronError(`Step '${op}' '${key}' must be an object of string values.`, ARGS);
+  }
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(value)) {
+    if (typeof v !== 'string') {
+      throw new BaronError(`Step '${op}' '${key}.${k}' must be a string.`, ARGS);
+    }
+    out[k] = v;
+  }
+  return out;
+}
+
 /** Map a recipe op + resolved params onto the corresponding port call. */
 async function dispatchOp(ports: RecipePorts, op: RecipeOp, params: Params): Promise<unknown> {
   switch (op) {
@@ -214,6 +266,36 @@ async function dispatchOp(ports: RecipePorts, op: RecipeOp, params: Params): Pro
         reqStr(params, 'pullRequestId', op),
         reqStr(params, 'body', op),
       );
+    case RECIPE_OPS.scmPrStatus:
+      return scm(ports, op).prStatus(reqStr(params, 'pullRequestId', op));
+    case RECIPE_OPS.ciRunTrigger: {
+      const ref = optStr(params, 'ref', op);
+      const variables = optStrRecord(params, 'variables', op);
+      return ci(ports, op).trigger({
+        pipelineId: reqStr(params, 'pipelineId', op),
+        ...(ref !== undefined ? { ref } : {}),
+        ...(variables !== undefined ? { variables } : {}),
+      });
+    }
+    case RECIPE_OPS.ciRunCancel:
+      return ci(ports, op).cancel(reqStr(params, 'runId', op));
+    case RECIPE_OPS.deployDeployments: {
+      const environment = optStr(params, 'environment', op);
+      const limit = optNum(params, 'limit', op);
+      return deploy(ports, op).deployments({
+        ...(environment !== undefined ? { environment } : {}),
+        ...(limit !== undefined ? { limit } : {}),
+      });
+    }
+    case RECIPE_OPS.notifySend: {
+      const channel = optStr(params, 'channel', op);
+      const threadKey = optStr(params, 'threadKey', op);
+      return notify(ports, op).send({
+        text: reqStr(params, 'text', op),
+        ...(channel !== undefined ? { channel } : {}),
+        ...(threadKey !== undefined ? { threadKey } : {}),
+      });
+    }
     case RECIPE_OPS.learningAppend: {
       const tags = optStrArray(params, 'tags', op);
       return knowledge(ports, op).learningAppend({

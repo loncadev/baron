@@ -5,8 +5,21 @@ import {
   exampleGithubTypeMap,
   recommendedGithubGapPolicy,
 } from '@baron/adapter-github';
-import { createMemoryScmTransport, createMemoryTransport } from '@baron/conformance';
-import { BaronError, type IssuesPort, type ScmPort } from '@baron/core';
+import {
+  createMemoryCiTransport,
+  createMemoryDeployTransport,
+  createMemoryNotifyTransport,
+  createMemoryScmTransport,
+  createMemoryTransport,
+} from '@baron/conformance';
+import {
+  BaronError,
+  BaseCiAdapter,
+  BaseDeployAdapter,
+  BaseNotifyAdapter,
+  type IssuesPort,
+  type ScmPort,
+} from '@baron/core';
 import { KnowledgeLoop, createMemoryKnowledgeStore } from '@baron/knowledge-loop';
 import { describe, expect, it } from 'vitest';
 import type { RecipeAsker } from './ask.js';
@@ -35,6 +48,30 @@ function allPorts(): RecipePorts {
   return {
     issues: issuesPort(),
     scm: scmPort(),
+    ci: new BaseCiAdapter(
+      {
+        provider: 'mem',
+        ci: {
+          canTrigger: true,
+          canCancel: true,
+          hasStages: false,
+          hasApprovalGates: false,
+          providesLogs: true,
+          hasArtifacts: false,
+        },
+      },
+      { status: { inProgress: 'running' }, result: { succeeded: 'succeeded' } },
+      createMemoryCiTransport(),
+    ),
+    deploy: new BaseDeployAdapter(
+      { provider: 'mem', deploy: { environments: true, deployments: true, canTrigger: false } },
+      { status: {}, result: {} },
+      createMemoryDeployTransport(),
+    ),
+    notify: new BaseNotifyAdapter(
+      { provider: 'mem', notify: { channels: true, threads: true, richText: true } },
+      createMemoryNotifyTransport(),
+    ),
     knowledge: new KnowledgeLoop(createMemoryKnowledgeStore()),
   };
 }
@@ -97,6 +134,27 @@ describe('runRecipe', () => {
     expect(branch.name).toBe(`feature/${issue.id}`);
 
     expect(asker.notes.some((n) => n.includes('Opened'))).toBe(true);
+  });
+
+  it('runs ci / notify / deploy / scm-status ops across the new ports', async () => {
+    const recipe = loadRecipe(`
+name: single-pane
+steps:
+  - do: ci.run.trigger
+    as: run
+    with: { pipelineId: "p1", ref: "main" }
+  - do: deploy.deployments
+    as: deploys
+    with: { limit: 5 }
+  - do: notify.send
+    as: msg
+    with: { text: "ci accepted: \${run.accepted}", channel: "releases" }
+  - message: "done"
+`);
+    const { context } = await runRecipe(recipe, { ports: allPorts(), asker: scriptedAsker() });
+    expect((context.run as { accepted: boolean }).accepted).toBe(true);
+    expect(Array.isArray(context.deploys)).toBe(true);
+    expect((context.msg as { id: string }).id).toBeTruthy();
   });
 
   it('skips an ask whose variable is pre-seeded via inputs', async () => {
