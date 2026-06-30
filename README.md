@@ -46,6 +46,7 @@ Or wire the MCP server into your agent and call the tools directly across every 
 | Guide | What it covers |
 | --- | --- |
 | [Getting started](./docs/getting-started.md) | Install, prerequisites, first `init` → `doctor` → `run`. |
+| [Setup walkthrough — Azure DevOps](./docs/setup-azure-devops.md) | From-scratch, copy-paste setup on Azure DevOps + Claude Code (PAT scopes, init→doctor→MCP, troubleshooting). |
 | [Concepts](./docs/concepts.md) | Ports, roles, capability gaps, the knowledge loop — the mental model. |
 | [Configuration](./docs/configuration.md) | `.baron/policy.json`, role/type/gap maps, credentials. |
 | [CLI](./docs/cli.md) | `baron init` / `doctor` / `run` reference. |
