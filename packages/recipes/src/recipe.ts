@@ -72,6 +72,26 @@ export interface Recipe {
   readonly steps: readonly Step[];
 }
 
+/** A declared input a recipe gathers via an `ask` step — surfaced so a caller can collect them upfront. */
+export interface RecipeInput {
+  readonly name: string;
+  readonly message: string;
+  readonly type: AskType;
+  readonly optional: boolean;
+  readonly choices?: readonly string[];
+}
+
+/** The inputs a recipe's `ask` steps gather, in order — used to drive non-interactive runs. */
+export function recipeInputs(recipe: Recipe): RecipeInput[] {
+  return recipe.steps.filter(isAskStep).map((step) => ({
+    name: step.ask.as,
+    message: step.ask.message,
+    type: step.ask.type,
+    optional: step.ask.optional === true,
+    ...(step.ask.choices !== undefined ? { choices: step.ask.choices } : {}),
+  }));
+}
+
 export function isAskStep(step: Step): step is AskStep {
   return 'ask' in step;
 }
