@@ -10,7 +10,9 @@ tools. The Claude Code plugin is a thin wrapper that registers it.
    a client (e.g. Claude Code) point the server at a project that isn't the server's own cwd (missing
    ⇒ `POLICY_NOT_FOUND`; run `baron init` first).
 2. Builds the live ports the policy binds (any of `issues`, `scm`, `ci`, `deploy`, `notify`) plus the
-   always-available local **knowledge loop** (markdown store under `.baron/knowledge`).
+   always-available local **knowledge loop** (markdown store under `.baron/knowledge`) and a
+   **recipe runner** over those bound ports (built-ins by name + project recipes under
+   `.baron/recipes`).
 3. Advertises only the tools for the bound ports, and routes each call to the right port.
 
 Credentials come from the environment (see [Configuration](./configuration.md)), never from the
@@ -39,6 +41,8 @@ policy.
 | `baron_deploy_environments` | deploy | List deployment environments. |
 | `baron_deploy_deployments` | deploy | List deployments with a normalized `DeployStatus`. |
 | `baron_notify_send` | notify | Send a message (`text`, optional `channel`, optional `threadKey` for threaded replies). |
+| `baron_recipe_list` | recipes | List the runnable recipes (built-ins + project recipes) and the `inputs` each declares. |
+| `baron_recipe_run` | recipes | Run a named recipe end-to-end as ONE deterministic, rule-enforced call (`name`, `inputs`). The engine enforces step order; required inputs are validated up front (`RECIPE_INPUT_MISSING`) — it never prompts. Prefer this over hand-composing the primitives for a packaged workflow. |
 | `baron_native_request` | — | **Escape hatch (last resort).** A non-portable raw authenticated provider REST call; only reaches providers the policy binds. Prefer the normalized tools above. |
 | `baron_learning_append` | loop | Record a durable learning. |
 | `baron_learning_query` | loop | Query learnings by tag / text. |
@@ -59,8 +63,12 @@ returns `PORT_UNBOUND`.
 
 ## Claude Code plugin
 
-`plugins/claude-code` registers the `baron` MCP server and ships a `baron` skill (teaches the agent
-the abstract vocabulary) and a `/baron-run` command. Install it for local development with:
+`plugins/claude-code` registers the `baron` MCP server and ships **skills** — a `baron` skill that
+teaches the agent the abstract vocabulary, plus a skill per packaged workflow (`/baron:task-start`,
+`/baron:task-finish`, `/baron:ship`, and `/baron:run-recipe` for any other recipe). Each is
+discoverable by description (natural language) and as a slash command, and runs the recipe as one
+`baron_recipe_run` call. (Workflows are surfaced as skills, not slash commands — custom commands have
+been merged into skills.) Install it for local development with:
 
 ```bash
 claude --plugin-dir ./plugins/claude-code

@@ -2,7 +2,20 @@
 
 A recipe is a declarative YAML workflow over Baron's primitives. The engine is pure mechanism —
 all the *opinion* (which steps, in what order) lives in the recipe, editable without touching code.
-Run one with [`baron run --recipe <path>`](./cli.md#baron-run).
+
+## Running a recipe
+
+A recipe runs as **one deterministic, rule-enforced call** — the engine enforces the step order, not
+the caller. Three surfaces, same engine:
+
+- **CLI** — [`baron run --recipe <path>`](./cli.md#baron-run). `ask` steps prompt on stdin.
+- **MCP** — [`baron_recipe_run`](./mcp.md#tools) `{ name, inputs }` runs a recipe by name
+  (built-ins: `task-start`, `task-finish`, `ship`; project recipes live in `.baron/recipes/*.yaml`).
+  Inputs are supplied **up front** in `inputs`; a missing required input fails with
+  `RECIPE_INPUT_MISSING` rather than prompting. `baron_recipe_list` reports each recipe's `inputs`.
+- **Claude Code skills** — `/baron:task-start`, `/baron:task-finish`, `/baron:ship`, and
+  `/baron:run-recipe` (for any other recipe). Each gathers the inputs and makes the single
+  `baron_recipe_run` call; also discoverable by natural language.
 
 ## Anatomy
 
@@ -20,7 +33,7 @@ steps:
     as: branch
     with:
       name: feature/${issue.id}
-      fromBranch: main
+      # fromBranch omitted → defaults to the repo's default branch, so the recipe stays portable
   - do: issue.transition
     as: issue
     with:
@@ -84,7 +97,7 @@ to text.
 | `issue.comment` | `id`, `body` | the comment |
 | `issue.link` | `fromId`, `toId`, `type` | — |
 | `issue.query` | `role?`, `typeRole?`, `limit?` | issue list |
-| `scm.branch.create` | `name`, `fromBranch` | the branch |
+| `scm.branch.create` | `name`, `fromBranch?` | the branch |
 | `scm.pr.create` | `title`, `sourceBranch`, `targetBranch?`, `body?`, `draft?` | the PR |
 | `scm.pr.thread` | `pullRequestId`, `body` | the thread |
 | `scm.pr.status` | `pullRequestId` | normalized PR status (state, reviewDecision, mergeable, checks) |
@@ -101,8 +114,15 @@ to text.
 [Concepts](./concepts.md#2-semantic-roles)); a bad value fails the step loudly. A `do` whose port
 isn't configured fails with `PORT_UNBOUND`.
 
-## Shipped examples
+## Built-in recipes
 
-`packages/recipes/recipes/` ships `task-start.yaml` and `task-finish.yaml`. Copy them as a starting
-point. `ship.yaml` is a multi-port example — it opens a draft PR (`scm`), moves the issue to
-`in_review` (`issues`), triggers the CI pipeline (`ci`), and notifies the team (`notify`) in one run.
+`packages/recipes/recipes/` ships three recipes, all runnable **by name** (`baron_recipe_run`, the
+recipe skills) as well as by path (`baron run --recipe`):
+
+- `task-start` — create a task, branch for it, move it to `in_progress`.
+- `task-finish` — open a draft PR for a branch and move its issue to `in_review`.
+- `ship` — a multi-port example: opens a draft PR (`scm`), moves the issue to `in_review` (`issues`),
+  triggers the CI pipeline (`ci`), and notifies the team (`notify`) in one run.
+
+Copy any of them into `.baron/recipes/` as a starting point for your own; project recipes there are
+runnable by name too.

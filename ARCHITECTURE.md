@@ -55,6 +55,7 @@ deployment, not just work tracking (decision #17).
 | 16 | Proof             | A second Azure DevOps project; Beetegre V2 ships as a reference policy example             |
 | 17 | Scope & audience  | **Single pane of glass** for full-stack devs & **solopreneurs**: grow ports across the dev lifecycle — `ci`/`pipelines`, `deployments`/`environments`, `scm` monitoring — so the agent need not fall back to a raw provider tool |
 | 18 | Coverage principle| **Normalize, don't raw-proxy.** New capabilities become ports with a semantic status layer (like roles); a **labeled provider-native escape hatch** is the explicit last resort, never the default path |
+| 19 | Workflow packaging | A recipe runs as **one deterministic, rule-enforced call** (`baron_recipe_run`) — the engine enforces step order, not the agent. Workflows are surfaced to harnesses as **skills, not slash commands** (commands have merged into skills); each per-recipe skill gathers inputs + makes the single call |
 
 ## The semantic role layer (decision #4)
 
@@ -103,6 +104,22 @@ Workflow *opinion* (when to move to `in_review`, what the PR body looks like, hi
 lives in **declarative recipes** outside the core, so teams can edit it. The deterministic
 guarantees we want (role↔native translation, atomic state+column patch, idempotent transition)
 live inside the primitive.
+
+### Recipes run as one deterministic call; harnesses see skills (decision #19)
+
+A packaged workflow must run **the same way every time** — so the *engine* enforces the step order,
+not the agent improvising the primitives. The recipe runner (`baron_recipe_run` over MCP; `baron run
+--recipe` on the CLI) executes a named recipe end-to-end with inputs supplied **up front** (a missing
+required input fails with `RECIPE_INPUT_MISSING` rather than prompting — runs are headless and
+deterministic). This is the reliability win over telling the agent "now create an issue, then a
+branch, then…": the order and rules are code, not reasoning.
+
+Harnesses surface these workflows as **skills**, not slash commands — Claude Code merged custom
+commands into skills, and skills add discovery-by-description (natural language) and supporting files
+on top of the `/name` invocation. Each per-recipe skill (`task-start`, `task-finish`, `ship`, plus a
+generic `run-recipe`) is *thin*: it gathers the declared inputs and makes the single
+`baron_recipe_run` call, with a strict instruction not to hand-compose the primitives. The skill is
+the discovery + input-gathering layer; the engine is the deterministic executor.
 
 ## Coverage roadmap: the single pane of glass (decisions #17–#18)
 
