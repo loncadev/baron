@@ -10,6 +10,7 @@ import {
   mergeCredentials,
   policyPath,
 } from '@baron/providers';
+import { createRecipeService } from '@baron/recipes';
 import type { McpPorts, NativeAccess } from './tools.js';
 
 function readIfPresent(path: string): string | undefined {
@@ -47,9 +48,10 @@ export function loadPorts(root: string, env: Env): McpPorts {
     }
     return executeNativeRequest(provider, effectiveEnv, request);
   };
-  return {
-    ...buildPorts(policy, effectiveEnv),
-    nativeAccess,
-    knowledge: createLocalKnowledgeLoop(knowledgeDir(root)),
-  };
+  const bound = buildPorts(policy, effectiveEnv);
+  const knowledge = createLocalKnowledgeLoop(knowledgeDir(root));
+  // The recipe runner drives the SAME bound ports the agent uses, deterministically (the engine
+  // enforces order/rules); built-ins resolve by name, project recipes from <root>/.baron/recipes.
+  const recipes = createRecipeService({ ...bound, knowledge }, root);
+  return { ...bound, knowledge, nativeAccess, recipes };
 }

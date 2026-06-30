@@ -28,6 +28,7 @@ import {
   isFollowupStatus,
 } from '@baron/knowledge-loop';
 import type { NativeRequest, NativeResponse } from '@baron/providers';
+import type { RecipeService } from '@baron/recipes';
 
 /** The provider-native escape hatch (decision #18), restricted by the caller to bound providers. */
 export type NativeAccess = (provider: string, request: NativeRequest) => Promise<NativeResponse>;
@@ -42,6 +43,8 @@ export interface McpPorts {
   readonly knowledge?: KnowledgeLoop;
   /** Provider-native escape hatch (decision #18); set by the loader, scoped to bound providers. */
   readonly nativeAccess?: NativeAccess;
+  /** Deterministic recipe runner (built-ins + project recipes) over the bound ports. */
+  readonly recipes?: RecipeService;
 }
 
 /** Tool names: snake_case, `baron_` (product) namespace, singular noun to mirror the primitives. */
@@ -81,6 +84,11 @@ export const DEPLOY_TOOL_NAMES = {
 
 export const NATIVE_TOOL_NAMES = {
   request: 'baron_native_request',
+} as const;
+
+export const RECIPE_TOOL_NAMES = {
+  list: 'baron_recipe_list',
+  run: 'baron_recipe_run',
 } as const;
 
 export const LOOP_TOOL_NAMES = {
@@ -491,6 +499,36 @@ export const NATIVE_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
         },
         query: { type: 'object', additionalProperties: { type: 'string' } },
         body: { description: 'JSON request body (any shape).' },
+      },
+    },
+  },
+];
+
+export const RECIPE_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
+  {
+    name: RECIPE_TOOL_NAMES.list,
+    description:
+      'List the runnable recipes (built-ins + project recipes) with their declared inputs. Call this ' +
+      'to discover what `baron_recipe_run` accepts before running a workflow.',
+    inputSchema: { type: 'object', additionalProperties: false, properties: {} },
+  },
+  {
+    name: RECIPE_TOOL_NAMES.run,
+    description:
+      'Run a named recipe end-to-end as ONE deterministic, rule-enforced workflow (the engine — not ' +
+      'you — enforces the step order). Supply all required inputs (from baron_recipe_list) in ' +
+      '`inputs`; a missing required input errors rather than prompting. Prefer this over composing the ' +
+      'individual issue/scm/ci tools yourself for a packaged workflow.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['name'],
+      properties: {
+        name: { type: 'string', minLength: 1, description: 'Recipe name (e.g. task-start).' },
+        inputs: {
+          type: 'object',
+          description: "Values for the recipe's `ask` inputs, keyed by input name.",
+        },
       },
     },
   },
@@ -1006,6 +1044,36 @@ export function callDeployTool(
   }
 }
 
+/** Dispatch an MCP tool call to the recipe runner. Marshals + shapes errors only. */
+export function callRecipeTool(
+  service: RecipeService,
+  name: string,
+  args: Record<string, unknown> | undefined,
+): Promise<ToolResult> {
+  switch (name) {
+    case RECIPE_TOOL_NAMES.list:
+      return run(async () => service.list());
+    case RECIPE_TOOL_NAMES.run:
+      return run(() => {
+        const inputs = args?.inputs;
+        if (
+          inputs !== undefined &&
+          (typeof inputs !== 'object' || inputs === null || Array.isArray(inputs))
+        ) {
+          throw new BaronError("Argument 'inputs' must be an object.", INVALID_ARGS);
+        }
+        return service.run(
+          requireString(args, 'name'),
+          (inputs as Record<string, unknown> | undefined) ?? {},
+        );
+      });
+    default:
+      return run(() => {
+        throw new BaronError(`Unknown tool '${name}'.`, 'UNKNOWN_TOOL');
+      });
+  }
+}
+
 /** Dispatch the escape-hatch tool to the native access fn. Marshals + shapes errors only. */
 export function callNativeTool(
   access: NativeAccess,
@@ -1039,6 +1107,7 @@ export function activeToolDefinitions(ports: McpPorts): ToolDefinition[] {
     ...(ports.ci ? CI_TOOL_DEFINITIONS : []),
     ...(ports.notify ? NOTIFY_TOOL_DEFINITIONS : []),
     ...(ports.deploy ? DEPLOY_TOOL_DEFINITIONS : []),
+    ...(ports.recipes ? RECIPE_TOOL_DEFINITIONS : []),
     ...(ports.nativeAccess ? NATIVE_TOOL_DEFINITIONS : []),
     ...(ports.knowledge ? LOOP_TOOL_DEFINITIONS : []),
   ];
@@ -1089,6 +1158,14 @@ export function dispatchTool(
       });
     }
     return callDeployTool(ports.deploy, name, args);
+  }
+  if (name.startsWith('baron_recipe_')) {
+    if (ports.recipes === undefined) {
+      return run(() => {
+        throw new BaronError('The recipe runner is not available.', 'PORT_UNBOUND');
+      });
+    }
+    return callRecipeTool(ports.recipes, name, args);
   }
   if (name.startsWith('baron_native_')) {
     if (ports.nativeAccess === undefined) {

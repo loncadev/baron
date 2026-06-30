@@ -126,6 +126,9 @@ importers:
       '@baron/providers':
         specifier: workspace:*
         version: link:../providers
+      '@baron/recipes':
+        specifier: workspace:*
+        version: link:../recipes
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
         version: 1.29.0(zod@4.4.3)

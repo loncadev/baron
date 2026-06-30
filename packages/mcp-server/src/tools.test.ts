@@ -30,6 +30,7 @@ import {
   WORK_ITEM_TYPE_ROLES,
 } from '@baron/core';
 import { KnowledgeLoop, createMemoryKnowledgeStore } from '@baron/knowledge-loop';
+import { type RecipeService, createRecipeService } from '@baron/recipes';
 import { describe, expect, it } from 'vitest';
 import {
   CI_TOOL_NAMES,
@@ -39,6 +40,7 @@ import {
   NATIVE_TOOL_NAMES,
   NOTIFY_TOOL_NAMES,
   type NativeAccess,
+  RECIPE_TOOL_NAMES,
   SCM_TOOL_NAMES,
   TOOL_DEFINITIONS,
   activeToolDefinitions,
@@ -46,6 +48,7 @@ import {
   callDeployTool,
   callLoopTool,
   callNotifyTool,
+  callRecipeTool,
   callScmTool,
   callTool,
   dispatchTool,
@@ -555,5 +558,66 @@ describe('callLoopTool', () => {
     const result = await callLoopTool(loop(), LOOP_TOOL_NAMES.followupList, { status: 'archived' });
     expect(result.isError).toBe(true);
     expect(result.structuredContent?.code).toBe('INVALID_ARGS');
+  });
+});
+
+// A root with no .baron/recipes — only the built-ins resolve.
+const RECIPE_ROOT = 'baron-test-no-project-recipes';
+function recipesService(): RecipeService {
+  return createRecipeService({ issues: githubPort(), scm: scmPort() }, RECIPE_ROOT);
+}
+
+describe('callRecipeTool', () => {
+  it('lists built-in recipes with their declared inputs', async () => {
+    const result = await callRecipeTool(recipesService(), RECIPE_TOOL_NAMES.list, undefined);
+    expect(result.isError).toBeUndefined();
+    const recipes = JSON.parse(result.content[0]?.text ?? '[]') as Array<{ name: string }>;
+    expect(recipes.map((r) => r.name)).toContain('task-start');
+  });
+
+  it('runs a named recipe deterministically with supplied inputs (no prompts)', async () => {
+    const result = await callRecipeTool(recipesService(), RECIPE_TOOL_NAMES.run, {
+      name: 'task-start',
+      inputs: { title: 'Wire it' },
+    });
+    expect(result.isError).toBeUndefined();
+    const context = parse(result.content[0]?.text ?? '{}');
+    expect((context.issue as { title: string }).title).toBe('Wire it');
+  });
+
+  it('rejects a missing required input as RECIPE_INPUT_MISSING (never prompts headless)', async () => {
+    const result = await callRecipeTool(recipesService(), RECIPE_TOOL_NAMES.run, {
+      name: 'task-start',
+    });
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent?.code).toBe('RECIPE_INPUT_MISSING');
+  });
+
+  it('rejects a non-object inputs argument as INVALID_ARGS', async () => {
+    const result = await callRecipeTool(recipesService(), RECIPE_TOOL_NAMES.run, {
+      name: 'task-start',
+      inputs: 'bad',
+    });
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent?.code).toBe('INVALID_ARGS');
+  });
+
+  it('rejects a missing recipe name as INVALID_ARGS', async () => {
+    const result = await callRecipeTool(recipesService(), RECIPE_TOOL_NAMES.run, {});
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent?.code).toBe('INVALID_ARGS');
+  });
+
+  it('advertises + dispatches recipe tools only when the runner is wired', async () => {
+    expect(
+      activeToolDefinitions({ recipes: recipesService() }).some(
+        (t) => t.name === RECIPE_TOOL_NAMES.run,
+      ),
+    ).toBe(true);
+    expect(activeToolDefinitions({}).some((t) => t.name === RECIPE_TOOL_NAMES.run)).toBe(false);
+    const ok = await dispatchTool({ recipes: recipesService() }, RECIPE_TOOL_NAMES.list, {});
+    expect(ok.isError).toBeUndefined();
+    const unbound = await dispatchTool({}, RECIPE_TOOL_NAMES.run, { name: 'task-start' });
+    expect(unbound.structuredContent?.code).toBe('PORT_UNBOUND');
   });
 });
