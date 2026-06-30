@@ -55,12 +55,21 @@ A tool that hits a capability gap returns an `isError` result whose text begins 
 (e.g. `CAPABILITY_GAP`, `ROLE_MAPPING`) — read it and adjust (retry with a different role, drop a
 parent, or tell the human to widen the gap policy) rather than treating it as a hard stop.
 
-## Recipes
+## Recipes (packaged workflows)
 
-Multi-step workflows live in declarative YAML recipes (see `@baron/recipes`, e.g. `task-start`,
-`task-finish`). Run one with the CLI: `baron run --recipe <path>`. Prefer a recipe when the user
-describes a whole flow ("start a task", "open a PR and move it to review"); use individual MCP tools
-for one-off actions.
+Multi-step workflows are **declarative recipes** run as ONE deterministic, rule-enforced call — the
+engine enforces the step order, you don't. Prefer a recipe whenever the user describes a whole flow
+("start a task", "open a PR and move it to review", "ship this"); use the individual MCP tools only
+for one-off actions, and never hand-compose the primitives to emulate a recipe.
+
+- `baron_recipe_list` — discover the runnable recipes and the `inputs` each declares.
+- `baron_recipe_run` `{ name, inputs }` — run one end-to-end. Required inputs are validated up front
+  (`RECIPE_INPUT_MISSING`); it never prompts. Built-ins: `task-start`, `task-finish`, `ship`. Project
+  recipes live in `.baron/recipes/*.yaml`.
+
+Dedicated skills wrap the built-ins — `/baron:task-start`, `/baron:task-finish`, `/baron:ship` (and
+`/baron:run-recipe` for anything else): each gathers the inputs and makes the single
+`baron_recipe_run` call. (`baron run --recipe <path>` runs the same recipes from the CLI.)
 
 ## Prerequisites
 
