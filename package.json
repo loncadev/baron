@@ -16,6 +16,7 @@
     "typecheck": "pnpm -r --filter \"./packages/**\" run typecheck",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
+    "licenses:check": "node scripts/check-licenses.mjs",
     "baron": "tsx packages/cli/src/bin.ts",
     "baron:mcp": "tsx packages/mcp-server/src/bin.ts"
   },
