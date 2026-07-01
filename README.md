@@ -106,7 +106,8 @@ never changes how the agent talks to Baron.
 | [Demo script](./docs/demo.md) | Ready-to-record 60-second "single pane" demo (Claude Code or CLI). |
 
 The full design decision record is in [ARCHITECTURE.md](./ARCHITECTURE.md); the contributor working
-contract is [CLAUDE.md](./CLAUDE.md), and contribution terms are in [CONTRIBUTING.md](./CONTRIBUTING.md).
+contract is [CLAUDE.md](./CLAUDE.md), contribution terms are in [CONTRIBUTING.md](./CONTRIBUTING.md),
+and the publish playbook is [RELEASING.md](./RELEASING.md).
 
 ## Status
 

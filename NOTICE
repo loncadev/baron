@@ -1,0 +1,17 @@
+Baron
+Copyright 2026 Baron contributors
+
+This product is licensed under the Apache License, Version 2.0 (see the LICENSE file).
+
+Open-core scope
+---------------
+The OSS packages in this repository are licensed under Apache-2.0:
+
+  @baron/core, @baron/providers, @baron/recipes, @baron/cli, @baron/mcp-server,
+  @baron/knowledge-loop, @baron/conformance, and the P0 adapters
+  @baron/adapter-azure-devops, @baron/adapter-github, @baron/adapter-slack,
+  plus the Claude Code plugin under plugins/claude-code.
+
+Commercial-tier features (SSO, secret-manager integrations, multi-team governance, audit) are
+NOT part of this repository and ship separately under a commercial license. See ARCHITECTURE.md
+decision #20 for the monetization boundary.
