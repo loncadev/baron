@@ -10,16 +10,18 @@ under ~90 seconds. Two variants — pick the one that fits where you're recordin
 
 ## Fastest path — the committed recording
 
-There is already a ready-made asciicast at [`docs/demo/baron-demo.cast`](./demo/baron-demo.cast).
-Render it to a GIF (needs [agg](https://github.com/asciinema/agg); `cargo install --git
-https://github.com/asciinema/agg`):
+The rendered GIF ([`docs/demo/baron-demo.gif`](./demo/baron-demo.gif)) is already embedded at the top
+of [README.md](../README.md). It's built from the asciicast at
+[`docs/demo/baron-demo.cast`](./demo/baron-demo.cast) by a self-contained Pillow renderer (no external
+tools):
 
 ```bash
-agg docs/demo/baron-demo.cast docs/demo/baron-demo.gif
+node scripts/gen-cast.mjs                                          # regenerate the .cast (edit wording/timing here)
+python scripts/render_gif.py docs/demo/baron-demo.cast docs/demo/baron-demo.gif   # .cast -> .gif
 ```
 
-Then drop `baron-demo.gif` at the top of [README.md](../README.md). To re-time or re-word it, edit
-`scripts/gen-cast.mjs` and run `pnpm demo:cast`.
+`pnpm demo:cast` runs the first step. (An asciicast is standard, so you can also render it with
+[agg](https://github.com/asciinema/agg) or upload it to asciinema.org if you prefer.)
 
 Want to see the workflow actually execute (no network, in-memory providers)?
 

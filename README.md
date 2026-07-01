@@ -4,6 +4,8 @@
 > Drive issues, branches, PRs, CI, deployments, and notifications across any stack through a single
 > normalized contract, instead of hardwiring one vendor's API into your prompts.
 
+![Baron running the task-start then task-finish recipes through its normalized ports](docs/demo/baron-demo.gif)
+
 ## The problem
 
 AI coding agents bake **one vendor's API** and **one team's process** into prompts. The moment your
