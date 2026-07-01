@@ -8,6 +8,28 @@ under ~90 seconds. Two variants — pick the one that fits where you're recordin
 > names, and the workflow runs as one deterministic call. On a different provider the *same* prompt
 > would produce the *same* roles mapped to that provider's native states.
 
+## Fastest path — the committed recording
+
+There is already a ready-made asciicast at [`docs/demo/baron-demo.cast`](./demo/baron-demo.cast).
+Render it to a GIF (needs [agg](https://github.com/asciinema/agg); `cargo install --git
+https://github.com/asciinema/agg`):
+
+```bash
+agg docs/demo/baron-demo.cast docs/demo/baron-demo.gif
+```
+
+Then drop `baron-demo.gif` at the top of [README.md](../README.md). To re-time or re-word it, edit
+`scripts/gen-cast.mjs` and run `pnpm demo:cast`.
+
+Want to see the workflow actually execute (no network, in-memory providers)?
+
+```bash
+pnpm demo   # runs task-start then task-finish through the REAL recipe engine and prints the output
+```
+
+That proves the engine runs the recipe deterministically end to end; the two variants below capture
+the *live-provider* version (the "roles → native states" beat) for the hero recording.
+
 ## Recording setup
 
 - Terminal at ~100×30, large font, clean prompt. Close noisy panes.

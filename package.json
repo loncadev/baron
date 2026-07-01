@@ -18,7 +18,9 @@
     "lint:fix": "biome check --write .",
     "licenses:check": "node scripts/check-licenses.mjs",
     "baron": "tsx packages/cli/src/bin.ts",
-    "baron:mcp": "tsx packages/mcp-server/src/bin.ts"
+    "baron:mcp": "tsx packages/mcp-server/src/bin.ts",
+    "demo": "pnpm --filter @baron/recipes exec tsx scripts/demo.ts",
+    "demo:cast": "node scripts/gen-cast.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
