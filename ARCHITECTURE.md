@@ -56,6 +56,7 @@ deployment, not just work tracking (decision #17).
 | 17 | Scope & audience  | **Single pane of glass** for full-stack devs & **solopreneurs**: grow ports across the dev lifecycle — `ci`/`pipelines`, `deployments`/`environments`, `scm` monitoring — so the agent need not fall back to a raw provider tool |
 | 18 | Coverage principle| **Normalize, don't raw-proxy.** New capabilities become ports with a semantic status layer (like roles); a **labeled provider-native escape hatch** is the explicit last resort, never the default path |
 | 19 | Workflow packaging | A recipe runs as **one deterministic, rule-enforced call** (`baron_recipe_run`) — the engine enforces step order, not the agent. Workflows are surfaced to harnesses as **skills, not slash commands** (commands have merged into skills); each per-recipe skill gathers inputs + makes the single call |
+| 20 | Monetization & entitlements | **Open-core boundary set at inception, but no entitlement machinery until a paying design-partner.** OSS stays **Apache-2.0** (client-side glue, not a hyperscaler-resellable stateful service → source-available would only cost adoption); commercial line = SSO, audit aggregation, multi-team governance, hosted secret-manager, cloud. Preserve the relicense *option* with a **CLA/DCO before the first external PR** + **trademark the name** + **dep-license scanning in CI** — the only irreversible-if-skipped moves. **Defer** the `Entitlements` code seam, signed-offline license, private repo, and cloud until real demand |
 
 ## The semantic role layer (decision #4)
 
@@ -152,6 +153,60 @@ API is not yet normalized, a single, **clearly-labeled** passthrough capability 
 invariant #5: gaps are never silent). The normalized ports are always the first-class path; the escape
 hatch is what keeps the tool usable at the edges while normalization catches up.
 
+## Monetization & entitlements (decision #20)
+
+Baron is **open-core** (decision #13). The *boundary* is set now, but the *machinery* is deferred —
+a decision stress-tested by four adversarial reviews (commercialization, licensing/IP, enforcement,
+community/lean). Their consensus, and the reasoning worth preserving:
+
+**OSS license stays Apache-2.0.** The instinct to go source-available (BSL/FSL/SSPL) to "protect the
+moat before a fork" is wrong *for this category*. Every cited relicensing war — HashiCorp→OpenTofu,
+Redis→Valkey, Elastic→OpenSearch — was **stateful infrastructure a hyperscaler resells as a managed
+service**, and the backlash was triggered by *relicensing already-open, already-adopted code*. Baron
+is client-side **glue** (npm packages + MCP server + CLI); a hyperscaler does not monetize it, so the
+BSL rationale does not apply, and source-available would only cost the **adoption that is the actual
+moat** (breadth of adapters + recipe ecosystem + mindshare — an execution moat, not a legal one).
+
+**Preserve the *option*, don't pay for it now.** The one genuinely irreversible risk is foreclosing a
+future relicense: Apache-2.0 grants no relicensing right, so a single outside PR permanently removes
+the option unless contributor rights are secured up front. Therefore the only "do-now" moves are the
+cheap, irreversible-if-skipped ones:
+
+- **CLA (or DCO + explicit relicense grant) before the first external PR** — keeps dual-license/
+  relicense legally possible without every contributor's consent. Zero-cost while solo; shuts on merge #1.
+- **Trademark the product name** — "fork the code, not the brand" is the real solo-dev moat (Apache
+  grants no trademark rights). Needs a clearance search first.
+- **Dependency-license scanning in CI** — denylist AGPL/SSPL/GPL/CC-NC so no transitive dep poisons a
+  permissive or (future) commercial artifact.
+
+**Commercial line = naturally server-side / relationship-gated features:** SSO/SAML, audit-log
+aggregation, multi-team governance, hosted secret-manager, and a possible thin hosted registry —
+kept in a **separate private repo + private packages** under a purpose-built source-available license
+(e.g. Elastic License v2, whose anti-circumvention + no-managed-service clauses fit) that **depends
+on** the Apache core and never mixes into OSS packages. Note the likely real *wedge* is **team-
+coordination / cross-provider sync** (the moment 2+ people share a role-mapping or policy), not SSO —
+SSO/audit is a late enterprise upsell, not the thing that first converts.
+
+**Deferred until a validated paying design-partner exists** (avoid pre-PMF over-engineering + the
+"commercialization theater" optics of shipping a tollbooth before a user): the `Entitlements` /
+`LicenseProvider` code seam, the signed-offline license validator, the private repo/packages, and any
+cloud offering. When built, bank these corrections:
+
+- The entitlement **check** lives in the **OSS core, transparent**; the **paid feature
+  *implementations*** live behind the closed package/server. Closing the *validator* buys nothing
+  (the call sites are still open) — the value of a closed package is IP separation + proprietary
+  logic, not enforcement.
+- **Never brick a paying customer:** expiry *degrades* paid features, never blocks core/CI; 30-day
+  grace + early warnings; no network call on any critical path (air-gapped/CI must work); clock-skew
+  tolerance; seat counts are honor-system attestation offline (audit, not enforcement). Buyers pay
+  because piracy is a **legal/audit liability**, not because DRM is unbreakable — so spend **zero**
+  effort on obfuscation/anti-tamper.
+
+Meanwhile the highest-leverage work is unchanged and comes first: **adoption** — a killer demo, a
+README that sells the single-pane pain in 60 seconds, and distribution — with $0-code monetization
+(GitHub Sponsors, paid support, hosted-beta waitlist) validating willingness-to-pay before any
+entitlement code is written.
+
 ## Repository layout
 
 ```
@@ -198,6 +253,10 @@ never committed.
 - OAuth app flows (GitHub App, Slack OAuth, Azure OAuth)
 - Additional adapters: Jira, Linear, GitLab, Asana, Notion
 - Commercial tier features: SSO, secret-manager integrations, multi-team governance
+- **Entitlements machinery (decision #20): deferred until a validated paying design-partner** — the
+  `Entitlements`/`LicenseProvider` seam, signed-offline license validator, private enterprise repo/
+  packages, and cloud offering. Building any of it pre-demand is over-engineering; the open-core
+  *boundary* and license posture are set now, the *machinery* is not
 
 ## Vertical slices
 
