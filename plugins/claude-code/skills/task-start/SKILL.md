@@ -1,36 +1,50 @@
 ---
 name: task-start
 description: >-
-  Start a task with Baron — create the issue, branch for it, and move it to in_progress as ONE
-  deterministic workflow. Use when the user asks to start, begin, or pick up work on a new task or
-  feature.
+  Start work on an EXISTING work item with Baron — load it, cut its canonical branch, move it to
+  in_progress, and sync the local checkout. Use when the user says to start/pick up/resume a known
+  task, bug, or story (by id, key, or URL). To create a new item first, use task-new.
+argument-hint: <issue-id>
 ---
 
-# Start a task
+# Start a task (existing work item)
 
-Run the **task-start** recipe as a single deterministic call. Do **not** perform the steps yourself
-(create issue → branch → transition → comment) — the Baron engine enforces their order and the
-role/branch rules. Your job is only to gather the inputs and make one call.
+Run the **task-start** recipe as ONE deterministic call, then sync the local working tree. The
+engine enforces the provider-side order (load → branch → in_progress → comment); your job is the
+inputs, the local git, and the briefing.
 
-## Inputs
+## Steps
 
-- `title` — the task title (required).
+1. **Resolve the issue id** from the user's words (`123`, `AB#123`, or a work-item URL → extract the
+   integer). Ask only if genuinely absent.
+2. **Preflight local git** (local git is YOUR job, not Baron's): run `git status --porcelain` — if
+   dirty, stop and ask the user to commit/stash first. Never start work on a dirty tree.
+3. **Run the recipe** — call `baron_recipe_run` exactly once:
 
-If you are unsure what the recipe needs, call `baron_recipe_list` and read `task-start`'s `inputs`.
+   ```json
+   { "name": "task-start", "inputs": { "issueId": "<id>" } }
+   ```
 
-## Run it
+   The engine loads the item, creates the **canonical branch** (`<prefix>/<id>-<slug>`, derived by
+   Baron's core so every agent picks the same name), moves it to `in_progress`, and comments the
+   branch on the item.
+4. **Sync the local checkout** to the branch Baron created on the provider:
 
-Call `baron_recipe_run` exactly once:
-
-```json
-{ "name": "task-start", "inputs": { "title": "<the task title>" } }
-```
+   ```bash
+   git fetch origin && git switch <branch-name-from-the-result>
+   ```
+5. **Assign if unassigned** (optional but recommended): if the returned issue has no `assignee`,
+   call `baron_issue_assign` with the user's provider handle (Azure: email; GitHub: login) — derive
+   it from `git config user.email` or ask.
+6. **Brief the user**: key, title, old→new role, branch, url — then proceed with the implementation
+   the user asked for.
 
 ## Rules
 
-- Take `title` from the user's request. Ask only if it is genuinely absent — never invent one.
-- Call `baron_recipe_run` **once**. Do NOT also call `baron_issue_create` / `baron_scm_branch_create`
-  yourself; that duplicates what the recipe already does.
-- If the result is an `isError` carrying a code (`RECIPE_INPUT_MISSING`, `ROLE_MAPPING`,
-  `CAPABILITY_GAP`, …), surface the code and its actionable hint and stop — do not retry blindly.
-- On success, report the issue key, the branch, and the issue's new role from the returned context.
+- Call `baron_recipe_run` **once**. Do NOT hand-compose `baron_issue_get`/`baron_scm_branch_create`.
+- A failure carrying `RECIPE_INPUT_MISSING` / `ROLE_MAPPING` / branch-name errors: surface the code
+  and stop. In particular, an epic/initiative has **no branch name by design** — ask the user for a
+  child story/task/bug instead of inventing a branch.
+- If the branch already exists on the provider (create fails saying so), this is a RESUME: skip to
+  step 4 (fetch + switch) and continue — do not create `-v2` variants without asking.
+- Re-running on an item already `in_progress` is safe (transition is idempotent).

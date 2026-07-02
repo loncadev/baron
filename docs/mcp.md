@@ -27,11 +27,13 @@ policy.
 | `baron_issue_transition` | issues | Move an issue to a workflow `role`. |
 | `baron_issue_comment` | issues | Comment on an issue. |
 | `baron_issue_link` | issues | Link two issues (`relates` / `blocks` / `blocked_by` / `duplicates`). |
+| `baron_issue_assign` | issues | Assign an issue to a provider-native user handle (Azure: email; GitHub: login). |
 | `baron_issue_query` | issues | List issues filtered by `role` / `typeRole` / `limit`. |
 | `baron_scm_branch_create` | scm | Create a branch from a base branch. |
 | `baron_scm_pr_create` | scm | Open a pull request (optional `draft`). |
 | `baron_scm_pr_thread` | scm | Add a discussion thread/comment to a PR. |
 | `baron_scm_pr_status` | scm | Normalized PR status: `state` (open/merged/closed/unknown), `reviewDecision`, `mergeable`, and a `checks` rollup. |
+| `baron_scm_pr_for_branch` | scm | The open PR for a source branch, or `null` — check before `pr_create` so re-runs never duplicate. |
 | `baron_ci_pipelines` | ci | List the pipelines/workflows defined for the repo. |
 | `baron_ci_runs` | ci | List runs (defaults `limit` 50) with a normalized `RunStatus`. |
 | `baron_ci_run_get` | ci | Fetch one run's detail, including per-stage status. |

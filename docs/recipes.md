@@ -92,15 +92,17 @@ to text.
 | `do:` | Params (`with`) | Result bound by `as` |
 | --- | --- | --- |
 | `issue.create` | `title`, `typeRole`, `body?`, `parentId?`, `labels?`, `initialRole?` | the issue |
-| `issue.get` | `id` | the issue |
+| `issue.get` | `id` | the issue (incl. `branchName`, the canonical `<prefix>/<id>-<slug>`) |
 | `issue.transition` | `id`, `role` | the issue |
 | `issue.comment` | `id`, `body` | the comment |
 | `issue.link` | `fromId`, `toId`, `type` | — |
+| `issue.assign` | `id`, `assignee` (provider-native handle) | the issue |
 | `issue.query` | `role?`, `typeRole?`, `limit?` | issue list |
 | `scm.branch.create` | `name`, `fromBranch?` | the branch |
 | `scm.pr.create` | `title`, `sourceBranch`, `targetBranch?`, `body?`, `draft?` | the PR |
 | `scm.pr.thread` | `pullRequestId`, `body` | the thread |
 | `scm.pr.status` | `pullRequestId` | normalized PR status (state, reviewDecision, mergeable, checks) |
+| `scm.pr.find` | `sourceBranch` | the open PR for that branch, or `null` (idempotency probe) |
 | `ci.run.trigger` | `pipelineId`, `ref?`, `variables?` | the triggered run |
 | `ci.run.cancel` | `runId` | the canceled run |
 | `deploy.deployments` | `environment?`, `limit?` | deployment list |
@@ -116,13 +118,18 @@ isn't configured fails with `PORT_UNBOUND`.
 
 ## Built-in recipes
 
-`packages/recipes/recipes/` ships three recipes, all runnable **by name** (`baron_recipe_run`, the
-recipe skills) as well as by path (`baron run --recipe`):
+`packages/recipes/recipes/` ships four recipes, all runnable **by name** (`baron_recipe_run`, the
+recipe skills) as well as by path (`baron run --recipe`). They mirror the reference flow Baron was
+abstracted from (ARCHITECTURE #21): creating and starting are separate acts, and review state moves
+on merge, not at PR-open.
 
-- `task-start` — create a task, branch for it, move it to `in_progress`.
-- `task-finish` — open a draft PR for a branch and move its issue to `in_review`.
-- `ship` — a multi-port example: opens a draft PR (`scm`), moves the issue to `in_review` (`issues`),
-  triggers the CI pipeline (`ci`), and notifies the team (`notify`) in one run.
+- `task-new` — CREATE a work item (title + type role + optional parent).
+- `task-start` — start an EXISTING item: load it, branch on its core-derived canonical
+  `branchName` (`<prefix>/<id>-<slug>`; fails loudly for epics), move to `in_progress`, note the
+  branch on the item.
+- `task-finish` — open a draft PR + post the link on the item. Deliberately does NOT move the role.
+- `ship` — a multi-port example: draft PR (`scm`) + `in_review` (`issues`) + CI trigger (`ci`) +
+  notify (`notify`) in one run.
 
 Copy any of them into `.baron/recipes/` as a starting point for your own; project recipes there are
 runnable by name too.

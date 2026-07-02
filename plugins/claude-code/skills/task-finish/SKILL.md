@@ -1,40 +1,42 @@
 ---
 name: task-finish
 description: >-
-  Finish a task with Baron — open a draft pull request for its branch and move the issue to
-  in_review as ONE deterministic workflow. Use when the user says a task is done, ready for review,
-  or asks to open a PR for it.
+  Finish a work-item branch with Baron — push it, open (or find) the draft pull request, and post
+  the PR link on the item. Use when the user says the work is done / ready for review / open a PR.
+  The item's role does NOT move here — it moves when the PR merges.
 ---
 
-# Finish a task
+# Finish a task (open the PR)
 
-Run the **task-finish** recipe as a single deterministic call. Do **not** open the PR, transition the
-issue, and add the thread yourself — the Baron engine enforces the order and the role mapping. Your
-job is only to gather the inputs and make one call.
+Idempotent finish: push the branch, check for an existing PR first, and only then run the
+**task-finish** recipe as ONE deterministic call. Local git is YOUR job; provider truth is Baron's.
 
-## Inputs
+## Steps
 
-- `issueId` — the issue being finished (required).
-- `branch` — the source branch the PR opens from (required).
-- `title` — the pull request title (required).
+1. **Identify the work item + branch**: parse the current branch (`git rev-parse --abbrev-ref HEAD`)
+   as `<prefix>/<id>-<slug>` and extract `<id>`. If the branch doesn't match, ask — never open a PR
+   from a non-work-item branch without confirming.
+2. **Preflight local git**: `git status --porcelain` — dirty tree → stop (commit/stash first). Then
+   **push**: `git push -u origin HEAD` (never `--force`; on a non-fast-forward reject, explain the
+   rebase path and stop).
+3. **Idempotency check** — call `baron_scm_pr_for_branch` with the branch:
+   - **PR exists** (non-null): do NOT create another. Report its URL, and add a
+     `baron_scm_pr_thread` note only if there is genuinely new context (new commits since).
+   - **null**: continue.
+4. **Run the recipe** — call `baron_recipe_run` exactly once:
 
-If you are unsure, call `baron_recipe_list` and read `task-finish`'s `inputs`. The PR targets the
-repo's default branch automatically — do not ask for a target branch.
+   ```json
+   { "name": "task-finish", "inputs": { "issueId": "<id>", "branch": "<branch>", "title": "<PR title>" } }
+   ```
 
-## Run it
-
-Call `baron_recipe_run` exactly once:
-
-```json
-{ "name": "task-finish", "inputs": { "issueId": "<id>", "branch": "<source branch>", "title": "<PR title>" } }
-```
+   PR title: the top commit's conventional-commit subject (ask only if it reads poorly). The engine
+   opens a DRAFT PR, adds the opening thread, and posts the PR link on the work item.
+5. **Report**: PR URL + "role unchanged — it moves to in_review when the PR merges" (merge-time is a
+   deliberate rule, not an omission).
 
 ## Rules
 
-- Gather the inputs from context (the issue currently in progress, the working branch). Ask only for
-  what is genuinely missing.
-- Call `baron_recipe_run` **once**. Do NOT also call `baron_scm_pr_create` / `baron_issue_transition`
-  yourself.
-- If the result is an `isError` with a code (`RECIPE_INPUT_MISSING`, `CAPABILITY_GAP`, …), surface
-  the code and its hint and stop — do not retry blindly.
-- On success, report the PR url and that the issue moved to review.
+- Call `baron_recipe_run` **once**, and only after the null check in step 3.
+- Do NOT transition the issue here — not manually either. If the user explicitly asks to move it,
+  use `baron_issue_transition` and say why (they own the exception).
+- Surface `isError` codes with their hint and stop; never retry blindly.

@@ -25,12 +25,16 @@ Baron translates these to each provider's native states/types/links and negotiat
 ## MCP tools (this plugin registers the `baron` MCP server)
 
 Issues port: `baron_issue_create`, `baron_issue_get`, `baron_issue_transition`,
-`baron_issue_comment`, `baron_issue_link`, `baron_issue_query`.
+`baron_issue_comment`, `baron_issue_link`, `baron_issue_assign` (provider-native handle: Azure
+email, GitHub login), `baron_issue_query`. Every returned issue carries `branchName` — the canonical
+`<prefix>/<id>-<slug>` branch derived by the core; use it verbatim, never invent branch names
+(unset for epics/initiatives = don't branch on those).
 
 Scm port: `baron_scm_branch_create`, `baron_scm_pr_create`, `baron_scm_pr_thread`,
-`baron_scm_pr_status`. `branch_create`/`pr_create` default the base branch to the repo default when
-omitted. `pr_status` returns a normalized `PullRequestStatus`: `state`
-(`open|merged|closed|unknown`), `reviewDecision`
+`baron_scm_pr_status`, `baron_scm_pr_for_branch`. `branch_create`/`pr_create` default the base
+branch to the repo default when omitted. `pr_for_branch` returns the OPEN PR for a source branch
+(or null) — check it BEFORE `pr_create` so a re-run never duplicates a PR. `pr_status` returns a
+normalized `PullRequestStatus`: `state` (`open|merged|closed|unknown`), `reviewDecision`
 (`approved|changes_requested|review_required|pending|unknown`), `mergeable`, and a `checks` rollup
 (`succeeded|failed|pending|none`) — reach for it to gate "is this PR ready to merge?".
 
@@ -64,12 +68,18 @@ for one-off actions, and never hand-compose the primitives to emulate a recipe.
 
 - `baron_recipe_list` — discover the runnable recipes and the `inputs` each declares.
 - `baron_recipe_run` `{ name, inputs }` — run one end-to-end. Required inputs are validated up front
-  (`RECIPE_INPUT_MISSING`); it never prompts. Built-ins: `task-start`, `task-finish`, `ship`. Project
-  recipes live in `.baron/recipes/*.yaml`.
+  (`RECIPE_INPUT_MISSING`); it never prompts. Built-ins: `task-new` (CREATE an item),
+  `task-start` (start an EXISTING item — branch + in_progress), `task-finish` (draft PR; the role
+  deliberately does NOT move — it moves on merge), `ship`. Project recipes live in
+  `.baron/recipes/*.yaml`.
 
-Dedicated skills wrap the built-ins — `/baron:task-start`, `/baron:task-finish`, `/baron:ship` (and
-`/baron:run-recipe` for anything else): each gathers the inputs and makes the single
-`baron_recipe_run` call. (`baron run --recipe <path>` runs the same recipes from the CLI.)
+Dedicated skills wrap the built-ins — `/baron:task-new`, `/baron:task-start`, `/baron:task-finish`,
+`/baron:ship` (and `/baron:run-recipe` for anything else): each gathers the inputs and makes the
+single `baron_recipe_run` call. (`baron run --recipe <path>` runs the same recipes from the CLI.)
+
+**Boundary rule:** recipes/tools own PROVIDER truth (work items, remote branches, PRs); the LOCAL
+working tree (git status/fetch/switch/push) is the agent's job around the call — see the per-recipe
+skills for the exact order.
 
 ## Prerequisites
 
