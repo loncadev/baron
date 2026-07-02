@@ -236,10 +236,14 @@ async function dispatchOp(ports: RecipePorts, op: RecipeOp, params: Params): Pro
           ? { initialRole: reqRole(params, 'initialRole', op) }
           : {}),
       });
+    case RECIPE_OPS.issueGet:
+      return issues(ports, op).get(reqStr(params, 'id', op));
     case RECIPE_OPS.issueTransition:
       return issues(ports, op).transition(reqStr(params, 'id', op), reqRole(params, 'role', op));
     case RECIPE_OPS.issueComment:
       return issues(ports, op).comment(reqStr(params, 'id', op), reqStr(params, 'body', op));
+    case RECIPE_OPS.issueAssign:
+      return issues(ports, op).assign(reqStr(params, 'id', op), reqStr(params, 'assignee', op));
     case RECIPE_OPS.issueLink:
       return issues(ports, op).link(
         reqStr(params, 'fromId', op),
@@ -283,6 +287,11 @@ async function dispatchOp(ports: RecipePorts, op: RecipeOp, params: Params): Pro
       );
     case RECIPE_OPS.scmPrStatus:
       return scm(ports, op).prStatus(reqStr(params, 'pullRequestId', op));
+    case RECIPE_OPS.scmPrFind: {
+      // Null (not undefined) for "no PR", so `as:`-bound context reads unambiguously in messages.
+      const found = await scm(ports, op).prForBranch(reqStr(params, 'sourceBranch', op));
+      return found ?? null;
+    }
     case RECIPE_OPS.ciRunTrigger: {
       const ref = optStr(params, 'ref', op);
       const variables = optStrRecord(params, 'variables', op);

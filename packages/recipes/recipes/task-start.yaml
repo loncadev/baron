@@ -1,18 +1,19 @@
 name: task-start
-description: Create a task, branch for it, and move it into progress.
+description: Start work on an EXISTING work item — load it, cut its canonical branch, move it to in_progress, and note the branch on the item. (Creating a new item is `task-new`.)
 steps:
-  - ask: { as: title, type: text, message: "Task title?" }
-  - do: issue.create
+  - ask: { as: issueId, type: text, message: "Work item id?" }
+  - do: issue.get
     as: issue
     with:
-      title: ${title}
-      typeRole: task
+      id: ${issueId}
+  # ${issue.branchName} is the core-derived canonical name (<prefix>/<id>-<slug>) — every agent and
+  # recipe derives the SAME name for the same item. It is unset for container types (epic/initiative),
+  # which makes this step fail loudly rather than branch on an epic.
   - do: scm.branch.create
     as: branch
     with:
-      # fromBranch omitted on purpose — defaults to the repo's default branch (main/release/master),
-      # so this recipe is portable across repos instead of assuming 'main'.
-      name: feature/${issue.id}
+      # fromBranch omitted on purpose — defaults to the repo's default branch (main/release/master).
+      name: ${issue.branchName}
   - do: issue.transition
     as: issue
     with:
@@ -21,5 +22,5 @@ steps:
   - do: issue.comment
     with:
       id: ${issue.id}
-      body: "Started on branch ${branch.name}."
-  - message: "Task ${issue.key} is in progress on ${branch.name}."
+      body: "Branch created: ${branch.name}."
+  - message: "${issue.key} is in progress on ${branch.name}."

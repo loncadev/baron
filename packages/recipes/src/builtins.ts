@@ -7,7 +7,7 @@ import { type Recipe, loadRecipe } from './recipe.js';
 const RECIPES_DIR = fileURLToPath(new URL('../recipes/', import.meta.url));
 
 /** The recipes Baron ships out of the box, runnable by name (no file path). */
-export const BUILTIN_RECIPE_NAMES = ['task-start', 'task-finish', 'ship'] as const;
+export const BUILTIN_RECIPE_NAMES = ['task-new', 'task-start', 'task-finish', 'ship'] as const;
 export type BuiltinRecipeName = (typeof BUILTIN_RECIPE_NAMES)[number];
 
 export function isBuiltinRecipe(name: string): name is BuiltinRecipeName {

@@ -1,0 +1,15 @@
+name: task-new
+description: Create a NEW work item (type + optional parent + optional starting role). Starting work on it afterwards is `task-start`.
+steps:
+  - ask: { as: title, type: text, message: "Work item title?" }
+  - ask: { as: typeRole, type: choice, message: "Type role?", choices: [task, bug, story] }
+  - ask: { as: parentId, type: text, message: "Parent id (empty for none)?", optional: true }
+  - do: issue.create
+    as: issue
+    with:
+      title: ${title}
+      typeRole: ${typeRole}
+      # Exactly-one-reference interpolation: an unanswered optional ask stays truly unset,
+      # so hierarchy/gap negotiation only runs when a parent was actually given.
+      parentId: ${parentId}
+  - message: "Created ${issue.key} (${issue.nativeType}): ${issue.title}"

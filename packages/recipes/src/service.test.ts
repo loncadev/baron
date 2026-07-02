@@ -34,22 +34,35 @@ describe('RecipeService', () => {
   it('lists the built-in recipes with their declared inputs', () => {
     const summaries = createRecipeService(ports(), ROOT).list();
     const names = summaries.map((s) => s.name);
-    expect(names).toEqual(expect.arrayContaining(['task-start', 'task-finish', 'ship']));
+    expect(names).toEqual(
+      expect.arrayContaining(['task-new', 'task-start', 'task-finish', 'ship']),
+    );
+    const taskNew = summaries.find((s) => s.name === 'task-new');
+    expect(taskNew?.inputs.map((i) => i.name)).toContain('title');
     const taskStart = summaries.find((s) => s.name === 'task-start');
-    expect(taskStart?.inputs.map((i) => i.name)).toContain('title');
+    expect(taskStart?.inputs.map((i) => i.name)).toContain('issueId');
   });
 
   it('runs a built-in recipe by name with pre-supplied inputs (deterministic, no prompts)', async () => {
-    const context = await createRecipeService(ports(), ROOT).run('task-start', {
-      title: 'Wire it',
-    });
-    expect((context.issue as { title: string; role?: string }).title).toBe('Wire it');
-    expect((context.issue as { role?: string }).role).toBe('in_progress');
-    expect((context.branch as { name: string }).name).toContain('feature/');
+    const service = createRecipeService(ports(), ROOT);
+    // task-new creates; task-start then works on the EXISTING item — the reference split.
+    const created = await service.run('task-new', { title: 'Wire it', typeRole: 'task' });
+    const issueId = (created.issue as { id: string }).id;
+
+    const context = await service.run('task-start', { issueId });
+    const issue = context.issue as { id: string; role?: string; branchName?: string };
+    expect(issue.id).toBe(issueId);
+    expect(issue.role).toBe('in_progress');
+    // The branch is the core-derived canonical name, never an invented one.
+    const branch = context.branch as { name: string };
+    expect(branch.name).toBe(issue.branchName);
+    expect(branch.name).toContain(`/${issueId}-wire-it`);
   });
 
   it('errors with the missing input names when a required input is absent', async () => {
-    await expect(createRecipeService(ports(), ROOT).run('task-start', {})).rejects.toThrow(/title/);
+    await expect(createRecipeService(ports(), ROOT).run('task-start', {})).rejects.toThrow(
+      /issueId/,
+    );
   });
 
   it('errors on an unknown recipe name', async () => {

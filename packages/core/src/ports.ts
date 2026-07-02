@@ -8,7 +8,20 @@ import type { Logger } from './logger.js';
 import { silentLogger } from './logger.js';
 import { resolveGap } from './policy.js';
 import { RoleResolver } from './role-resolver.js';
-import type { WorkflowRole } from './roles.js';
+import type { WorkItemTypeRole, WorkflowRole } from './roles.js';
+
+/**
+ * Deterministic tie-break for reverse type-role resolution when a flat provider maps several type
+ * roles onto one native type: prefer the branchable, story-level reading over container types.
+ */
+const REVERSE_TYPE_ROLE_PRIORITY: readonly WorkItemTypeRole[] = [
+  'story',
+  'task',
+  'bug',
+  'subtask',
+  'epic',
+  'initiative',
+];
 
 /** A raw issue as a provider transport speaks it (before normalization to {@link Issue}). */
 export interface NativeIssue {
@@ -259,9 +272,14 @@ export class BaseIssuesAdapter implements IssuesPort {
   }
 
   private reverseTypeRole(nativeType: string) {
-    for (const [typeRole, name] of Object.entries(this.cfg.typeMap)) {
-      if (name === nativeType) return typeRole as keyof typeof this.cfg.typeMap;
-    }
-    return undefined;
+    const candidates = Object.entries(this.cfg.typeMap)
+      .filter(([, name]) => name === nativeType)
+      .map(([typeRole]) => typeRole as keyof typeof this.cfg.typeMap);
+    if (candidates.length <= 1) return candidates[0];
+    // A flat provider collapses several type roles onto one native type (GitHub: everything ->
+    // 'issue'), making the reverse lookup ambiguous. Tie-break deterministically, preferring the
+    // branchable story-level reading over containers — insertion order would be arbitrary and
+    // could resolve every issue to 'initiative', which (correctly) has no branch prefix.
+    return REVERSE_TYPE_ROLE_PRIORITY.find((role) => candidates.includes(role)) ?? candidates[0];
   }
 }

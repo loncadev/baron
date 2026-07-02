@@ -7,14 +7,17 @@ import { parse as parseYaml } from 'yaml';
  */
 export const RECIPE_OPS = {
   issueCreate: 'issue.create',
+  issueGet: 'issue.get',
   issueTransition: 'issue.transition',
   issueComment: 'issue.comment',
   issueLink: 'issue.link',
+  issueAssign: 'issue.assign',
   issueQuery: 'issue.query',
   scmBranchCreate: 'scm.branch.create',
   scmPrCreate: 'scm.pr.create',
   scmPrThread: 'scm.pr.thread',
   scmPrStatus: 'scm.pr.status',
+  scmPrFind: 'scm.pr.find',
   ciRunTrigger: 'ci.run.trigger',
   ciRunCancel: 'ci.run.cancel',
   deployDeployments: 'deploy.deployments',

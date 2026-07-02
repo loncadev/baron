@@ -71,6 +71,7 @@ describe('createMcpServer (end-to-end over the MCP protocol)', () => {
         MCP_TOOL_NAMES.transition,
         MCP_TOOL_NAMES.comment,
         MCP_TOOL_NAMES.link,
+        MCP_TOOL_NAMES.assign,
         MCP_TOOL_NAMES.query,
       ].sort(),
     );

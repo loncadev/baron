@@ -305,13 +305,14 @@ function parse(text: string): Record<string, unknown> {
 }
 
 describe('TOOL_DEFINITIONS', () => {
-  it('exposes the six implemented issue primitives', () => {
+  it('exposes the seven implemented issue primitives', () => {
     expect(TOOL_DEFINITIONS.map((t) => t.name)).toEqual([
       MCP_TOOL_NAMES.create,
       MCP_TOOL_NAMES.get,
       MCP_TOOL_NAMES.transition,
       MCP_TOOL_NAMES.comment,
       MCP_TOOL_NAMES.link,
+      MCP_TOOL_NAMES.assign,
       MCP_TOOL_NAMES.query,
     ]);
   });
@@ -523,6 +524,50 @@ describe('callScmTool', () => {
     expect(result.isError).toBe(true);
     expect(result.structuredContent?.code).toBe('INVALID_ARGS');
   });
+
+  it('pr_for_branch returns the open PR for a branch, and an explicit null when none', async () => {
+    const port = scmPort();
+    const none = await callScmTool(port, SCM_TOOL_NAMES.prForBranch, {
+      sourceBranch: 'feature/none',
+    });
+    expect(none.isError).toBeUndefined();
+    expect(JSON.parse(none.content[0]?.text ?? '')).toBeNull();
+
+    const created = parse(
+      await callScmTool(port, SCM_TOOL_NAMES.prCreate, {
+        title: 'PR',
+        sourceBranch: 'feature/find-me',
+        targetBranch: 'main',
+      }).then((r) => r.content[0]?.text ?? '{}'),
+    );
+    const found = await callScmTool(port, SCM_TOOL_NAMES.prForBranch, {
+      sourceBranch: 'feature/find-me',
+    });
+    expect(parse(found.content[0]?.text ?? '{}').id).toBe(created.id);
+  });
+});
+
+describe('baron_issue_assign', () => {
+  it('assigns an issue and returns the normalized assignee', async () => {
+    const port = githubPort();
+    const created = parse(
+      await callTool(port, MCP_TOOL_NAMES.create, { title: 'x', typeRole: 'task' }).then(
+        (r) => r.content[0]?.text ?? '{}',
+      ),
+    );
+    const result = await callTool(port, MCP_TOOL_NAMES.assign, {
+      id: created.id,
+      assignee: 'octocat',
+    });
+    expect(result.isError).toBeUndefined();
+    expect(parse(result.content[0]?.text ?? '{}').assignee).toBe('octocat');
+  });
+
+  it('rejects a missing assignee as INVALID_ARGS', async () => {
+    const result = await callTool(githubPort(), MCP_TOOL_NAMES.assign, { id: '1' });
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent?.code).toBe('INVALID_ARGS');
+  });
 });
 
 describe('callLoopTool', () => {
@@ -577,8 +622,8 @@ describe('callRecipeTool', () => {
 
   it('runs a named recipe deterministically with supplied inputs (no prompts)', async () => {
     const result = await callRecipeTool(recipesService(), RECIPE_TOOL_NAMES.run, {
-      name: 'task-start',
-      inputs: { title: 'Wire it' },
+      name: 'task-new',
+      inputs: { title: 'Wire it', typeRole: 'task' },
     });
     expect(result.isError).toBeUndefined();
     const context = parse(result.content[0]?.text ?? '{}');

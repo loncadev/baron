@@ -54,6 +54,7 @@ export const MCP_TOOL_NAMES = {
   transition: 'baron_issue_transition',
   comment: 'baron_issue_comment',
   link: 'baron_issue_link',
+  assign: 'baron_issue_assign',
   query: 'baron_issue_query',
 } as const;
 
@@ -62,6 +63,7 @@ export const SCM_TOOL_NAMES = {
   prCreate: 'baron_scm_pr_create',
   prThread: 'baron_scm_pr_thread',
   prStatus: 'baron_scm_pr_status',
+  prForBranch: 'baron_scm_pr_for_branch',
 } as const;
 
 export const CI_TOOL_NAMES = {
@@ -226,6 +228,25 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
     },
   },
   {
+    name: MCP_TOOL_NAMES.assign,
+    description:
+      'Assign an issue to a user by their provider-native handle (Azure DevOps: email; GitHub: ' +
+      'login). Providers without assignment negotiate the gap per policy.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['id', 'assignee'],
+      properties: {
+        id: { type: 'string', minLength: 1 },
+        assignee: {
+          type: 'string',
+          minLength: 1,
+          description: 'Provider-native user handle (email on Azure DevOps, login on GitHub).',
+        },
+      },
+    },
+  },
+  {
     name: MCP_TOOL_NAMES.query,
     description:
       'List issues filtered by workflow role and/or type role (filters are AND-combined). Returns a ' +
@@ -313,6 +334,24 @@ export const SCM_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
       additionalProperties: false,
       required: ['pullRequestId'],
       properties: { pullRequestId: { type: 'string', minLength: 1 } },
+    },
+  },
+  {
+    name: SCM_TOOL_NAMES.prForBranch,
+    description:
+      'Find the OPEN pull request whose source is the given branch (null when none). Check this ' +
+      'BEFORE opening a PR for a branch so a re-run updates/reports instead of duplicating.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['sourceBranch'],
+      properties: {
+        sourceBranch: {
+          type: 'string',
+          minLength: 1,
+          description: 'Branch name (no refs/heads/).',
+        },
+      },
     },
   },
 ];
@@ -755,6 +794,8 @@ export function callTool(
           requireLinkType(args),
         ),
       );
+    case MCP_TOOL_NAMES.assign:
+      return run(() => port.assign(requireString(args, 'id'), requireString(args, 'assignee')));
     case MCP_TOOL_NAMES.query:
       return run(() => port.query(toQuery(args)));
     default:
@@ -806,6 +847,13 @@ export function callScmTool(
       });
     case SCM_TOOL_NAMES.prStatus:
       return run(() => port.prStatus(requireString(args, 'pullRequestId')));
+    case SCM_TOOL_NAMES.prForBranch:
+      return run(async () => {
+        // Map "no PR" to an explicit null: run() reports undefined as {"ok":true}, which would
+        // read as success-with-a-PR; null tells the agent unambiguously "none exists yet".
+        const pr = await port.prForBranch(requireString(args, 'sourceBranch'));
+        return pr ?? null;
+      });
     case SCM_TOOL_NAMES.prThread:
       return run(() =>
         port.addPullRequestThread(

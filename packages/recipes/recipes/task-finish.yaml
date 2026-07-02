@@ -1,5 +1,5 @@
 name: task-finish
-description: Open a pull request for a branch and move its issue to review.
+description: Open a draft pull request for a work-item branch and post the PR link back on the item. Deliberately does NOT move the item's role — review/testing state changes when the PR actually merges, not when it opens.
 steps:
   - ask: { as: issueId, type: text, message: "Issue id?" }
   - ask: { as: branch, type: text, message: "Source branch?" }
@@ -11,12 +11,13 @@ steps:
       title: ${title}
       sourceBranch: ${branch}
       draft: true
-  - do: issue.transition
-    with:
-      id: ${issueId}
-      role: in_review
   - do: scm.pr.thread
     with:
       pullRequestId: ${pr.id}
       body: "Opened for issue ${issueId}."
-  - message: "Opened PR ${pr.url}; moved ${issueId} to review."
+  # Give the card full context: reviewers/QA opening the work item see the PR without digging.
+  - do: issue.comment
+    with:
+      id: ${issueId}
+      body: "PR opened: ${pr.url} (from ${branch}). Role unchanged — moves to in_review on merge."
+  - message: "Opened PR ${pr.url} for ${issueId}. Role unchanged; transition on merge (task-move)."
