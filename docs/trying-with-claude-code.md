@@ -30,8 +30,8 @@ Claude Code reads a project's `.mcp.json`. Create **`BeeMaster/.mcp.json`**:
 
 - The server reads `BeeMaster/.baron/policy.json` and overlays `BeeMaster/.baron/credentials` (your
   PAT) onto the environment — so credentials stay in the gitignored file, not in `.mcp.json`.
-- Windows note: if Claude Code can't find `pnpm`, use `"command": "pnpm.cmd"`. Once `@baron/mcp-server`
-  is published, this becomes `"command": "npx", "args": ["-y", "@baron/mcp-server"]` with the same
+- Windows note: if Claude Code can't find `pnpm`, use `"command": "pnpm.cmd"`. Once `@lonca/baron-mcp-server`
+  is published, this becomes `"command": "npx", "args": ["-y", "@lonca/baron-mcp-server"]` with the same
   `BARON_ROOT`.
 - Restart Claude Code (or reload MCP servers) so it picks up the new server.
 
@@ -119,4 +119,4 @@ above is what confirms them against the live API for the first time.
 - **`in_review` / `blocked`:** `in_review` → state `Test`; `blocked` is unmapped (transitioning to it
   errors loudly by design — map it if your process has a blocked state).
 - **Reverse type-role** is best-effort when several roles map to one native type.
-- The dev MCP launch via `pnpm`/`tsx` is a pre-publish convenience; publishing will make it `npx @baron/mcp-server`.
+- The dev MCP launch via `pnpm`/`tsx` is a pre-publish convenience; publishing will make it `npx @lonca/baron-mcp-server`.

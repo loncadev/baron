@@ -1,6 +1,6 @@
 # MCP server & plugin
 
-Baron's core is exposed as a stdio **MCP server** (`@baron/mcp-server`, bin `baron-mcp`), so any MCP
+Baron's core is exposed as a stdio **MCP server** (`@lonca/baron-mcp-server`, bin `baron-mcp`), so any MCP
 client — Claude Code, Cursor, Codex, … — can drive work tracking and source control by calling
 tools. The Claude Code plugin is a thin wrapper that registers it.
 
@@ -74,6 +74,6 @@ been merged into skills.) Install it for local development with:
 claude --plugin-dir ./plugins/claude-code
 ```
 
-Its `.claude-plugin/plugin.json` launches the server via `npx -y @baron/mcp-server`; before that
+Its `.claude-plugin/plugin.json` launches the server via `npx -y @lonca/baron-mcp-server`; before that
 package is published, point the `mcpServers.baron` command at your local build instead. See
 [plugins/claude-code/README.md](../plugins/claude-code/README.md).

@@ -1,7 +1,7 @@
 # Releasing Baron
 
 Two independent milestones: **(1) push the source to a public GitHub repo**, and later **(2) publish
-the packages to npm** (so `npx @baron/mcp-server` and the Claude Code plugin work for others). You can
+the packages to npm** (so `npx @lonca/baron-mcp-server` and the Claude Code plugin work for others). You can
 do (1) now; (2) only when you want others to install without cloning.
 
 ## 1. First public GitHub push
@@ -37,7 +37,7 @@ until step 2 is done.
 
 - [ ] **Reserve the `@baron` org on npm** (`npm org create` / the npm website). Verify the scope is
       free first — if taken, pick another scope and update every `package.json` `name`.
-- [x] **`@baron/conformance` is `private: true` for now** (marked in v0.1.0) — it's only ever a
+- [x] **`@lonca/baron-conformance` is `private: true` for now** (marked in v0.1.0) — it's only ever a
       *devDependency* of the adapters/cli/mcp-server, so no published package needs it at runtime. To
       publish it later (so third parties can conformance-test their own adapters), split its entry
       points (pure in-memory transports vs. the vitest-coupled suites), add a `build`/`files`/
@@ -63,22 +63,22 @@ Notes:
   ordering needed.
 - Only the built `dist` + declared `files` ship; `src` is included per each package's `files` (kept so
   recipes/`import.meta.url` assets and source maps resolve). Tests, `scripts/`, and dev config never ship.
-- `@baron/mcp-server` exposes bin `baron-mcp`; `@baron/cli` exposes bin `baron`. Both target `dist/bin.js`,
+- `@lonca/baron-mcp-server` exposes bin `baron-mcp`; `@lonca/baron-cli` exposes bin `baron`. Both target `dist/bin.js`,
   so `pnpm build` must run first.
 
 **After publishing, smoke-test the consumer path:**
 
 ```bash
-npx -y @baron/mcp-server            # should start the MCP server (Ctrl-C to stop)
-npx -y @baron/cli --help            # should print the CLI usage
+npx -y @lonca/baron-mcp-server            # should start the MCP server (Ctrl-C to stop)
+npx -y @lonca/baron-cli --help            # should print the CLI usage
 ```
 
-Then update the plugin so it runs the published server (it already declares `npx -y @baron/mcp-server`
+Then update the plugin so it runs the published server (it already declares `npx -y @lonca/baron-mcp-server`
 in `plugins/claude-code/.claude-plugin/plugin.json`).
 
 ## Commercial tier (later)
 
 Enterprise features live in a **separate private repo** under a commercial license (e.g. Elastic
-License v2), depend on the published `@baron/*` packages, and publish to a **private** registry — never
+License v2), depend on the published `@lonca/baron-*` packages, and publish to a **private** registry — never
 mixed into this repo. Only build the entitlement machinery once there is a paying design-partner
 (ARCHITECTURE.md #20).

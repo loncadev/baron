@@ -1,6 +1,11 @@
-import { BaronError } from '@baron/core';
-import { type Env, KNOWN_PROVIDERS, credentialsPath, mergeCredentials } from '@baron/providers';
-import type { RecipeAsker } from '@baron/recipes';
+import { BaronError } from '@lonca/baron-core';
+import {
+  type Env,
+  KNOWN_PROVIDERS,
+  credentialsPath,
+  mergeCredentials,
+} from '@lonca/baron-providers';
+import type { RecipeAsker } from '@lonca/baron-recipes';
 import { runDoctor } from './doctor.js';
 import { runInit } from './init.js';
 import type { FileSystem, Prompter } from './ports.js';

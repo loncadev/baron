@@ -3,7 +3,7 @@ import {
   type DeployPort,
   type GapPolicy,
   type RecordingLogger,
-} from '@baron/core';
+} from '@lonca/baron-core';
 import { describe, expect, it } from 'vitest';
 
 export interface DeployConformanceTarget {

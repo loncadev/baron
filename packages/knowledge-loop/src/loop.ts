@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { BaronError } from '@baron/core';
+import { BaronError } from '@lonca/baron-core';
 import { filterFollowups, filterLearnings } from './filter.js';
 import type { KnowledgeStore } from './store.js';
 import type {

@@ -1,4 +1,4 @@
-import { createMemoryDeployTransport } from '@baron/conformance';
+import { createMemoryDeployTransport } from '@lonca/baron-conformance';
 import { describe, expect, it } from 'vitest';
 import { defineGithubDeployAdapter } from './deploy.js';
 

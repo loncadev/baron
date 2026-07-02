@@ -1,4 +1,4 @@
-# @baron/conformance
+# @lonca/baron-conformance
 
 Baron adapter conformance suite and in-memory transports (test support).
 
@@ -8,7 +8,7 @@ one pane of glass (issues, scm, ci, deploy, notify) across providers, via MCP + 
 ## Install
 
 ```bash
-npm install @baron/conformance
+npm install @lonca/baron-conformance
 ```
 
 ## Documentation

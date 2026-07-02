@@ -11,7 +11,7 @@ import {
   type ReviewDecision,
   type ScmManifest,
   type ScmTransport,
-} from '@baron/core';
+} from '@lonca/baron-core';
 import * as azdev from 'azure-devops-node-api';
 import {
   PullRequestStatus as AzurePrStatus,

@@ -1,4 +1,4 @@
-# @baron/providers
+# @lonca/baron-providers
 
 Baron provider registry: builds the live ports a policy binds, plus the native escape hatch.
 
@@ -8,7 +8,7 @@ one pane of glass (issues, scm, ci, deploy, notify) across providers, via MCP + 
 ## Install
 
 ```bash
-npm install @baron/providers
+npm install @lonca/baron-providers
 ```
 
 ## Documentation

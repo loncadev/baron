@@ -8,7 +8,7 @@ import {
   type Logger,
   type ProviderRoleMap,
   type TypeMap,
-} from '@baron/core';
+} from '@lonca/baron-core';
 import { GITHUB_PROVIDER } from './provider.js';
 
 export { GITHUB_PROVIDER } from './provider.js';

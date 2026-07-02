@@ -4,14 +4,14 @@ import {
   exampleGithubRoleMap,
   exampleGithubTypeMap,
   recommendedGithubGapPolicy,
-} from '@baron/adapter-github';
+} from '@lonca/baron-adapter-github';
 import {
   createMemoryCiTransport,
   createMemoryDeployTransport,
   createMemoryNotifyTransport,
   createMemoryScmTransport,
   createMemoryTransport,
-} from '@baron/conformance';
+} from '@lonca/baron-conformance';
 import {
   BaronError,
   BaseCiAdapter,
@@ -19,8 +19,8 @@ import {
   BaseNotifyAdapter,
   type IssuesPort,
   type ScmPort,
-} from '@baron/core';
-import { KnowledgeLoop, createMemoryKnowledgeStore } from '@baron/knowledge-loop';
+} from '@lonca/baron-core';
+import { KnowledgeLoop, createMemoryKnowledgeStore } from '@lonca/baron-knowledge-loop';
 import { describe, expect, it } from 'vitest';
 import type { RecipeAsker } from './ask.js';
 import { type RecipePorts, runRecipe } from './engine.js';

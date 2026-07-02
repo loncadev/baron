@@ -1,5 +1,5 @@
 {
-  "name": "@baron/mcp-server",
+  "name": "@lonca/baron-mcp-server",
   "version": "0.1.0",
   "type": "module",
   "license": "Apache-2.0",
@@ -27,15 +27,15 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@baron/core": "workspace:*",
-    "@baron/knowledge-loop": "workspace:*",
-    "@baron/providers": "workspace:*",
-    "@baron/recipes": "workspace:*",
+    "@lonca/baron-core": "workspace:*",
+    "@lonca/baron-knowledge-loop": "workspace:*",
+    "@lonca/baron-providers": "workspace:*",
+    "@lonca/baron-recipes": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0"
   },
   "devDependencies": {
-    "@baron/adapter-github": "workspace:*",
-    "@baron/conformance": "workspace:*",
+    "@lonca/baron-adapter-github": "workspace:*",
+    "@lonca/baron-conformance": "workspace:*",
     "@types/node": "^22.0.0"
   },
   "description": "Baron MCP server: drive issues, scm, ci, deploy, and notify across providers from any MCP client.",

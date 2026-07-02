@@ -2,8 +2,8 @@ import {
   azureIntrospectionFixture,
   createMemoryIntrospector,
   githubIntrospectionFixture,
-} from '@baron/conformance';
-import { parsePolicy, resolveIssuesConfig } from '@baron/core';
+} from '@lonca/baron-conformance';
+import { parsePolicy, resolveIssuesConfig } from '@lonca/baron-core';
 import { describe, expect, it } from 'vitest';
 import { memoryFileSystem, scriptedPrompter } from './fakes.js';
 import { runInit } from './init.js';

@@ -4,14 +4,14 @@ import {
   exampleGithubRoleMap,
   exampleGithubTypeMap,
   recommendedGithubGapPolicy,
-} from '@baron/adapter-github';
+} from '@lonca/baron-adapter-github';
 import {
   createMemoryCiTransport,
   createMemoryDeployTransport,
   createMemoryNotifyTransport,
   createMemoryScmTransport,
   createMemoryTransport,
-} from '@baron/conformance';
+} from '@lonca/baron-conformance';
 import {
   BaseCiAdapter,
   BaseDeployAdapter,
@@ -28,9 +28,9 @@ import {
   type ScmPort,
   WORKFLOW_ROLES,
   WORK_ITEM_TYPE_ROLES,
-} from '@baron/core';
-import { KnowledgeLoop, createMemoryKnowledgeStore } from '@baron/knowledge-loop';
-import { type RecipeService, createRecipeService } from '@baron/recipes';
+} from '@lonca/baron-core';
+import { KnowledgeLoop, createMemoryKnowledgeStore } from '@lonca/baron-knowledge-loop';
+import { type RecipeService, createRecipeService } from '@lonca/baron-recipes';
 import { describe, expect, it } from 'vitest';
 import {
   CI_TOOL_NAMES,

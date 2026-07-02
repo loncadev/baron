@@ -1,13 +1,13 @@
-import { BaronError, parsePolicyJson } from '@baron/core';
-import { createLocalKnowledgeLoop } from '@baron/knowledge-loop';
-import { type Env, buildPorts, knowledgeDir } from '@baron/providers';
+import { BaronError, parsePolicyJson } from '@lonca/baron-core';
+import { createLocalKnowledgeLoop } from '@lonca/baron-knowledge-loop';
+import { type Env, buildPorts, knowledgeDir } from '@lonca/baron-providers';
 import {
   type RecipeAsker,
   type RecipeContext,
   type RunRecipeResult,
   loadRecipe,
   runRecipe,
-} from '@baron/recipes';
+} from '@lonca/baron-recipes';
 import { policyPath } from './paths.js';
 import type { FileSystem } from './ports.js';
 

@@ -9,7 +9,7 @@ import {
   type GapPolicy,
   type Logger,
   type NativeDeployment,
-} from '@baron/core';
+} from '@lonca/baron-core';
 import * as azdev from 'azure-devops-node-api';
 import { TaskResult } from 'azure-devops-node-api/interfaces/TaskAgentInterfaces.js';
 import { AZURE_DEVOPS_PROVIDER } from './provider.js';

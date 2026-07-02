@@ -1,4 +1,4 @@
-# @baron/adapter-azure-devops
+# @lonca/baron-adapter-azure-devops
 
 Baron adapter for Azure DevOps: issues, scm, ci, deploy.
 
@@ -8,7 +8,7 @@ one pane of glass (issues, scm, ci, deploy, notify) across providers, via MCP + 
 ## Install
 
 ```bash
-npm install @baron/adapter-azure-devops
+npm install @lonca/baron-adapter-azure-devops
 ```
 
 ## Documentation

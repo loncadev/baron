@@ -1,4 +1,4 @@
-import type { Introspector, ProviderIntrospection } from '@baron/core';
+import type { Introspector, ProviderIntrospection } from '@lonca/baron-core';
 import { Octokit } from 'octokit';
 import { GITHUB_PROVIDER } from './provider.js';
 import type { GithubTransportOptions } from './transport.js';

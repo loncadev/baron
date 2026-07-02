@@ -20,15 +20,15 @@ import {
   isRunStatus,
   isWorkItemTypeRole,
   isWorkflowRole,
-} from '@baron/core';
+} from '@lonca/baron-core';
 import {
   FOLLOWUP_STATUSES,
   type FollowupStatus,
   type KnowledgeLoop,
   isFollowupStatus,
-} from '@baron/knowledge-loop';
-import type { NativeRequest, NativeResponse } from '@baron/providers';
-import type { RecipeService } from '@baron/recipes';
+} from '@lonca/baron-knowledge-loop';
+import type { NativeRequest, NativeResponse } from '@lonca/baron-providers';
+import type { RecipeService } from '@lonca/baron-recipes';
 
 /** The provider-native escape hatch (decision #18), restricted by the caller to bound providers. */
 export type NativeAccess = (provider: string, request: NativeRequest) => Promise<NativeResponse>;

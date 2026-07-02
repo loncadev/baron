@@ -88,4 +88,4 @@ recipes branch on a single vocabulary instead of vendor-specific state machines.
 A new provider (Jira, Linear, GitLab, …) is a thin adapter: a `CapabilityManifest` + an
 `IssuesTransport` (and/or `ScmTransport`) doing provider I/O only — no role/native translation, which
 stays in the shared core. Every adapter must pass the network-free conformance suite
-(`@baron/conformance`); live behavior is covered by credential-gated smoke tests.
+(`@lonca/baron-conformance`); live behavior is covered by credential-gated smoke tests.

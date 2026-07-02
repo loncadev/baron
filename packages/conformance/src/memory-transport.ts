@@ -5,7 +5,7 @@ import type {
   NativeIssue,
   NativeQuery,
   NativeTarget,
-} from '@baron/core';
+} from '@lonca/baron-core';
 
 interface Rec {
   id: string;

@@ -9,7 +9,7 @@ import type {
   PipelineQuery,
   RunQuery,
   TriggerInput,
-} from '@baron/core';
+} from '@lonca/baron-core';
 
 export interface MemoryCiOptions {
   readonly pipelines?: readonly Pipeline[];

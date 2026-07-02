@@ -1,4 +1,4 @@
-import { BaronError } from '@baron/core';
+import { BaronError } from '@lonca/baron-core';
 import { parse as parseYaml } from 'yaml';
 
 /**

@@ -10,8 +10,8 @@ import {
   runIntrospectionConformance,
   runIssuesConformance,
   runScmConformance,
-} from '@baron/conformance';
-import { RecordingLogger } from '@baron/core';
+} from '@lonca/baron-conformance';
+import { RecordingLogger } from '@lonca/baron-core';
 import {
   defineGithubCiAdapter,
   defineGithubDeployAdapter,

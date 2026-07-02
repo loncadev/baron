@@ -1,4 +1,4 @@
-# @baron/adapter-slack
+# @lonca/baron-adapter-slack
 
 Baron adapter for Slack: notify.
 
@@ -8,7 +8,7 @@ one pane of glass (issues, scm, ci, deploy, notify) across providers, via MCP + 
 ## Install
 
 ```bash
-npm install @baron/adapter-slack
+npm install @lonca/baron-adapter-slack
 ```
 
 ## Documentation

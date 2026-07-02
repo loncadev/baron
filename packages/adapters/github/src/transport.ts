@@ -6,7 +6,7 @@ import {
   type NativeIssue,
   type NativeQuery,
   type NativeTarget,
-} from '@baron/core';
+} from '@lonca/baron-core';
 import { Octokit } from 'octokit';
 
 export interface GithubTransportOptions {

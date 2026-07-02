@@ -1,5 +1,5 @@
 {
-  "name": "@baron/providers",
+  "name": "@lonca/baron-providers",
   "version": "0.1.0",
   "type": "module",
   "license": "Apache-2.0",
@@ -24,10 +24,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@baron/core": "workspace:*",
-    "@baron/adapter-azure-devops": "workspace:*",
-    "@baron/adapter-github": "workspace:*",
-    "@baron/adapter-slack": "workspace:*"
+    "@lonca/baron-core": "workspace:*",
+    "@lonca/baron-adapter-azure-devops": "workspace:*",
+    "@lonca/baron-adapter-github": "workspace:*",
+    "@lonca/baron-adapter-slack": "workspace:*"
   },
   "description": "Baron provider registry: builds the live ports a policy binds, plus the native escape hatch.",
   "keywords": ["baron", "ai-agents", "mcp", "work-orchestration", "devops", "providers", "policy"],

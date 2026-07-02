@@ -3,7 +3,7 @@
 // recipes, same role→native translation — only the provider I/O is in-memory. Prompts are pre-scripted
 // and echoed inline so the transcript reads like a live session.
 //
-// Run:  pnpm --filter @baron/recipes exec tsx scripts/demo.ts
+// Run:  pnpm --filter @lonca/baron-recipes exec tsx scripts/demo.ts
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
@@ -12,8 +12,8 @@ import {
   exampleGithubRoleMap,
   exampleGithubTypeMap,
   recommendedGithubGapPolicy,
-} from '@baron/adapter-github';
-// Deep-import the pure in-memory transports directly: @baron/conformance's index also re-exports the
+} from '@lonca/baron-adapter-github';
+// Deep-import the pure in-memory transports directly: @lonca/baron-conformance's index also re-exports the
 // conformance suites, which import vitest and blow up outside a test runner.
 import { createMemoryScmTransport } from '../../conformance/src/memory-scm-transport.js';
 import { createMemoryTransport } from '../../conformance/src/memory-transport.js';

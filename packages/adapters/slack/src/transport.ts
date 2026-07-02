@@ -3,7 +3,7 @@ import {
   type NativeNotification,
   type NotifyMessage,
   type NotifyTransport,
-} from '@baron/core';
+} from '@lonca/baron-core';
 
 export interface SlackNotifyTransportOptions {
   /** Slack bot token (xoxb-…). Read from env / secret-manager by the caller; never committed. */

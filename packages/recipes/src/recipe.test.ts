@@ -1,4 +1,4 @@
-import { BaronError } from '@baron/core';
+import { BaronError } from '@lonca/baron-core';
 import { describe, expect, it } from 'vitest';
 import { loadRecipe, parseRecipe } from './recipe.js';
 

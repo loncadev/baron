@@ -1,4 +1,4 @@
-import type { GapPolicy, NotifyPort, RecordingLogger } from '@baron/core';
+import type { GapPolicy, NotifyPort, RecordingLogger } from '@lonca/baron-core';
 import { describe, expect, it } from 'vitest';
 
 export interface NotifyConformanceTarget {

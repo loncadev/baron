@@ -1,5 +1,10 @@
-import { BaronError, type Introspector, parsePolicyJson, resolveIssuesConfig } from '@baron/core';
-import { type Env, getProviderDescriptor } from '@baron/providers';
+import {
+  BaronError,
+  type Introspector,
+  parsePolicyJson,
+  resolveIssuesConfig,
+} from '@lonca/baron-core';
+import { type Env, getProviderDescriptor } from '@lonca/baron-providers';
 import { policyPath } from './paths.js';
 import type { FileSystem } from './ports.js';
 

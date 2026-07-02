@@ -15,7 +15,7 @@ import {
   type PipelineQuery,
   type RunQuery,
   type TriggerInput,
-} from '@baron/core';
+} from '@lonca/baron-core';
 import { Octokit } from 'octokit';
 import { GITHUB_PROVIDER } from './provider.js';
 import type { GithubTransportOptions } from './transport.js';

@@ -1,5 +1,5 @@
-import { createMemoryCiTransport } from '@baron/conformance';
-import type { NativeRun } from '@baron/core';
+import { createMemoryCiTransport } from '@lonca/baron-conformance';
+import type { NativeRun } from '@lonca/baron-core';
 import { describe, expect, it } from 'vitest';
 import { defineGithubCiAdapter } from './ci.js';
 

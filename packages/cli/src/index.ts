@@ -1,4 +1,4 @@
-export * from '@baron/providers';
+export * from '@lonca/baron-providers';
 export * from './ports.js';
 export * from './paths.js';
 export * from './init.js';

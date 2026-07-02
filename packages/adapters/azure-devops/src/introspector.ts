@@ -4,7 +4,7 @@ import type {
   Introspector,
   ProviderIntrospection,
   StateCategory,
-} from '@baron/core';
+} from '@lonca/baron-core';
 import * as azdev from 'azure-devops-node-api';
 import type { TeamContext } from 'azure-devops-node-api/interfaces/CoreInterfaces.js';
 import { AZURE_DEVOPS_PROVIDER } from './provider.js';

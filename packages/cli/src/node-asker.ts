@@ -1,6 +1,6 @@
 import { stdin, stdout } from 'node:process';
 import { createInterface } from 'node:readline/promises';
-import type { RecipeAsker } from '@baron/recipes';
+import type { RecipeAsker } from '@lonca/baron-recipes';
 
 async function prompt(question: string): Promise<string> {
   const rl = createInterface({ input: stdin, output: stdout });

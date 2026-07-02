@@ -4,9 +4,9 @@ import {
   exampleGithubRoleMap,
   exampleGithubTypeMap,
   recommendedGithubGapPolicy,
-} from '@baron/adapter-github';
-import { createMemoryScmTransport, createMemoryTransport } from '@baron/conformance';
-import type { IssuesPort, ScmPort } from '@baron/core';
+} from '@lonca/baron-adapter-github';
+import { createMemoryScmTransport, createMemoryTransport } from '@lonca/baron-conformance';
+import type { IssuesPort, ScmPort } from '@lonca/baron-core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { describe, expect, it } from 'vitest';

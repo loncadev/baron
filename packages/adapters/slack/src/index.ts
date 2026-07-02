@@ -4,7 +4,7 @@ import {
   type Logger,
   type NotifyManifest,
   type NotifyTransport,
-} from '@baron/core';
+} from '@lonca/baron-core';
 import { SLACK_PROVIDER } from './provider.js';
 
 export { SLACK_PROVIDER } from './provider.js';

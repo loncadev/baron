@@ -1,4 +1,4 @@
-# @baron/adapter-github
+# @lonca/baron-adapter-github
 
 Baron adapter for GitHub: issues, scm, ci, deploy.
 
@@ -8,7 +8,7 @@ one pane of glass (issues, scm, ci, deploy, notify) across providers, via MCP + 
 ## Install
 
 ```bash
-npm install @baron/adapter-github
+npm install @lonca/baron-adapter-github
 ```
 
 ## Documentation

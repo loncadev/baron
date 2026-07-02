@@ -5,7 +5,7 @@ import {
   type RecordingLogger,
   RoleMappingError,
   type WorkflowRole,
-} from '@baron/core';
+} from '@lonca/baron-core';
 import { describe, expect, it } from 'vitest';
 
 export interface IssuesConformanceTarget {

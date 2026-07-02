@@ -26,14 +26,14 @@ importers:
 
   packages/adapters/azure-devops:
     dependencies:
-      '@baron/core':
+      '@lonca/baron-core':
         specifier: workspace:*
         version: link:../../core
       azure-devops-node-api:
         specifier: ^15.1.2
         version: 15.1.2
     devDependencies:
-      '@baron/conformance':
+      '@lonca/baron-conformance':
         specifier: workspace:*
         version: link:../../conformance
       '@types/node':
@@ -42,14 +42,14 @@ importers:
 
   packages/adapters/github:
     dependencies:
-      '@baron/core':
+      '@lonca/baron-core':
         specifier: workspace:*
         version: link:../../core
       octokit:
         specifier: ^5.0.5
         version: 5.0.5
     devDependencies:
-      '@baron/conformance':
+      '@lonca/baron-conformance':
         specifier: workspace:*
         version: link:../../conformance
       '@types/node':
@@ -58,11 +58,11 @@ importers:
 
   packages/adapters/slack:
     dependencies:
-      '@baron/core':
+      '@lonca/baron-core':
         specifier: workspace:*
         version: link:../../core
     devDependencies:
-      '@baron/conformance':
+      '@lonca/baron-conformance':
         specifier: workspace:*
         version: link:../../conformance
       '@types/node':
@@ -71,20 +71,20 @@ importers:
 
   packages/cli:
     dependencies:
-      '@baron/core':
+      '@lonca/baron-core':
         specifier: workspace:*
         version: link:../core
-      '@baron/knowledge-loop':
+      '@lonca/baron-knowledge-loop':
         specifier: workspace:*
         version: link:../knowledge-loop
-      '@baron/providers':
+      '@lonca/baron-providers':
         specifier: workspace:*
         version: link:../providers
-      '@baron/recipes':
+      '@lonca/baron-recipes':
         specifier: workspace:*
         version: link:../recipes
     devDependencies:
-      '@baron/conformance':
+      '@lonca/baron-conformance':
         specifier: workspace:*
         version: link:../conformance
       '@types/node':
@@ -93,7 +93,7 @@ importers:
 
   packages/conformance:
     dependencies:
-      '@baron/core':
+      '@lonca/baron-core':
         specifier: workspace:*
         version: link:../core
       vitest:
@@ -104,11 +104,11 @@ importers:
 
   packages/knowledge-loop:
     dependencies:
-      '@baron/core':
+      '@lonca/baron-core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
-      '@baron/conformance':
+      '@lonca/baron-conformance':
         specifier: workspace:*
         version: link:../conformance
       '@types/node':
@@ -117,26 +117,26 @@ importers:
 
   packages/mcp-server:
     dependencies:
-      '@baron/core':
+      '@lonca/baron-core':
         specifier: workspace:*
         version: link:../core
-      '@baron/knowledge-loop':
+      '@lonca/baron-knowledge-loop':
         specifier: workspace:*
         version: link:../knowledge-loop
-      '@baron/providers':
+      '@lonca/baron-providers':
         specifier: workspace:*
         version: link:../providers
-      '@baron/recipes':
+      '@lonca/baron-recipes':
         specifier: workspace:*
         version: link:../recipes
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
         version: 1.29.0(zod@4.4.3)
     devDependencies:
-      '@baron/adapter-github':
+      '@lonca/baron-adapter-github':
         specifier: workspace:*
         version: link:../adapters/github
-      '@baron/conformance':
+      '@lonca/baron-conformance':
         specifier: workspace:*
         version: link:../conformance
       '@types/node':
@@ -145,35 +145,35 @@ importers:
 
   packages/providers:
     dependencies:
-      '@baron/adapter-azure-devops':
+      '@lonca/baron-adapter-azure-devops':
         specifier: workspace:*
         version: link:../adapters/azure-devops
-      '@baron/adapter-github':
+      '@lonca/baron-adapter-github':
         specifier: workspace:*
         version: link:../adapters/github
-      '@baron/adapter-slack':
+      '@lonca/baron-adapter-slack':
         specifier: workspace:*
         version: link:../adapters/slack
-      '@baron/core':
+      '@lonca/baron-core':
         specifier: workspace:*
         version: link:../core
 
   packages/recipes:
     dependencies:
-      '@baron/core':
+      '@lonca/baron-core':
         specifier: workspace:*
         version: link:../core
-      '@baron/knowledge-loop':
+      '@lonca/baron-knowledge-loop':
         specifier: workspace:*
         version: link:../knowledge-loop
       yaml:
         specifier: ^2.6.0
         version: 2.9.0
     devDependencies:
-      '@baron/adapter-github':
+      '@lonca/baron-adapter-github':
         specifier: workspace:*
         version: link:../adapters/github
-      '@baron/conformance':
+      '@lonca/baron-conformance':
         specifier: workspace:*
         version: link:../conformance
       '@types/node':

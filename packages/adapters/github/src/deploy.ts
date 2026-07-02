@@ -9,7 +9,7 @@ import {
   type GapPolicy,
   type Logger,
   type NativeDeployment,
-} from '@baron/core';
+} from '@lonca/baron-core';
 import { Octokit } from 'octokit';
 import { GITHUB_PROVIDER } from './provider.js';
 import type { GithubTransportOptions } from './transport.js';

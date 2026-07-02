@@ -15,7 +15,7 @@ import {
   type PipelineQuery,
   type RunQuery,
   type TriggerInput,
-} from '@baron/core';
+} from '@lonca/baron-core';
 import * as azdev from 'azure-devops-node-api';
 import {
   type Build,

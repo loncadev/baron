@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { BaronError, parsePolicyJson } from '@baron/core';
-import { createLocalKnowledgeLoop } from '@baron/knowledge-loop';
+import { BaronError, parsePolicyJson } from '@lonca/baron-core';
+import { createLocalKnowledgeLoop } from '@lonca/baron-knowledge-loop';
 import {
   type Env,
   buildPorts,
@@ -9,8 +9,8 @@ import {
   knowledgeDir,
   mergeCredentials,
   policyPath,
-} from '@baron/providers';
-import { createRecipeService } from '@baron/recipes';
+} from '@lonca/baron-providers';
+import { createRecipeService } from '@lonca/baron-recipes';
 import type { McpPorts, NativeAccess } from './tools.js';
 
 function readIfPresent(path: string): string | undefined {

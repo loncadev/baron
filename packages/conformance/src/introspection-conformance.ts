@@ -4,7 +4,7 @@ import {
   parsePolicy,
   proposePolicy,
   resolveIssuesConfig,
-} from '@baron/core';
+} from '@lonca/baron-core';
 import { describe, expect, it } from 'vitest';
 
 export interface IntrospectionConformanceTarget {

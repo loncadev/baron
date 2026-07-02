@@ -4,8 +4,8 @@ A complete, copy-paste walkthrough to wire Baron to an **Azure DevOps** project 
 **Claude Code**, as a first-time user. End state: you ask Claude things like *"list my backlog"* or
 *"start a task and open a PR"* and it does them through Baron's normalized tools.
 
-> Baron is pre-publish, so you run it from the cloned repo (via `pnpm`/`tsx`). Once `@baron/*` is on
-> npm, the same steps use `npx @baron/mcp-server` instead — noted where it matters.
+> Baron is pre-publish, so you run it from the cloned repo (via `pnpm`/`tsx`). Once `@lonca/baron-*` is on
+> npm, the same steps use `npx @lonca/baron-mcp-server` instead — noted where it matters.
 
 ---
 
@@ -179,7 +179,7 @@ Claude Code reads a project's `.mcp.json`. Create `<your-project>/.mcp.json`:
 - `BARON_ROOT` points the server at this project, so it reads `<your-project>/.baron/policy.json` +
   `credentials` no matter where it runs.
 - **Windows:** if Claude Code can't find `pnpm`, set `"command": "pnpm.cmd"`.
-- **Once published:** replace `command`/`args` with `"command": "npx", "args": ["-y", "@baron/mcp-server"]`
+- **Once published:** replace `command`/`args` with `"command": "npx", "args": ["-y", "@lonca/baron-mcp-server"]`
   (keep the `BARON_ROOT` env).
 - **Restart Claude Code** (or reload MCP servers) so it picks up the new server. Confirm it started:
   running `pnpm baron:mcp` (with `BARON_ROOT` set) prints `baron mcp-server running on stdio (root: …)`

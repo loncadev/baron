@@ -6,8 +6,8 @@ import {
   parsePolicy,
   proposePolicy,
   serializePolicy,
-} from '@baron/core';
-import { type Env, type ProviderDescriptor, getProviderDescriptor } from '@baron/providers';
+} from '@lonca/baron-core';
+import { type Env, type ProviderDescriptor, getProviderDescriptor } from '@lonca/baron-providers';
 import {
   BARON_DIR,
   CREDENTIALS_IGNORE_ENTRY,

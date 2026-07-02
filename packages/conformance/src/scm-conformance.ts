@@ -1,4 +1,4 @@
-import type { GapPolicy, RecordingLogger, ScmPort } from '@baron/core';
+import type { GapPolicy, RecordingLogger, ScmPort } from '@lonca/baron-core';
 import { describe, expect, it } from 'vitest';
 
 export interface ScmConformanceTarget {

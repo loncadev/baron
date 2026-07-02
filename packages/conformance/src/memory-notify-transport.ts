@@ -1,4 +1,4 @@
-import type { NativeNotification, NotifyMessage, NotifyTransport } from '@baron/core';
+import type { NativeNotification, NotifyMessage, NotifyTransport } from '@lonca/baron-core';
 
 /**
  * In-memory stand-in for a `notify` transport. Deterministic and network-free so the notify

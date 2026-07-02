@@ -1,5 +1,5 @@
 {
-  "name": "@baron/adapter-github",
+  "name": "@lonca/baron-adapter-github",
   "version": "0.1.0",
   "type": "module",
   "license": "Apache-2.0",
@@ -24,11 +24,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@baron/core": "workspace:*",
+    "@lonca/baron-core": "workspace:*",
     "octokit": "^5.0.5"
   },
   "devDependencies": {
-    "@baron/conformance": "workspace:*",
+    "@lonca/baron-conformance": "workspace:*",
     "@types/node": "^22.0.0"
   },
   "description": "Baron adapter for GitHub: issues, scm, ci, deploy.",

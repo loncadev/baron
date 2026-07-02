@@ -4,7 +4,7 @@ import type {
   NativePullRequestInput,
   NativeThread,
   ScmTransport,
-} from '@baron/core';
+} from '@lonca/baron-core';
 
 /**
  * In-memory stand-in for an `scm` transport. Deterministic and network-free so the scm conformance

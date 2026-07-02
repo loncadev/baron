@@ -1,8 +1,8 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { BaronError, type BaronPolicyFile, serializePolicy } from '@baron/core';
-import { policyPath } from '@baron/providers';
+import { BaronError, type BaronPolicyFile, serializePolicy } from '@lonca/baron-core';
+import { policyPath } from '@lonca/baron-providers';
 import { describe, expect, it } from 'vitest';
 import { loadPorts } from './load.js';
 

@@ -8,7 +8,7 @@
     "baron": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@baron/mcp-server"],
+      "args": ["-y", "@lonca/baron-mcp-server"],
       "env": {}
     }
   }

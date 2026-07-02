@@ -1,4 +1,4 @@
-import { BaronError, type BaronPolicyFile, serializePolicy } from '@baron/core';
+import { BaronError, type BaronPolicyFile, serializePolicy } from '@lonca/baron-core';
 import { describe, expect, it } from 'vitest';
 import { memoryFileSystem, scriptedAsker } from './fakes.js';
 import { policyPath } from './paths.js';

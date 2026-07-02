@@ -12,7 +12,7 @@ import {
   createAzureDevOpsScmTransport,
   createAzureDevOpsTransport,
   exampleAzureDevOpsLinkMap,
-} from '@baron/adapter-azure-devops';
+} from '@lonca/baron-adapter-azure-devops';
 import {
   GITHUB_PROVIDER,
   createGithubCiTransport,
@@ -27,12 +27,12 @@ import {
   githubDeployStatusMaps,
   githubManifest,
   githubScmManifest,
-} from '@baron/adapter-github';
+} from '@lonca/baron-adapter-github';
 import {
   SLACK_PROVIDER,
   createSlackNotifyTransport,
   slackNotifyManifest,
-} from '@baron/adapter-slack';
+} from '@lonca/baron-adapter-slack';
 import {
   BaronError,
   type BaronPolicyFile,
@@ -65,7 +65,7 @@ import {
   type ScmTransport,
   parseGapPolicy,
   resolveIssuesConfig,
-} from '@baron/core';
+} from '@lonca/baron-core';
 import {
   type NativeHttp,
   type NativeRequest,

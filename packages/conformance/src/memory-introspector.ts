@@ -1,4 +1,4 @@
-import type { Introspector, ProviderIntrospection } from '@baron/core';
+import type { Introspector, ProviderIntrospection } from '@lonca/baron-core';
 
 /**
  * In-memory stand-in for a provider introspector. It returns a fixed {@link ProviderIntrospection}

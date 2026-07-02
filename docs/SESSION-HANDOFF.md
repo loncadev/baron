@@ -37,12 +37,12 @@ committed and green:
   `policy.json` and routing each call by name prefix (an unbound port → `PORT_UNBOUND` isError).
   Tool-input enums come from the core unions; `BaronError` surfaces as an `isError` result with the
   `.code`. Verified end-to-end over the MCP protocol via the SDK's in-memory transport pair.
-- Recipe + plugin layer done: `@baron/recipes` is a declarative YAML engine (typed `ask` steps,
+- Recipe + plugin layer done: `@lonca/baron-recipes` is a declarative YAML engine (typed `ask` steps,
   `do` steps mapped 1:1 to port primitives, `message` steps, `${path}` interpolation) — workflow
   opinion lives in recipes, not the core (decisions #3/#6/#7). `baron run --recipe <path>` executes
   one against the policy's live ports; `plugins/claude-code` is the harness wrapper (MCP-server
   registration + a skill + `/baron-run`).
-- Knowledge loop done (decision #11): `@baron/knowledge-loop` exposes `learning.append`/`query` +
+- Knowledge loop done (decision #11): `@lonca/baron-knowledge-loop` exposes `learning.append`/`query` +
   `followup.append`/`list` over a pluggable `KnowledgeStore` (in-memory + the default `local-md`
   store: one human-readable, CRLF-tolerant markdown file per record). The loop is always available;
   it's wired into the MCP server (`baron_learning_*` / `baron_followup_*` tools) and recipes
@@ -50,32 +50,32 @@ committed and green:
 
 ## What exists
 
-- `@baron/core` — roles, capability manifest, gap policy, `RoleResolver`, `IssuesPort` +
+- `@lonca/baron-core` — roles, capability manifest, gap policy, `RoleResolver`, `IssuesPort` +
   `BaseIssuesAdapter` (all translation logic lives here).
-- `@baron/adapter-azure-devops`, `@baron/adapter-github` — issues manifest + example role/type/link
+- `@lonca/baron-adapter-azure-devops`, `@lonca/baron-adapter-github` — issues manifest + example role/type/link
   maps + `define*IssuesAdapter` + **live** issues transport & introspector; plus the `scm` manifest +
   `define*ScmAdapter` + **live** scm transport (octokit / azure-devops-node-api). Gated smoke tests
   for both ports.
-- `@baron/conformance` — in-memory issues + scm transports + in-memory introspector + the shared
+- `@lonca/baron-conformance` — in-memory issues + scm transports + in-memory introspector + the shared
   issues / introspection / scm suites every adapter passes.
-- `@baron/knowledge-loop` — `KnowledgeLoop` (`learning`/`followup` primitives + filtering),
+- `@lonca/baron-knowledge-loop` — `KnowledgeLoop` (`learning`/`followup` primitives + filtering),
   `KnowledgeStore` contract + an in-memory store and the default `local-md` markdown store, an
   in-package store conformance suite, and `createLocalKnowledgeLoop(dir)`.
-- `@baron/cli` — `baron init` / `baron doctor` / `baron run`. Pure command logic (`runInit` /
+- `@lonca/baron-cli` — `baron init` / `baron doctor` / `baron run`. Pure command logic (`runInit` /
   `runDoctor` / `runRecipeFile`) behind injected `FileSystem` / `Prompter` / `RecipeAsker` ports
   (tested with in-memory fakes); thin Node-backed shell in `bin.ts`; a dependency-free flag parser.
-- `@baron/recipes` — YAML recipe engine: `parseRecipe` / `loadRecipe`, `${path}` `interpolate`,
+- `@lonca/baron-recipes` — YAML recipe engine: `parseRecipe` / `loadRecipe`, `${path}` `interpolate`,
   `runRecipe(recipe, {ports, asker, inputs})`, the `RecipeAsker` contract, and shipped example
   recipes (`recipes/task-start.yaml`, `task-finish.yaml`). Pure mechanism — no role/native
   translation (that stays in the ports).
 - `plugins/claude-code` — Claude Code plugin scaffold (not a workspace package): `plugin.json`
   registers the `baron` MCP server; a `baron` skill + `/baron-run` command. Validated by installing
   into Claude Code (no automated test).
-- `@baron/providers` — shared infrastructure both the CLI and the MCP server depend on (so they
+- `@lonca/baron-providers` — shared infrastructure both the CLI and the MCP server depend on (so they
   don't depend on each other): the provider registry (id → issues + scm manifests, credential env
   keys, live transport / introspector / scm-transport factories), `buildIssuesPort` / `buildScmPort`,
   and the `.baron` path helpers.
-- `@baron/mcp-server` — multi-port stdio MCP server (`baron-mcp` bin) exposing the bound ports'
+- `@lonca/baron-mcp-server` — multi-port stdio MCP server (`baron-mcp` bin) exposing the bound ports'
   tools; `tools.ts` is pure/SDK-agnostic (issue + scm tool tables, prefix-routed `dispatchTool`),
   `server.ts` is the thin SDK wiring, `load.ts` (`loadPorts`) builds the issues/scm ports from
   policy + env.

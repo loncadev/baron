@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { BaronError } from '@baron/core';
+import { BaronError } from '@lonca/baron-core';
 import type { RecipeAsker } from './ask.js';
 import { BUILTIN_RECIPE_NAMES, isBuiltinRecipe, loadBuiltinRecipe } from './builtins.js';
 import { type RecipePorts, runRecipe } from './engine.js';

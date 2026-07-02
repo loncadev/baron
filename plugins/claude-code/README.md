@@ -37,7 +37,7 @@ plugins/claude-code/
 claude --plugin-dir ./plugins/claude-code
 ```
 
-The manifest launches the MCP server via `npx -y @baron/mcp-server`. Before that package is
+The manifest launches the MCP server via `npx -y @lonca/baron-mcp-server`. Before that package is
 published, point the `mcpServers.baron` command at your local build (`pnpm build`, then
 `node packages/mcp-server/dist/bin.js`) instead.
 

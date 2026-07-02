@@ -65,7 +65,7 @@ for release; `pnpm build` (tsup) produces it. Do not point dev consumers at `dis
 
 ## Testing
 
-- Every adapter must pass the shared **conformance suite** (`@baron/conformance`) using the
+- Every adapter must pass the shared **conformance suite** (`@lonca/baron-conformance`) using the
   in-memory transport — pure, network-free, deterministic.
 - Live provider behavior is validated by **gated smoke tests** (skipped unless the relevant
   credentials are present in env). Never commit credentials or recordings containing secrets.

@@ -1,5 +1,5 @@
 {
-  "name": "@baron/recipes",
+  "name": "@lonca/baron-recipes",
   "version": "0.1.0",
   "type": "module",
   "license": "Apache-2.0",
@@ -24,13 +24,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@baron/core": "workspace:*",
-    "@baron/knowledge-loop": "workspace:*",
+    "@lonca/baron-core": "workspace:*",
+    "@lonca/baron-knowledge-loop": "workspace:*",
     "yaml": "^2.6.0"
   },
   "devDependencies": {
-    "@baron/adapter-github": "workspace:*",
-    "@baron/conformance": "workspace:*",
+    "@lonca/baron-adapter-github": "workspace:*",
+    "@lonca/baron-conformance": "workspace:*",
     "@types/node": "^22.0.0"
   },
   "description": "Baron recipe engine: run declarative YAML workflows over Baron primitives, deterministically.",
