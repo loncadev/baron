@@ -1,6 +1,6 @@
 {
   "name": "@baron/adapter-azure-devops",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "license": "Apache-2.0",
   "main": "./src/index.ts",
@@ -8,7 +8,7 @@
   "exports": {
     ".": "./src/index.ts"
   },
-  "files": ["dist", "src"],
+  "files": ["dist"],
   "publishConfig": {
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
@@ -30,5 +30,25 @@
   "devDependencies": {
     "@baron/conformance": "workspace:*",
     "@types/node": "^22.0.0"
+  },
+  "description": "Baron adapter for Azure DevOps: issues, scm, ci, deploy.",
+  "keywords": [
+    "baron",
+    "ai-agents",
+    "mcp",
+    "work-orchestration",
+    "devops",
+    "azure-devops",
+    "adapter"
+  ],
+  "author": "Baron contributors",
+  "homepage": "https://github.com/loncadev/baron#readme",
+  "bugs": {
+    "url": "https://github.com/loncadev/baron/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/loncadev/baron.git",
+    "directory": "packages/adapters/azure-devops"
   }
 }

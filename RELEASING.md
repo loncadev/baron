@@ -37,15 +37,15 @@ until step 2 is done.
 
 - [ ] **Reserve the `@baron` org on npm** (`npm org create` / the npm website). Verify the scope is
       free first — if taken, pick another scope and update every `package.json` `name`.
-- [ ] Decide on `@baron/conformance`: it has no `files`/`publishConfig` yet because it's currently
-      test-only. Third parties writing their own adapters need it to run the conformance suite — if you
-      want that, give it a `build` (tsup), `files: ["dist","src"]`, and a `publishConfig` like the other
-      packages, then publish it too. Otherwise leave it unpublished (adapters depend on it only as a
-      devDependency, so published adapters don't need it at runtime).
-- [ ] Adopt a versioning workflow. Recommended: [Changesets](https://github.com/changesets/changesets)
-      (`pnpm add -Dw @changesets/cli && pnpm changeset init`) — it bumps versions, updates changelogs,
-      and publishes the monorepo in dependency order. All packages sit at `0.0.0`; the first release is
-      `0.1.0`.
+- [x] **`@baron/conformance` is `private: true` for now** (marked in v0.1.0) — it's only ever a
+      *devDependency* of the adapters/cli/mcp-server, so no published package needs it at runtime. To
+      publish it later (so third parties can conformance-test their own adapters), split its entry
+      points (pure in-memory transports vs. the vitest-coupled suites), add a `build`/`files`/
+      `publishConfig`, drop `private`, then republish.
+- [x] **Versioning:** packages are at **`0.1.0`** (set by `scripts/prep-publish.mjs`, which also applies
+      per-package `repository`/`homepage`/`bugs`/`keywords`/`description`, `files: ["dist"]`, and copies
+      `LICENSE`/`README` into each). For future releases, consider adopting
+      [Changesets](https://github.com/changesets/changesets) to automate bumps + changelogs.
 
 **Each release:**
 
