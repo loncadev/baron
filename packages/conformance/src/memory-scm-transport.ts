@@ -14,6 +14,7 @@ import type {
 export function createMemoryScmTransport(): ScmTransport {
   let prSeq = 0;
   let threadSeq = 0;
+  const prs: NativePullRequest[] = [];
 
   return {
     async createBranch(name: string, fromBranch: string): Promise<NativeBranch> {
@@ -22,7 +23,7 @@ export function createMemoryScmTransport(): ScmTransport {
 
     async createPullRequest(input: NativePullRequestInput): Promise<NativePullRequest> {
       prSeq += 1;
-      return {
+      const pr: NativePullRequest = {
         id: `mem-pr-${prSeq}`,
         number: String(prSeq),
         title: input.title,
@@ -31,6 +32,12 @@ export function createMemoryScmTransport(): ScmTransport {
         targetBranch: input.targetBranch,
         draft: input.draft,
       };
+      prs.push(pr);
+      return pr;
+    },
+
+    async findPullRequestByBranch(sourceBranch: string): Promise<NativePullRequest | undefined> {
+      return prs.find((pr) => pr.sourceBranch === sourceBranch);
     },
 
     async addPullRequestThread(pullRequestId: string, _body: string): Promise<NativeThread> {

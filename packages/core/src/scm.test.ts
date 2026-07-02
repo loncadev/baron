@@ -23,6 +23,17 @@ const transport: ScmTransport = {
   async defaultBranch() {
     return 'release';
   },
+  async findPullRequestByBranch(sourceBranch: string) {
+    return sourceBranch === 'feature/existing'
+      ? {
+          id: 'pr-existing',
+          title: 'Existing',
+          sourceBranch,
+          targetBranch: 'release',
+          draft: false,
+        }
+      : undefined;
+  },
   async getPullRequestStatus(pullRequestId: string) {
     return {
       id: pullRequestId,

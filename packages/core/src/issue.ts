@@ -16,6 +16,14 @@ export interface Issue {
   readonly nativeState: string;
   readonly parentId?: string | undefined;
   readonly labels: readonly string[];
+  /** Provider-native user handle of the assignee (Azure: email; GitHub: login), if any. */
+  readonly assignee?: string | undefined;
+  /**
+   * Canonical branch name for working on this item (`<prefix>/<id>-<slug>`), derived by the core
+   * so every agent/recipe picks the same name. Undefined for container types (epic/initiative) and
+   * unmapped native types — callers must refuse to branch, not invent a name.
+   */
+  readonly branchName?: string | undefined;
   readonly url?: string | undefined;
   readonly provider: string;
 }

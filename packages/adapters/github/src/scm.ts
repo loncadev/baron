@@ -76,6 +76,28 @@ export function createGithubScmTransport(options: GithubTransportOptions): ScmTr
       return { id: String(data.id), url: data.html_url };
     },
 
+    async findPullRequestByBranch(sourceBranch: string): Promise<NativePullRequest | undefined> {
+      // `head` must be owner-qualified or it matches nothing (GitHub treats it as a full ref filter).
+      const { data } = await octokit.rest.pulls.list({
+        owner,
+        repo,
+        state: 'open',
+        head: `${owner}:${sourceBranch}`,
+        per_page: 1,
+      });
+      const pr = data[0];
+      if (pr === undefined) return undefined;
+      return {
+        id: String(pr.number),
+        number: String(pr.number),
+        title: pr.title,
+        url: pr.html_url,
+        sourceBranch,
+        targetBranch: pr.base.ref,
+        draft: pr.draft ?? false,
+      };
+    },
+
     async defaultBranch(): Promise<string> {
       const { data } = await octokit.rest.repos.get({ owner, repo });
       return data.default_branch;

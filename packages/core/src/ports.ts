@@ -1,3 +1,4 @@
+import { deriveBranchName } from './branch-name.js';
 import type { CapabilityManifest } from './capabilities.js';
 import type { IssuesProviderConfig, NativeTarget } from './config.js';
 import { BaronError } from './errors.js';
@@ -20,6 +21,8 @@ export interface NativeIssue {
   readonly discriminator: string;
   readonly parentId?: string | undefined;
   readonly labels: readonly string[];
+  /** Provider-native user handle of the assignee (Azure: email; GitHub: login), if any. */
+  readonly assignee?: string | undefined;
   readonly url?: string | undefined;
 }
 
@@ -66,6 +69,8 @@ export interface IssuesTransport {
   /** Create a native typed link. Only called when the manifest declares `issueLinks`. */
   linkIssues(fromId: string, toId: string, nativeLinkType: string): Promise<void>;
   queryIssues(query: NativeQuery): Promise<readonly NativeIssue[]>;
+  /** Assign to a provider-native user handle. Only called when the manifest declares `assignment`. */
+  assignIssue(id: string, assignee: string): Promise<NativeIssue>;
 }
 
 /** The normalized primitive surface the core exposes for the `issues` port. */
@@ -77,6 +82,8 @@ export interface IssuesPort {
   comment(id: string, body: string): Promise<IssueComment>;
   link(fromId: string, toId: string, type: IssueLinkType): Promise<void>;
   query(filter: IssueQuery): Promise<readonly Issue[]>;
+  /** Assign the issue to a provider-native user handle (Azure: email; GitHub: login). */
+  assign(id: string, assignee: string): Promise<Issue>;
 }
 
 /**
@@ -203,6 +210,15 @@ export class BaseIssuesAdapter implements IssuesPort {
     // 'degrade' intentionally drops the link; resolveGap already logged a warning.
   }
 
+  async assign(id: string, assignee: string): Promise<Issue> {
+    if (!this.manifest.issues.assignment) {
+      resolveGap('assignment', this.manifest, this.cfg.gapPolicy, this.logger);
+      // 'degrade' reaches here: the assignment is intentionally dropped (warned), return unchanged.
+      return this.get(id);
+    }
+    return this.toIssue(await this.transport.assignIssue(id, assignee));
+  }
+
   async query(filter: IssueQuery): Promise<readonly Issue[]> {
     const nativeType =
       filter.typeRole === undefined ? undefined : this.cfg.typeMap[filter.typeRole];
@@ -223,17 +239,20 @@ export class BaseIssuesAdapter implements IssuesPort {
   }
 
   private toIssue(native: NativeIssue): Issue {
+    const typeRole = this.reverseTypeRole(native.nativeType);
     return {
       id: native.id,
       key: native.key,
       title: native.title,
       body: native.body,
       nativeType: native.nativeType,
-      typeRole: this.reverseTypeRole(native.nativeType),
+      typeRole,
       role: this.resolver.toRole(native.discriminator),
       nativeState: native.discriminator,
       parentId: native.parentId,
       labels: native.labels,
+      assignee: native.assignee,
+      branchName: deriveBranchName({ id: native.id, title: native.title, typeRole }),
       url: native.url,
       provider: this.cfg.provider,
     };

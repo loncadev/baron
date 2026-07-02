@@ -147,6 +147,8 @@ export interface ScmTransport {
   defaultBranch(): Promise<string>;
   /** Normalized PR status (state + review decision + mergeability + checks rollup). */
   getPullRequestStatus(pullRequestId: string): Promise<PullRequestStatus>;
+  /** The open PR whose source is `sourceBranch`, or undefined when none exists. */
+  findPullRequestByBranch(sourceBranch: string): Promise<NativePullRequest | undefined>;
 }
 
 /** The normalized primitive surface the core exposes for the `scm` port. */
@@ -157,6 +159,11 @@ export interface ScmPort {
   addPullRequestThread(pullRequestId: string, body: string): Promise<PullRequestThread>;
   /** Read a PR's normalized status (scm monitoring): state, review decision, mergeability, checks. */
   prStatus(pullRequestId: string): Promise<PullRequestStatus>;
+  /**
+   * The open PR for a source branch, or undefined. The idempotency primitive behind "finish" flows:
+   * check before create so re-running a workflow updates/reports instead of opening a duplicate.
+   */
+  prForBranch(sourceBranch: string): Promise<PullRequest | undefined>;
 }
 
 /**
@@ -220,6 +227,20 @@ export class BaseScmAdapter implements ScmPort {
     // Aggregation is provider-specific (votes/policy vs reviews/checks), so the transport computes
     // the normalized status; the base simply delegates.
     return this.transport.getPullRequestStatus(pullRequestId);
+  }
+
+  async prForBranch(sourceBranch: string): Promise<PullRequest | undefined> {
+    const native = await this.transport.findPullRequestByBranch(sourceBranch);
+    if (native === undefined) return undefined;
+    return {
+      id: native.id,
+      number: native.number,
+      title: native.title,
+      url: native.url,
+      sourceBranch: native.sourceBranch,
+      targetBranch: native.targetBranch,
+      draft: native.draft,
+    };
   }
 
   async addPullRequestThread(pullRequestId: string, body: string): Promise<PullRequestThread> {

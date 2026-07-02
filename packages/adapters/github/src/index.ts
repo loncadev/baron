@@ -30,6 +30,7 @@ export const githubManifest: CapabilityManifest = {
     nativeLabels: true,
     comments: true,
     issueLinks: false,
+    assignment: true,
   },
 };
 

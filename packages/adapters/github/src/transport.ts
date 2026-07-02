@@ -59,6 +59,7 @@ export function createGithubTransport(options: GithubTransportOptions): IssuesTr
     discriminator: discriminator ?? data.state ?? GH_STATE.OPEN,
     parentId: undefined,
     labels: labelNames(data.labels),
+    assignee: data.assignee?.login ?? undefined,
     url: data.html_url,
   });
 
@@ -134,6 +135,18 @@ export function createGithubTransport(options: GithubTransportOptions): IssuesTr
         createdAt: data.created_at,
         url: data.html_url,
       };
+    },
+
+    async assignIssue(id: string, assignee: string): Promise<NativeIssue> {
+      // Baron's single-assignee model maps to GitHub's assignees ARRAY: setting replaces the set
+      // with exactly this login (update, not addAssignees, so a previous assignee doesn't linger).
+      const { data } = await octokit.rest.issues.update({
+        owner,
+        repo,
+        issue_number: Number(id),
+        assignees: [assignee],
+      });
+      return toNative(data);
     },
 
     async linkIssues(): Promise<void> {

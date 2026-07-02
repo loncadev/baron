@@ -3,7 +3,7 @@ import {
   createMemoryIntrospector,
   githubIntrospectionFixture,
 } from '@lonca/baron-conformance';
-import { BaronError } from '@lonca/baron-core';
+import { BaronError, WORK_ITEM_TYPE_ROLES } from '@lonca/baron-core';
 import { describe, expect, it } from 'vitest';
 import { runDoctor } from './doctor.js';
 import { memoryFileSystem, scriptedPrompter } from './fakes.js';
@@ -91,8 +91,9 @@ describe('runDoctor', () => {
       introspector: createMemoryIntrospector(githubIntrospectionFixture),
     });
     expect(report.ok).toBe(true);
-    // Only the type map is checkable on a flat provider; no native states or columns.
-    expect(report.checks).toBe(5);
+    // Only the type map is checkable on a flat provider; no native states or columns. One check
+    // per abstract type role (all collapse onto GitHub's single 'issue' type).
+    expect(report.checks).toBe(WORK_ITEM_TYPE_ROLES.length);
   });
 
   it('throws an actionable error when no policy exists', async () => {

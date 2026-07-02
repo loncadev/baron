@@ -129,6 +129,35 @@ export function createAzureDevOpsScmTransport(
       return { id: String(thread.id ?? '') };
     },
 
+    async findPullRequestByBranch(sourceBranch: string): Promise<NativePullRequest | undefined> {
+      const git = await api();
+      const matches = await git.getPullRequests(
+        repository,
+        {
+          sourceRefName: `${REFS_HEADS}${sourceBranch}`,
+          status: AzurePrStatus.Active,
+        },
+        project,
+        undefined,
+        undefined,
+        1,
+      );
+      const pr = matches[0];
+      if (pr?.pullRequestId === undefined) return undefined;
+      const id = String(pr.pullRequestId);
+      const stripRef = (ref: string | undefined): string =>
+        ref?.startsWith(REFS_HEADS) ? ref.slice(REFS_HEADS.length) : (ref ?? '');
+      return {
+        id,
+        number: id,
+        title: pr.title ?? '',
+        url: prWebUrl(id),
+        sourceBranch: stripRef(pr.sourceRefName),
+        targetBranch: stripRef(pr.targetRefName),
+        draft: pr.isDraft ?? false,
+      };
+    },
+
     async getPullRequestStatus(pullRequestId: string): Promise<PullRequestStatus> {
       const git = await api();
       const pr = await git.getPullRequestById(Number(pullRequestId), project);

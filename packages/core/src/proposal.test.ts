@@ -14,6 +14,7 @@ const richManifest: CapabilityManifest = {
     nativeLabels: true,
     comments: true,
     issueLinks: true,
+    assignment: true,
   },
 };
 
@@ -42,6 +43,7 @@ const flatManifest: CapabilityManifest = {
     nativeLabels: true,
     comments: true,
     issueLinks: false,
+    assignment: true,
   },
 };
 

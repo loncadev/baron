@@ -27,6 +27,7 @@ export const azureDevOpsManifest: CapabilityManifest = {
     nativeLabels: true,
     comments: true,
     issueLinks: true,
+    assignment: true,
   },
 };
 

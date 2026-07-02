@@ -1,4 +1,5 @@
 import {
+  BRANCH_TYPE_PREFIXES,
   CapabilityGapError,
   type GapPolicy,
   type IssuesPort,
@@ -129,6 +130,49 @@ export function runIssuesConformance(target: IssuesConformanceTarget): void {
       const { adapter } = target.build({});
       expect(typeof adapter.manifest.issues.comments).toBe('boolean');
       expect(typeof adapter.manifest.issues.issueLinks).toBe('boolean');
+      expect(typeof adapter.manifest.issues.assignment).toBe('boolean');
+    });
+
+    it('derives the canonical branch name (<prefix>/<id>-<slug>) on every read', async () => {
+      const { adapter } = target.build({});
+      const issue = await adapter.create({ title: 'Añadir búsqueda çok iyi', typeRole: 'task' });
+      // Deterministic naming is the point: same item -> same name, everywhere. The prefix follows
+      // the REVERSE-resolved type role (flat providers may collapse types), never an invented one.
+      expect(issue.typeRole).toBeDefined();
+      const prefix =
+        issue.typeRole === undefined ? undefined : BRANCH_TYPE_PREFIXES[issue.typeRole];
+      if (prefix === undefined) {
+        expect(issue.branchName).toBeUndefined();
+      } else {
+        expect(issue.branchName).toBe(`${prefix}/${issue.id}-anadir-busqueda-cok-iyi`);
+      }
+      const fetched = await adapter.get(issue.id);
+      expect(fetched.branchName).toBe(issue.branchName);
+    });
+
+    describe('assignment handling per manifest + policy', () => {
+      it('assigns natively, or negotiates the gap (degrade warns, strict errors)', async () => {
+        const probe = target.build({});
+        const issue = await probe.adapter.create({ title: 'assign me', typeRole: 'task' });
+
+        if (probe.adapter.manifest.issues.assignment) {
+          const assigned = await probe.adapter.assign(issue.id, 'dev@example.com');
+          expect(assigned.assignee).toBe('dev@example.com');
+          return;
+        }
+
+        // Strict policy -> loud failure, never silent.
+        await expect(probe.adapter.assign(issue.id, 'dev@example.com')).rejects.toBeInstanceOf(
+          CapabilityGapError,
+        );
+
+        // Degrade -> assignment dropped with a warning, issue returned unchanged.
+        const soft = target.build({ assignment: { kind: 'degrade' } });
+        const other = await soft.adapter.create({ title: 'assign me', typeRole: 'task' });
+        const result = await soft.adapter.assign(other.id, 'dev@example.com');
+        expect(result.assignee).toBeUndefined();
+        expect(soft.logger.entries.some((e) => e.level === 'warn')).toBe(true);
+      });
     });
 
     it('comment adds a comment and returns it normalized', async () => {

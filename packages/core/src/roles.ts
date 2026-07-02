@@ -23,9 +23,16 @@ export function isWorkflowRole(value: string): value is WorkflowRole {
 
 /**
  * Abstract work-item type roles. A provider maps these onto its native types
- * (Azure: Epic/Feature/Product Backlog Item/Task; GitHub: a flat issue + labels).
+ * (Azure: Epic/Feature/Product Backlog Item/Task/Bug; GitHub: a flat issue + labels).
  */
-export const WORK_ITEM_TYPE_ROLES = ['initiative', 'epic', 'story', 'task', 'subtask'] as const;
+export const WORK_ITEM_TYPE_ROLES = [
+  'initiative',
+  'epic',
+  'story',
+  'task',
+  'bug',
+  'subtask',
+] as const;
 
 export type WorkItemTypeRole = (typeof WORK_ITEM_TYPE_ROLES)[number];
 

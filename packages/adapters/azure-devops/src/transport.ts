@@ -30,6 +30,7 @@ const FIELD = {
   STATE: 'System.State',
   TYPE: 'System.WorkItemType',
   TAGS: 'System.Tags',
+  ASSIGNED_TO: 'System.AssignedTo',
 } as const;
 
 /**
@@ -37,7 +38,13 @@ const FIELD = {
  * and labels, NOT the (potentially huge) Description body or the relations graph. `get` fetches the
  * full item; query is a lightweight projection so a large result can't blow the caller's context.
  */
-const QUERY_FIELDS: readonly string[] = [FIELD.TITLE, FIELD.STATE, FIELD.TYPE, FIELD.TAGS];
+const QUERY_FIELDS: readonly string[] = [
+  FIELD.TITLE,
+  FIELD.STATE,
+  FIELD.TYPE,
+  FIELD.TAGS,
+  FIELD.ASSIGNED_TO,
+];
 
 /** The relation that points to the PARENT in Azure's native hierarchy. */
 const PARENT_REL = 'System.LinkTypes.Hierarchy-Reverse';
@@ -114,6 +121,11 @@ export function createAzureDevOpsTransport(options: AzureDevOpsTransportOptions)
     const parent = item.relations?.find((relation) => relation.rel === PARENT_REL);
     const state = String(fields[FIELD.STATE] ?? '');
     const description = fields[FIELD.DESCRIPTION];
+    // AssignedTo is an IdentityRef object on reads; the stable, writable handle is uniqueName (email).
+    const assignedTo = fields[FIELD.ASSIGNED_TO] as
+      | { uniqueName?: string; displayName?: string }
+      | undefined;
+    const assignee = assignedTo?.uniqueName ?? assignedTo?.displayName;
     return {
       id: String(item.id ?? ''),
       key: `AB#${item.id ?? ''}`,
@@ -123,6 +135,7 @@ export function createAzureDevOpsTransport(options: AzureDevOpsTransportOptions)
       discriminator: discriminator ?? state,
       parentId: parseTrailingId(parent?.url),
       labels: parseTags(fields[FIELD.TAGS]),
+      assignee: assignee !== undefined && assignee.length > 0 ? assignee : undefined,
       url: item.url ?? undefined,
     };
   };
@@ -217,6 +230,17 @@ export function createAzureDevOpsTransport(options: AzureDevOpsTransportOptions)
         createdAt: comment.createdDate?.toISOString(),
         url: comment.url,
       };
+    },
+
+    async assignIssue(id: string, assignee: string): Promise<NativeIssue> {
+      const witApi = await api();
+      // System.AssignedTo accepts an email/uniqueName string; Azure resolves it to the identity.
+      const updated = await witApi.updateWorkItem(
+        null,
+        [{ op: Operation.Add, path: fieldPath(FIELD.ASSIGNED_TO), value: assignee }],
+        Number(id),
+      );
+      return toNative(updated);
     },
 
     async linkIssues(fromId: string, toId: string, nativeLinkType: string): Promise<void> {

@@ -1,4 +1,5 @@
 export * from './roles.js';
+export * from './branch-name.js';
 export * from './links.js';
 export * from './errors.js';
 export * from './logger.js';

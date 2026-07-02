@@ -16,6 +16,7 @@ interface Rec {
   discriminator: string;
   parentId: string | undefined;
   labels: string[];
+  assignee: string | undefined;
   url: string;
   links: Array<{ toId: string; type: string }>;
 }
@@ -47,6 +48,7 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
     discriminator: r.discriminator,
     parentId: r.parentId,
     labels: [...r.labels],
+    assignee: r.assignee,
     url: r.url,
   });
 
@@ -69,6 +71,7 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
         discriminator: opts.defaultDiscriminator,
         parentId: input.parentId,
         labels: [...input.labels],
+        assignee: undefined,
         url: `mem://${id}`,
         links: [],
       };
@@ -104,6 +107,12 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
       const rec = must(fromId);
       must(toId);
       rec.links.push({ toId, type: nativeLinkType });
+    },
+
+    async assignIssue(id: string, assignee: string): Promise<NativeIssue> {
+      const rec = must(id);
+      rec.assignee = assignee;
+      return snapshot(rec);
     },
 
     async queryIssues(query: NativeQuery): Promise<readonly NativeIssue[]> {

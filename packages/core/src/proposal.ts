@@ -41,6 +41,7 @@ const TYPE_KEYWORDS: Record<WorkItemTypeRole, RegExp> = {
   epic: /epic|feature/i,
   story: /story|backlog item|pbi|requirement/i,
   task: /^task$|task|to-?do/i,
+  bug: /bug|defect|incident/i,
   subtask: /sub-?task/i,
 };
 

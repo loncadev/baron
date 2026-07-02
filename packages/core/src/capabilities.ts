@@ -26,6 +26,8 @@ export interface IssuesCapabilities {
    * Azure: yes (System.LinkTypes.*); GitHub issues: no (must be emulated or degraded).
    */
   issueLinks: boolean;
+  /** Assigning a work item to a user (Azure: System.AssignedTo; GitHub: assignees). */
+  assignment: boolean;
 }
 
 export type CapabilityName = keyof IssuesCapabilities;

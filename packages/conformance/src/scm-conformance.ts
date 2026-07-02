@@ -71,6 +71,20 @@ export function runScmConformance(target: ScmConformanceTarget): void {
       expect(['succeeded', 'failed', 'pending', 'none']).toContain(status.checks.rollup);
     });
 
+    it('prForBranch finds the open PR for a source branch, undefined otherwise', async () => {
+      const { adapter } = target.build();
+      // The idempotency primitive behind "finish" flows: nothing yet -> undefined.
+      expect(await adapter.prForBranch('feature/nothing-here')).toBeUndefined();
+      const created = await adapter.createPullRequest({
+        title: 'PR',
+        sourceBranch: 'feature/find-me',
+        targetBranch: 'main',
+      });
+      const found = await adapter.prForBranch('feature/find-me');
+      expect(found?.id).toBe(created.id);
+      expect(found?.sourceBranch).toBe('feature/find-me');
+    });
+
     it('addPullRequestThread returns a thread reference', async () => {
       const { adapter } = target.build();
       const pr = await adapter.createPullRequest({
