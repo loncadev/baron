@@ -35,8 +35,15 @@ until step 2 is done.
 
 **One-time:**
 
-- [ ] **Reserve the `@baron` org on npm** (`npm org create` / the npm website). Verify the scope is
-      free first — if taken, pick another scope and update every `package.json` `name`.
+- [x] **Scope: `@lonca/baron-*`** (published 2026-07-02). The `@baron` org was taken; packages live
+      under the owned `@lonca` org, prefixed `baron-` because plain `@lonca/*` names (e.g.
+      `@lonca/core`) already exist.
+- [x] **Auth (the hard-won lesson):** the account has 2FA `auth-and-writes`, so publishing needs a
+      **granular access token with the "Bypass two-factor authentication" checkbox CHECKED**
+      (classic/Automation tokens were removed by npm in Dec 2025; write tokens are capped at 90 days —
+      current one expires ~2026-09-30, regenerate then). Pitfall: `npm login` writes its own 2-hour
+      *session token* into `~/.npmrc`, silently shadowing yours — if publish fails with `EOTP`, check
+      that the `_authToken` line in `~/.npmrc` is the bypass token, not the session token.
 - [x] **`@lonca/baron-conformance` is `private: true` for now** (marked in v0.1.0) — it's only ever a
       *devDependency* of the adapters/cli/mcp-server, so no published package needs it at runtime. To
       publish it later (so third parties can conformance-test their own adapters), split its entry
