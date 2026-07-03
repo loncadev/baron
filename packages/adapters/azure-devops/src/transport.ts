@@ -1,10 +1,11 @@
-import type {
-  IssuesTransport,
-  NativeComment,
-  NativeCreateInput,
-  NativeIssue,
-  NativeQuery,
-  NativeTarget,
+import {
+  ASSIGNEE_ME,
+  type IssuesTransport,
+  type NativeComment,
+  type NativeCreateInput,
+  type NativeIssue,
+  type NativeQuery,
+  type NativeTarget,
 } from '@lonca/baron-core';
 import * as azdev from 'azure-devops-node-api';
 import {
@@ -76,10 +77,23 @@ function escapeWiql(value: string): string {
  * `queryByWiql` does NOT constrain `FROM WorkItems`, which otherwise spans the entire organization —
  * the source of a query leaking every project's items. Exported for unit testing without the SDK.
  */
-export function buildWorkItemsWiql(project: string, state?: string, nativeType?: string): string {
+export function buildWorkItemsWiql(
+  project: string,
+  state?: string,
+  nativeType?: string,
+  assignee?: string,
+): string {
   const clauses = [`[${FIELD.TEAM_PROJECT}] = '${escapeWiql(project)}'`];
   if (state !== undefined) clauses.push(`[${FIELD.STATE}] = '${escapeWiql(state)}'`);
   if (nativeType !== undefined) clauses.push(`[${FIELD.TYPE}] = '${escapeWiql(nativeType)}'`);
+  if (assignee !== undefined) {
+    // '@me' rides WIQL's native @Me macro (no identity lookup needed); anything else is a literal.
+    clauses.push(
+      assignee === ASSIGNEE_ME
+        ? `[${FIELD.ASSIGNED_TO}] = @Me`
+        : `[${FIELD.ASSIGNED_TO}] = '${escapeWiql(assignee)}'`,
+    );
+  }
   return `SELECT [${FIELD.ID}] FROM WorkItems WHERE ${clauses.join(' AND ')}`;
 }
 
@@ -260,7 +274,12 @@ export function createAzureDevOpsTransport(options: AzureDevOpsTransportOptions)
 
     async queryIssues(query: NativeQuery): Promise<readonly NativeIssue[]> {
       const witApi = await api();
-      const wiql = buildWorkItemsWiql(project, query.target?.[TARGET.STATE], query.nativeType);
+      const wiql = buildWorkItemsWiql(
+        project,
+        query.target?.[TARGET.STATE],
+        query.nativeType,
+        query.assignee,
+      );
 
       const result = await witApi.queryByWiql({ query: wiql }, { project }, undefined, query.limit);
       const ids = (result.workItems ?? [])

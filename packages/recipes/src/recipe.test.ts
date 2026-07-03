@@ -66,9 +66,32 @@ describe('parseRecipe', () => {
     ).toThrow(/exactly one of/);
   });
 
-  it('rejects a step that is none of ask/do/message', () => {
+  it('rejects a step that is none of ask/do/message/require', () => {
     expect(() => parseRecipe({ name: 'r', steps: [{ frob: true }] })).toThrow(
-      /'ask', 'do', or 'message'/,
+      /'ask', 'do', 'message', or 'require'/,
     );
+  });
+
+  it('rejects a require step without a message or with multiple condition keys', () => {
+    expect(() => parseRecipe({ name: 'r', steps: [{ require: { truthy: '${x}' } }] })).toThrow(
+      /require\.message/,
+    );
+    expect(() =>
+      parseRecipe({
+        name: 'r',
+        steps: [{ require: { truthy: '${x}', falsy: '${y}', message: 'm' } }],
+      }),
+    ).toThrow(/exactly one of/);
+  });
+
+  it('parses when: on do and message steps', () => {
+    const recipe = parseRecipe({
+      name: 'r',
+      steps: [
+        { do: 'issue.comment', with: { id: '1', body: 'b' }, when: { truthy: '${x}' } },
+        { message: 'm', when: { notEquals: ['${a}', 'done'] } },
+      ],
+    });
+    expect(recipe.steps).toHaveLength(2);
   });
 });

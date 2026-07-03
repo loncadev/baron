@@ -27,9 +27,11 @@ import {
   RECIPE_OPS,
   type Recipe,
   type RecipeOp,
+  type StepCondition,
   isAskStep,
   isDoStep,
   isMessageStep,
+  isRequireStep,
 } from './recipe.js';
 
 export interface RecipePorts {
@@ -252,11 +254,13 @@ async function dispatchOp(ports: RecipePorts, op: RecipeOp, params: Params): Pro
       );
     case RECIPE_OPS.issueQuery: {
       const limit = optNum(params, 'limit', op);
+      const assignee = optStr(params, 'assignee', op);
       const query: IssueQuery = {
         ...(optStr(params, 'role', op) !== undefined ? { role: reqRole(params, 'role', op) } : {}),
         ...(optStr(params, 'typeRole', op) !== undefined
           ? { typeRole: reqTypeRole(params, 'typeRole', op) }
           : {}),
+        ...(assignee !== undefined ? { assignee } : {}),
         ...(limit !== undefined ? { limit } : {}),
       };
       return issues(ports, op).query(query);
@@ -365,11 +369,40 @@ async function dispatchOp(ports: RecipePorts, op: RecipeOp, params: Params): Pro
   }
 }
 
+const REQUIRE = 'RECIPE_REQUIRE';
+
+/** A guard/when operand is "present" unless it resolved to nothing: undefined/null/''/false. */
+function isTruthy(value: unknown): boolean {
+  return value !== undefined && value !== null && value !== '' && value !== false;
+}
+
+/** Interpolated string comparison; absent operands compare as ''. */
+function asComparable(value: unknown): string {
+  return value === undefined || value === null ? '' : String(value);
+}
+
+function evalCondition(condition: StepCondition, context: RecipeContext): boolean {
+  if (condition.truthy !== undefined) return isTruthy(interpolate(condition.truthy, context));
+  if (condition.falsy !== undefined) return !isTruthy(interpolate(condition.falsy, context));
+  if (condition.equals !== undefined) {
+    const [a, b] = condition.equals;
+    return asComparable(interpolate(a, context)) === asComparable(interpolate(b, context));
+  }
+  if (condition.notEquals !== undefined) {
+    const [a, b] = condition.notEquals;
+    return asComparable(interpolate(a, context)) !== asComparable(interpolate(b, context));
+  }
+  // Unreachable for a parsed recipe (the parser enforces exactly one key).
+  throw new BaronError('Empty step condition.', REQUIRE);
+}
+
 /**
  * Execute a recipe step by step against the injected ports, threading a context: `ask` steps gather
  * typed human input (skipped when pre-seeded), `do` steps call a primitive and bind its result,
- * `message` steps surface a line. All workflow opinion lives in the recipe; this engine is pure
- * mechanism (invariant #3) and does no role/native translation (that stays in the ports, #4).
+ * `message` steps surface a line, `require` steps are engine-enforced guards (decision #19: the
+ * rules live in the engine, not in agent judgement), and a `when:` condition skips a do/message
+ * step. All workflow opinion lives in the recipe; this engine is pure mechanism (invariant #3) and
+ * does no role/native translation (that stays in the ports, #4).
  */
 export async function runRecipe(
   recipe: Recipe,
@@ -391,12 +424,24 @@ export async function runRecipe(
       continue;
     }
 
+    if (isRequireStep(step)) {
+      const { message, ...condition } = step.require;
+      if (!evalCondition(condition, context)) {
+        // The message is authored for the human: interpolated, actionable, and it STOPS the run —
+        // a failed guard must never fall through to the mutation steps below it.
+        throw new BaronError(String(interpolate(message, context)), REQUIRE);
+      }
+      continue;
+    }
+
     if (isMessageStep(step)) {
+      if (step.when !== undefined && !evalCondition(step.when, context)) continue;
       options.asker.note(String(interpolate(step.message, context)));
       continue;
     }
 
     if (isDoStep(step)) {
+      if (step.when !== undefined && !evalCondition(step.when, context)) continue;
       const params = (interpolate(step.with ?? {}, context) ?? {}) as Params;
       const result = await dispatchOp(options.ports, step.do, params);
       if (step.as !== undefined) context[step.as] = result;

@@ -6,9 +6,15 @@ steps:
     as: issue
     with:
       id: ${issueId}
+  # Engine-enforced guards (decision #19): a failed require STOPS the run before any mutation.
+  - require:
+      notEquals: ["${issue.role}", "done"]
+      message: "${issue.key} is already done — reopen it (task-move) or pick an active item."
+  - require:
+      truthy: "${issue.branchName}"
+      message: "${issue.key} (${issue.nativeType}) has no canonical branch — containers (epic/initiative) and unmapped types are never branched. Pick a child story/task/bug."
   # ${issue.branchName} is the core-derived canonical name (<prefix>/<id>-<slug>) — every agent and
-  # recipe derives the SAME name for the same item. It is unset for container types (epic/initiative),
-  # which makes this step fail loudly rather than branch on an epic.
+  # recipe derives the SAME name for the same item.
   - do: scm.branch.create
     as: branch
     with:

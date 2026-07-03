@@ -28,7 +28,7 @@ policy.
 | `baron_issue_comment` | issues | Comment on an issue. |
 | `baron_issue_link` | issues | Link two issues (`relates` / `blocks` / `blocked_by` / `duplicates`). |
 | `baron_issue_assign` | issues | Assign an issue to a provider-native user handle (Azure: email; GitHub: login). |
-| `baron_issue_query` | issues | List issues filtered by `role` / `typeRole` / `limit`. |
+| `baron_issue_query` | issues | List issues filtered by `role` / `typeRole` / `assignee` (handle or `@me`) / `limit`. |
 | `baron_scm_branch_create` | scm | Create a branch from a base branch. |
 | `baron_scm_pr_create` | scm | Open a pull request (optional `draft`). |
 | `baron_scm_pr_thread` | scm | Add a discussion thread/comment to a PR. |

@@ -136,6 +136,98 @@ describe('runRecipe', () => {
     expect(asker.notes.some((n) => n.includes('Opened'))).toBe(true);
   });
 
+  it('require guard STOPS the run with the interpolated message before any later mutation', async () => {
+    const recipe = loadRecipe(`
+name: guarded
+steps:
+  - ask: { as: title, type: text, message: "Title?" }
+  - do: issue.create
+    as: issue
+    with: { title: "\${title}", typeRole: task }
+  - require:
+      equals: ["\${issue.role}", "in_progress"]
+      message: "\${issue.key} is not in progress — refuse."
+  - do: issue.comment
+    with: { id: "\${issue.id}", body: "never reached" }
+`);
+    await expect(
+      runRecipe(recipe, { ports: allPorts(), asker: scriptedAsker(['x']) }),
+    ).rejects.toMatchObject({ code: 'RECIPE_REQUIRE', message: expect.stringContaining('#1') });
+  });
+
+  it('require guard passes when the condition holds (truthy on a present field)', async () => {
+    const recipe = loadRecipe(`
+name: guarded-ok
+steps:
+  - do: issue.create
+    as: issue
+    with: { title: "guarded ok", typeRole: task }
+  - require:
+      truthy: "\${issue.branchName}"
+      message: "no branch name"
+  - message: "branch is \${issue.branchName}"
+`);
+    const asker = scriptedAsker();
+    await runRecipe(recipe, { ports: allPorts(), asker });
+    expect(asker.notes.some((n) => n.includes('branch is'))).toBe(true);
+  });
+
+  it('when: skips do/message steps without failing (falsy vs truthy branches)', async () => {
+    const recipe = loadRecipe(`
+name: branchy
+steps:
+  - do: scm.pr.find
+    as: existing
+    with: { sourceBranch: "feature/none" }
+  - do: scm.pr.create
+    as: pr
+    when:
+      falsy: "\${existing}"
+    with: { title: "PR", sourceBranch: "feature/none" }
+  - message: "created \${pr.id}"
+    when:
+      falsy: "\${existing}"
+  - message: "reused \${existing.id}"
+    when:
+      truthy: "\${existing}"
+`);
+    const asker = scriptedAsker();
+    const { context } = await runRecipe(recipe, { ports: allPorts(), asker });
+    expect(context.pr).toBeDefined();
+    expect(asker.notes.some((n) => n.startsWith('created'))).toBe(true);
+    expect(asker.notes.some((n) => n.startsWith('reused'))).toBe(false);
+  });
+
+  it('task-finish is engine-idempotent: a second run reports the existing PR, no duplicate', async () => {
+    const ports = allPorts();
+    const finish = `
+name: finish
+steps:
+  - do: scm.pr.find
+    as: existingPr
+    with: { sourceBranch: "feature/once" }
+  - message: "PR already open: \${existingPr.url}"
+    when:
+      truthy: "\${existingPr}"
+  - do: scm.pr.create
+    as: pr
+    when:
+      falsy: "\${existingPr}"
+    with: { title: "Once", sourceBranch: "feature/once" }
+`;
+    const first = await runRecipe(loadRecipe(finish), { ports, asker: scriptedAsker() });
+    expect(first.context.pr).toBeDefined();
+    expect(first.context.existingPr).toBeNull();
+
+    const asker = scriptedAsker();
+    const second = await runRecipe(loadRecipe(finish), { ports, asker });
+    expect(second.context.pr).toBeUndefined(); // create skipped
+    expect((second.context.existingPr as { id: string }).id).toBe(
+      (first.context.pr as { id: string }).id,
+    );
+    expect(asker.notes.some((n) => n.includes('already open'))).toBe(true);
+  });
+
   it('runs ci / notify / deploy / scm-status ops across the new ports', async () => {
     const recipe = loadRecipe(`
 name: single-pane

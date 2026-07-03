@@ -121,6 +121,9 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
       for (const rec of store.values()) {
         if (discriminator !== undefined && rec.discriminator !== discriminator) continue;
         if (query.nativeType !== undefined && rec.nativeType !== query.nativeType) continue;
+        // '@me' resolves to a fixed fake identity so the suite can exercise the sentinel path.
+        const wanted = query.assignee === '@me' ? 'me@example.com' : query.assignee;
+        if (wanted !== undefined && rec.assignee !== wanted) continue;
         results.push(snapshot(rec));
       }
       return query.limit !== undefined ? results.slice(0, query.limit) : results;

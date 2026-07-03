@@ -26,7 +26,8 @@ Baron translates these to each provider's native states/types/links and negotiat
 
 Issues port: `baron_issue_create`, `baron_issue_get`, `baron_issue_transition`,
 `baron_issue_comment`, `baron_issue_link`, `baron_issue_assign` (provider-native handle: Azure
-email, GitHub login), `baron_issue_query`. Every returned issue carries `branchName` — the canonical
+email, GitHub login), `baron_issue_query` (filters: `role`, `typeRole`, `assignee` — a handle or
+`@me` for "my items"). Every returned issue carries `branchName` — the canonical
 `<prefix>/<id>-<slug>` branch derived by the core; use it verbatim, never invent branch names
 (unset for epics/initiatives = don't branch on those).
 

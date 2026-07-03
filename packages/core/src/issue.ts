@@ -38,10 +38,18 @@ export interface IssueComment {
   readonly url?: string | undefined;
 }
 
+/**
+ * Sentinel assignee meaning "the authenticated user" — each transport resolves it natively
+ * (Azure: the WIQL `@Me` macro; GitHub: the token's login).
+ */
+export const ASSIGNEE_ME = '@me';
+
 /** Filter for `issue.query`, expressed in abstract terms. All fields are optional (AND-combined). */
 export interface IssueQuery {
   readonly role?: WorkflowRole | undefined;
   readonly typeRole?: WorkItemTypeRole | undefined;
+  /** Provider-native user handle, or {@link ASSIGNEE_ME} for the authenticated user. */
+  readonly assignee?: string | undefined;
   readonly limit?: number | undefined;
 }
 

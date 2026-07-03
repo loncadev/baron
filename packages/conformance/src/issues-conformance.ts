@@ -195,6 +195,18 @@ export function runIssuesConformance(target: IssuesConformanceTarget): void {
       expect(byType.some((i) => i.id === issue.id)).toBe(true);
     });
 
+    it('query filters by assignee when the provider supports assignment', async () => {
+      const { adapter } = target.build({});
+      if (!adapter.manifest.issues.assignment) return;
+      const mine = await adapter.create({ title: 'mine', typeRole: 'task' });
+      await adapter.create({ title: 'unassigned', typeRole: 'task' });
+      await adapter.assign(mine.id, 'dev@example.com');
+
+      const byAssignee = await adapter.query({ assignee: 'dev@example.com' });
+      expect(byAssignee.some((i) => i.id === mine.id)).toBe(true);
+      expect(byAssignee.every((i) => i.assignee === 'dev@example.com')).toBe(true);
+    });
+
     describe('link handling per manifest + policy', () => {
       it('native links succeed; flat providers emulate or error', async () => {
         const probe = target.build({});

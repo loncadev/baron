@@ -64,6 +64,8 @@ export interface NativeComment {
 export interface NativeQuery {
   readonly target?: NativeTarget | undefined;
   readonly nativeType?: string | undefined;
+  /** Provider-native user handle, or the '@me' sentinel the transport resolves natively. */
+  readonly assignee?: string | undefined;
   readonly limit?: number | undefined;
 }
 
@@ -245,6 +247,7 @@ export class BaseIssuesAdapter implements IssuesPort {
     const query = {
       ...(filter.role !== undefined ? { target: this.resolver.toNative(filter.role) } : {}),
       ...(nativeType !== undefined ? { nativeType } : {}),
+      ...(filter.assignee !== undefined ? { assignee: filter.assignee } : {}),
       ...(filter.limit !== undefined ? { limit: filter.limit } : {}),
     };
     const natives = await this.transport.queryIssues(query);

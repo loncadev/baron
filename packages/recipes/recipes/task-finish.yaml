@@ -1,23 +1,39 @@
 name: task-finish
-description: Open a draft pull request for a work-item branch and post the PR link back on the item. Deliberately does NOT move the item's role — review/testing state changes when the PR actually merges, not when it opens.
+description: Open a draft pull request for a work-item branch and post the PR link back on the item. Idempotent — an existing open PR is reported, never duplicated. Deliberately does NOT move the item's role; review state changes when the PR merges.
 steps:
   - ask: { as: issueId, type: text, message: "Issue id?" }
   - ask: { as: branch, type: text, message: "Source branch?" }
   - ask: { as: title, type: text, message: "Pull request title?" }
+  # Idempotency probe: the engine (not the agent) decides create-vs-report (decision #19).
+  - do: scm.pr.find
+    as: existingPr
+    with:
+      sourceBranch: ${branch}
+  - message: "PR already open for ${branch}: ${existingPr.url} — not duplicating."
+    when:
+      truthy: "${existingPr}"
   - do: scm.pr.create
     as: pr
+    when:
+      falsy: "${existingPr}"
     with:
       # targetBranch omitted — defaults to the repo's default branch, keeping the recipe portable.
       title: ${title}
       sourceBranch: ${branch}
       draft: true
   - do: scm.pr.thread
+    when:
+      falsy: "${existingPr}"
     with:
       pullRequestId: ${pr.id}
       body: "Opened for issue ${issueId}."
   # Give the card full context: reviewers/QA opening the work item see the PR without digging.
   - do: issue.comment
+    when:
+      falsy: "${existingPr}"
     with:
       id: ${issueId}
       body: "PR opened: ${pr.url} (from ${branch}). Role unchanged — moves to in_review on merge."
   - message: "Opened PR ${pr.url} for ${issueId}. Role unchanged; transition on merge (task-move)."
+    when:
+      falsy: "${existingPr}"

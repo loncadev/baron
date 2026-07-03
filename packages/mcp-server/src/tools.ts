@@ -257,6 +257,13 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
       properties: {
         role: { type: 'string', enum: ROLE_ENUM, description: 'Filter by workflow role.' },
         typeRole: { type: 'string', enum: TYPE_ROLE_ENUM, description: 'Filter by type role.' },
+        assignee: {
+          type: 'string',
+          minLength: 1,
+          description:
+            "Filter by assignee: a provider-native handle (Azure: email; GitHub: login) or '@me' " +
+            'for the authenticated user.',
+        },
         limit: {
           type: 'number',
           minimum: 1,
@@ -702,11 +709,13 @@ function toQuery(args: Record<string, unknown> | undefined): IssueQuery {
   if (limit !== undefined && (typeof limit !== 'number' || !Number.isFinite(limit) || limit < 1)) {
     throw new BaronError("Argument 'limit' must be a positive number.", INVALID_ARGS);
   }
+  const assignee = optionalString(args, 'assignee');
   // Default the cap so an unbounded query (e.g. an early-project backlog spanning hundreds of items)
   // can't overflow the agent's context. The default is documented in the tool schema, not silent.
   return {
     ...(roleRaw !== undefined ? { role: roleRaw as WorkflowRole } : {}),
     ...(typeRoleRaw !== undefined ? { typeRole: typeRoleRaw as WorkItemTypeRole } : {}),
+    ...(assignee !== undefined ? { assignee } : {}),
     limit: limit !== undefined ? (limit as number) : DEFAULT_QUERY_LIMIT,
   };
 }

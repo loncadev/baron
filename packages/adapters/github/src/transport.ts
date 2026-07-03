@@ -1,4 +1,5 @@
 import {
+  ASSIGNEE_ME,
   BaronError,
   type IssuesTransport,
   type NativeComment,
@@ -49,6 +50,14 @@ function labelNames(labels: IssueResponse['labels']): string[] {
 export function createGithubTransport(options: GithubTransportOptions): IssuesTransport {
   const { owner, repo, token } = options;
   const octokit = new Octokit({ auth: token });
+
+  // '@me' has no REST equivalent on listForRepo; resolve the token's login once and cache it.
+  let myLogin: Promise<string> | undefined;
+  const resolveAssignee = (assignee: string): Promise<string> => {
+    if (assignee !== ASSIGNEE_ME) return Promise.resolve(assignee);
+    myLogin ??= octokit.rest.users.getAuthenticated().then(({ data }) => data.login);
+    return myLogin;
+  };
 
   const toNative = (data: IssueResponse, discriminator?: string): NativeIssue => ({
     id: String(data.number),
@@ -171,6 +180,8 @@ export function createGithubTransport(options: GithubTransportOptions): IssuesTr
             ? GH_STATE.OPEN
             : 'all';
       const { limit } = query;
+      const assignee =
+        query.assignee === undefined ? undefined : await resolveAssignee(query.assignee);
 
       // Paginate (per_page caps at 100) and stop once `limit` non-PR issues are collected, so a
       // limit > 100 is honored rather than silently truncated. GitHub models PRs as issues — skip
@@ -181,6 +192,7 @@ export function createGithubTransport(options: GithubTransportOptions): IssuesTr
         repo,
         state,
         ...(label !== undefined ? { labels: label } : {}),
+        ...(assignee !== undefined ? { assignee } : {}),
         per_page: 100,
       })) {
         for (const item of data) {

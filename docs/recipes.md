@@ -77,6 +77,44 @@ result. A failing primitive aborts the run with its actionable error.
 - message: "Opened PR ${pr.url}."
 ```
 
+### `require` — engine-enforced guard
+
+```yaml
+- require:
+    truthy: "${issue.branchName}"
+    message: "${issue.key} has no canonical branch — pick a child story/task/bug."
+- require:
+    notEquals: ["${issue.role}", "done"]
+    message: "${issue.key} is already done."
+```
+
+When the condition is false the run **stops** with the (interpolated) message
+(`RECIPE_REQUIRE`) — a failed guard never falls through to the mutation steps below it. The rules
+live in the engine, not in agent judgement (decision #19). Conditions (exactly one per guard):
+`truthy: <value>` / `falsy: <value>` (present vs absent/''/false/null) and
+`equals: [a, b]` / `notEquals: [a, b]` (interpolated string comparison). Deliberately not an
+expression language.
+
+### `when:` — conditional do/message steps
+
+```yaml
+- do: scm.pr.find
+  as: existingPr
+  with:
+    sourceBranch: ${branch}
+- do: scm.pr.create
+  as: pr
+  when:
+    falsy: "${existingPr}"
+  with: { title: "${title}", sourceBranch: "${branch}" }
+- message: "PR already open: ${existingPr.url}"
+  when:
+    truthy: "${existingPr}"
+```
+
+A `when:` (same condition shapes) skips the step when false — the skipped step's `as` stays unset.
+This is how `task-finish` is idempotent **in the engine**: find-then-create-or-report.
+
 ## Interpolation
 
 String values may contain `${path}` references into the run context (seeded inputs + each step's
@@ -97,7 +135,7 @@ to text.
 | `issue.comment` | `id`, `body` | the comment |
 | `issue.link` | `fromId`, `toId`, `type` | — |
 | `issue.assign` | `id`, `assignee` (provider-native handle) | the issue |
-| `issue.query` | `role?`, `typeRole?`, `limit?` | issue list |
+| `issue.query` | `role?`, `typeRole?`, `assignee?` (handle or `@me`), `limit?` | issue list |
 | `scm.branch.create` | `name`, `fromBranch?` | the branch |
 | `scm.pr.create` | `title`, `sourceBranch`, `targetBranch?`, `body?`, `draft?` | the PR |
 | `scm.pr.thread` | `pullRequestId`, `body` | the thread |
