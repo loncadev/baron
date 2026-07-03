@@ -38,9 +38,10 @@ plugins/claude-code/
 claude --plugin-dir ./plugins/claude-code
 ```
 
-The manifest launches the MCP server via `npx -y @lonca/baron-mcp-server`. Before that package is
-published, point the `mcpServers.baron` command at your local build (`pnpm build`, then
-`node packages/mcp-server/dist/bin.js`) instead.
+The manifest launches the MCP server via `npx -y @lonca/baron-mcp-server@latest` (the explicit
+`@latest` keeps `npx` from silently reusing a stale cached install). To run against a local build
+instead, point the `mcpServers.baron` command at `node packages/mcp-server/dist/bin.js` after
+`pnpm build`.
 
 > Status: scaffold. The MCP server and recipes it fronts are covered by the workspace test suite;
 > this plugin's wiring is validated by installing it into Claude Code (no automated test).

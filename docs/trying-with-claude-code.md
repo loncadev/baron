@@ -31,8 +31,9 @@ Claude Code reads a project's `.mcp.json`. Create **`BeeMaster/.mcp.json`**:
 - The server reads `BeeMaster/.baron/policy.json` and overlays `BeeMaster/.baron/credentials` (your
   PAT) onto the environment — so credentials stay in the gitignored file, not in `.mcp.json`.
 - Windows note: if Claude Code can't find `pnpm`, use `"command": "pnpm.cmd"`. Once `@lonca/baron-mcp-server`
-  is published, this becomes `"command": "npx", "args": ["-y", "@lonca/baron-mcp-server"]` with the same
-  `BARON_ROOT`.
+  is published, this becomes `"command": "npx", "args": ["-y", "@lonca/baron-mcp-server@latest"]` with the
+  same `BARON_ROOT`. The explicit `@latest` matters: a bare package name makes `npx` reuse its cached
+  install without ever re-checking the registry, silently pinning you to a stale version.
 - Restart Claude Code (or reload MCP servers) so it picks up the new server.
 
 With BeeMaster's policy (issues bound, knowledge loop always on), Claude will see:

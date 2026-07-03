@@ -76,6 +76,7 @@ been merged into skills.) Install it for local development with:
 claude --plugin-dir ./plugins/claude-code
 ```
 
-Its `.claude-plugin/plugin.json` launches the server via `npx -y @lonca/baron-mcp-server`; before that
-package is published, point the `mcpServers.baron` command at your local build instead. See
+Its `.claude-plugin/plugin.json` launches the server via `npx -y @lonca/baron-mcp-server@latest`
+(the explicit `@latest` keeps `npx` from reusing a stale cached install); to run a local build
+instead, point the `mcpServers.baron` command at it. See
 [plugins/claude-code/README.md](../plugins/claude-code/README.md).

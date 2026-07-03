@@ -73,15 +73,17 @@ Notes:
 - `@lonca/baron-mcp-server` exposes bin `baron-mcp`; `@lonca/baron-cli` exposes bin `baron`. Both target `dist/bin.js`,
   so `pnpm build` must run first.
 
-**After publishing, smoke-test the consumer path:**
+**After publishing, smoke-test the consumer path** (always with an explicit `@latest` or version —
+a bare package name makes `npx` reuse its cached install without re-checking the registry, so you'd
+be smoke-testing a stale version):
 
 ```bash
-npx -y @lonca/baron-mcp-server            # should start the MCP server (Ctrl-C to stop)
-npx -y @lonca/baron-cli --help            # should print the CLI usage
+npx -y @lonca/baron-mcp-server@latest     # should start the MCP server (Ctrl-C to stop)
+npx -y @lonca/baron-cli@latest --help     # should print the CLI usage
 ```
 
-Then update the plugin so it runs the published server (it already declares `npx -y @lonca/baron-mcp-server`
-in `plugins/claude-code/.claude-plugin/plugin.json`).
+Consumers launching via `@latest` (the plugin manifest and the documented `.mcp.json` shape do) pick
+up the new release on their next MCP restart automatically.
 
 ## Commercial tier (later)
 

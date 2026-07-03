@@ -179,8 +179,9 @@ Claude Code reads a project's `.mcp.json`. Create `<your-project>/.mcp.json`:
 - `BARON_ROOT` points the server at this project, so it reads `<your-project>/.baron/policy.json` +
   `credentials` no matter where it runs.
 - **Windows:** if Claude Code can't find `pnpm`, set `"command": "pnpm.cmd"`.
-- **Once published:** replace `command`/`args` with `"command": "npx", "args": ["-y", "@lonca/baron-mcp-server"]`
-  (keep the `BARON_ROOT` env).
+- **Once published:** replace `command`/`args` with `"command": "npx", "args": ["-y", "@lonca/baron-mcp-server@latest"]`
+  (keep the `BARON_ROOT` env). The explicit `@latest` matters — a bare name makes `npx` reuse its
+  cached install without re-checking the registry, silently pinning you to a stale version.
 - **Restart Claude Code** (or reload MCP servers) so it picks up the new server. Confirm it started:
   running `pnpm baron:mcp` (with `BARON_ROOT` set) prints `baron mcp-server running on stdio (root: …)`
   to stderr, then waits — Ctrl-C to stop.
