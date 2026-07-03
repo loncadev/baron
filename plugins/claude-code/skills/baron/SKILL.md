@@ -16,7 +16,7 @@ providers are whatever `.baron/policy.json` binds (run `baron init` first if it 
 ## Vocabulary (never use provider-native states)
 
 - Workflow roles: `backlog → ready → in_progress → in_review → done`, plus `blocked`.
-- Type roles: `initiative`, `epic`, `story`, `task`, `subtask`.
+- Type roles: `initiative`, `epic`, `story`, `task`, `bug`, `subtask`.
 - Link types: `relates`, `blocks`, `blocked_by`, `duplicates`.
 
 Baron translates these to each provider's native states/types/links and negotiates capability gaps
@@ -80,9 +80,13 @@ Dedicated skills wrap the built-ins — `/baron:task-new`, `/baron:task-start`, 
 `/baron:ship` (and `/baron:run-recipe` for anything else): each gathers the inputs and makes the
 single `baron_recipe_run` call. (`baron run --recipe <path>` runs the same recipes from the CLI.)
 
-`/baron:task-sync` is a *sweep* (not a recipe): it reconciles in-flight items against their branch's
-PR reality — the "PR merged but the card is still in progress" drift — and batch-fixes it, using
-`baron_issue_query` + `baron_scm_pr_for_branch {state:"merged"}` over the core-derived `branchName`.
+Two more skills complete the task-* family (also *not* recipes — interactive, over the primitives):
+- `/baron:task-move <id> <role>` — move an item to a role, guarding backward/reopen/block moves
+  behind a required one-line reason (posted on the item first). Roles, not vendor columns.
+- `/baron:task-list [@me|in_progress|bugs|…]` — read-only listing over `baron_issue_query`.
+- `/baron:task-sync [@me|all]` — reconcile in-flight items against their branch's PR reality (the
+  "PR merged but the card is still in progress" drift) via `baron_issue_query` +
+  `baron_scm_pr_for_branch {state:"merged"}` over the core-derived `branchName`, and batch-fix it.
 
 **Boundary rule:** recipes/tools own PROVIDER truth (work items, remote branches, PRs); the LOCAL
 working tree (git status/fetch/switch/push) is the agent's job around the call — see the per-recipe
