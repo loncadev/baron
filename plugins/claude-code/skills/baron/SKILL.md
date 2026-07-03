@@ -33,8 +33,10 @@ email, GitHub login), `baron_issue_query` (filters: `role`, `typeRole`, `assigne
 
 Scm port: `baron_scm_branch_create`, `baron_scm_pr_create`, `baron_scm_pr_thread`,
 `baron_scm_pr_status`, `baron_scm_pr_for_branch`. `branch_create`/`pr_create` default the base
-branch to the repo default when omitted. `pr_for_branch` returns the OPEN PR for a source branch
-(or null) — check it BEFORE `pr_create` so a re-run never duplicates a PR. `pr_status` returns a
+branch to the repo default when omitted. `pr_for_branch { sourceBranch, state? }` returns the most
+recent PR for a branch (with its `state`) or null: `state:"open"` (default) is the idempotency probe
+— check it BEFORE `pr_create` so a re-run never duplicates a PR; `state:"merged"` is the drift probe
+(did this branch land while its item stayed in progress?). `pr_status` returns a
 normalized `PullRequestStatus`: `state` (`open|merged|closed|unknown`), `reviewDecision`
 (`approved|changes_requested|review_required|pending|unknown`), `mergeable`, and a `checks` rollup
 (`succeeded|failed|pending|none`) — reach for it to gate "is this PR ready to merge?".
@@ -77,6 +79,10 @@ for one-off actions, and never hand-compose the primitives to emulate a recipe.
 Dedicated skills wrap the built-ins — `/baron:task-new`, `/baron:task-start`, `/baron:task-finish`,
 `/baron:ship` (and `/baron:run-recipe` for anything else): each gathers the inputs and makes the
 single `baron_recipe_run` call. (`baron run --recipe <path>` runs the same recipes from the CLI.)
+
+`/baron:task-sync` is a *sweep* (not a recipe): it reconciles in-flight items against their branch's
+PR reality — the "PR merged but the card is still in progress" drift — and batch-fixes it, using
+`baron_issue_query` + `baron_scm_pr_for_branch {state:"merged"}` over the core-derived `branchName`.
 
 **Boundary rule:** recipes/tools own PROVIDER truth (work items, remote branches, PRs); the LOCAL
 working tree (git status/fetch/switch/push) is the agent's job around the call — see the per-recipe

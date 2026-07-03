@@ -38,6 +38,8 @@ export interface PullRequest {
   readonly sourceBranch: string;
   readonly targetBranch: string;
   readonly draft: boolean;
+  /** Lifecycle state; populated by `prForBranch` (a freshly created PR is always `open`). */
+  readonly state?: PrState | undefined;
 }
 
 /** A normalized PR discussion thread reference. */
@@ -86,6 +88,8 @@ export interface NativePullRequest {
   readonly sourceBranch: string;
   readonly targetBranch: string;
   readonly draft: boolean;
+  /** Lifecycle state; set by `findPullRequestByBranch` so callers needn't a second status read. */
+  readonly state?: PrState | undefined;
 }
 
 export interface NativeThread {
@@ -101,6 +105,18 @@ export interface NativeThread {
 /** Normalized PR lifecycle state. */
 export const PR_STATES = ['open', 'merged', 'closed', 'unknown'] as const;
 export type PrState = (typeof PR_STATES)[number];
+
+/**
+ * The lifecycle filter `prForBranch` searches by. `open` (default) powers finish-flow idempotency
+ * (don't duplicate an open PR); `merged` powers drift detection (did this branch's work land while
+ * its item stayed in progress?); `all` returns the most recent PR regardless of state.
+ */
+export const PR_STATE_FILTERS = ['open', 'merged', 'closed', 'all'] as const;
+export type PrStateFilter = (typeof PR_STATE_FILTERS)[number];
+
+export function isPrStateFilter(value: string): value is PrStateFilter {
+  return (PR_STATE_FILTERS as readonly string[]).includes(value);
+}
 
 /** Normalized review decision across providers (Azure reviewer votes / GitHub review states). */
 export const REVIEW_DECISIONS = [
@@ -147,8 +163,14 @@ export interface ScmTransport {
   defaultBranch(): Promise<string>;
   /** Normalized PR status (state + review decision + mergeability + checks rollup). */
   getPullRequestStatus(pullRequestId: string): Promise<PullRequestStatus>;
-  /** The open PR whose source is `sourceBranch`, or undefined when none exists. */
-  findPullRequestByBranch(sourceBranch: string): Promise<NativePullRequest | undefined>;
+  /**
+   * The most recent PR whose source is `sourceBranch` and whose state matches `stateFilter`, or
+   * undefined when none. The transport sets the returned PR's `state`.
+   */
+  findPullRequestByBranch(
+    sourceBranch: string,
+    stateFilter: PrStateFilter,
+  ): Promise<NativePullRequest | undefined>;
 }
 
 /** The normalized primitive surface the core exposes for the `scm` port. */
@@ -160,10 +182,11 @@ export interface ScmPort {
   /** Read a PR's normalized status (scm monitoring): state, review decision, mergeability, checks. */
   prStatus(pullRequestId: string): Promise<PullRequestStatus>;
   /**
-   * The open PR for a source branch, or undefined. The idempotency primitive behind "finish" flows:
-   * check before create so re-running a workflow updates/reports instead of opening a duplicate.
+   * The most recent PR for a source branch matching `stateFilter` (default `open`), with its `state`
+   * populated; undefined when none. `open` is the finish-flow idempotency probe (don't duplicate an
+   * open PR); `merged` is the drift probe (did this branch land while its item stayed in progress?).
    */
-  prForBranch(sourceBranch: string): Promise<PullRequest | undefined>;
+  prForBranch(sourceBranch: string, stateFilter?: PrStateFilter): Promise<PullRequest | undefined>;
 }
 
 /**
@@ -220,6 +243,8 @@ export class BaseScmAdapter implements ScmPort {
       sourceBranch: native.sourceBranch,
       targetBranch: native.targetBranch,
       draft: native.draft,
+      // A freshly created PR is open by definition — surface it uniformly with prForBranch results.
+      state: 'open',
     };
   }
 
@@ -229,8 +254,11 @@ export class BaseScmAdapter implements ScmPort {
     return this.transport.getPullRequestStatus(pullRequestId);
   }
 
-  async prForBranch(sourceBranch: string): Promise<PullRequest | undefined> {
-    const native = await this.transport.findPullRequestByBranch(sourceBranch);
+  async prForBranch(
+    sourceBranch: string,
+    stateFilter: PrStateFilter = 'open',
+  ): Promise<PullRequest | undefined> {
+    const native = await this.transport.findPullRequestByBranch(sourceBranch, stateFilter);
     if (native === undefined) return undefined;
     return {
       id: native.id,
@@ -240,6 +268,7 @@ export class BaseScmAdapter implements ScmPort {
       sourceBranch: native.sourceBranch,
       targetBranch: native.targetBranch,
       draft: native.draft,
+      state: native.state,
     };
   }
 

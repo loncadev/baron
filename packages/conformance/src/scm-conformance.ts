@@ -71,7 +71,7 @@ export function runScmConformance(target: ScmConformanceTarget): void {
       expect(['succeeded', 'failed', 'pending', 'none']).toContain(status.checks.rollup);
     });
 
-    it('prForBranch finds the open PR for a source branch, undefined otherwise', async () => {
+    it('prForBranch finds the open PR (default filter) with its state, undefined otherwise', async () => {
       const { adapter } = target.build();
       // The idempotency primitive behind "finish" flows: nothing yet -> undefined.
       expect(await adapter.prForBranch('feature/nothing-here')).toBeUndefined();
@@ -83,6 +83,20 @@ export function runScmConformance(target: ScmConformanceTarget): void {
       const found = await adapter.prForBranch('feature/find-me');
       expect(found?.id).toBe(created.id);
       expect(found?.sourceBranch).toBe('feature/find-me');
+      // A just-opened PR is open — the state is populated, not left blank.
+      expect(found?.state).toBe('open');
+    });
+
+    it('prForBranch filters by lifecycle state (a fresh PR is open, not merged)', async () => {
+      const { adapter } = target.build();
+      await adapter.createPullRequest({ title: 'PR', sourceBranch: 'feature/fresh' });
+      // The drift probe: a brand-new PR has not merged, so the merged filter finds nothing.
+      expect(await adapter.prForBranch('feature/fresh', 'merged')).toBeUndefined();
+      // The open filter still finds it, and `all` returns the most recent regardless of state.
+      expect((await adapter.prForBranch('feature/fresh', 'open'))?.state).toBe('open');
+      expect((await adapter.prForBranch('feature/fresh', 'all'))?.sourceBranch).toBe(
+        'feature/fresh',
+      );
     });
 
     it('addPullRequestThread returns a thread reference', async () => {

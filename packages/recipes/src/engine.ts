@@ -7,12 +7,15 @@ import {
   type IssueQuery,
   type IssuesPort,
   type NotifyPort,
+  PR_STATE_FILTERS,
+  type PrStateFilter,
   type ScmPort,
   WORKFLOW_ROLES,
   WORK_ITEM_TYPE_ROLES,
   type WorkItemTypeRole,
   type WorkflowRole,
   isIssueLinkType,
+  isPrStateFilter,
   isWorkItemTypeRole,
   isWorkflowRole,
 } from '@lonca/baron-core';
@@ -292,8 +295,18 @@ async function dispatchOp(ports: RecipePorts, op: RecipeOp, params: Params): Pro
     case RECIPE_OPS.scmPrStatus:
       return scm(ports, op).prStatus(reqStr(params, 'pullRequestId', op));
     case RECIPE_OPS.scmPrFind: {
+      const stateFilter = optStr(params, 'state', op);
+      if (stateFilter !== undefined && !isPrStateFilter(stateFilter)) {
+        throw new BaronError(
+          `Step '${op}' 'state'='${stateFilter}' must be one of ${PR_STATE_FILTERS.join(', ')}.`,
+          ARGS,
+        );
+      }
       // Null (not undefined) for "no PR", so `as:`-bound context reads unambiguously in messages.
-      const found = await scm(ports, op).prForBranch(reqStr(params, 'sourceBranch', op));
+      const found = await scm(ports, op).prForBranch(
+        reqStr(params, 'sourceBranch', op),
+        stateFilter as PrStateFilter | undefined,
+      );
       return found ?? null;
     }
     case RECIPE_OPS.ciRunTrigger: {

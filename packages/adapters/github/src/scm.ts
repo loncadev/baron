@@ -7,6 +7,8 @@ import {
   type NativePullRequest,
   type NativePullRequestInput,
   type NativeThread,
+  type PrState,
+  type PrStateFilter,
   type PullRequestStatus,
   type ReviewDecision,
   type ScmManifest,
@@ -76,25 +78,43 @@ export function createGithubScmTransport(options: GithubTransportOptions): ScmTr
       return { id: String(data.id), url: data.html_url };
     },
 
-    async findPullRequestByBranch(sourceBranch: string): Promise<NativePullRequest | undefined> {
+    async findPullRequestByBranch(
+      sourceBranch: string,
+      stateFilter: PrStateFilter,
+    ): Promise<NativePullRequest | undefined> {
+      // GitHub has no "merged" list state — merged is a subset of `closed` (merged_at set). So for
+      // merged/closed we list closed and filter client-side; open/all map directly.
+      const listState = stateFilter === 'open' ? 'open' : stateFilter === 'all' ? 'all' : 'closed';
       // `head` must be owner-qualified or it matches nothing (GitHub treats it as a full ref filter).
       const { data } = await octokit.rest.pulls.list({
         owner,
         repo,
-        state: 'open',
+        state: listState,
         head: `${owner}:${sourceBranch}`,
-        per_page: 1,
+        sort: 'created',
+        direction: 'desc',
+        per_page: stateFilter === 'open' || stateFilter === 'all' ? 1 : 20,
       });
-      const pr = data[0];
-      if (pr === undefined) return undefined;
+      type PrItem = (typeof data)[number];
+      const isMerged = (pr: PrItem): boolean => pr.merged_at != null;
+      const prState = (pr: PrItem): PrState =>
+        isMerged(pr) ? 'merged' : pr.state === 'closed' ? 'closed' : 'open';
+      const match =
+        stateFilter === 'merged'
+          ? data.find(isMerged)
+          : stateFilter === 'closed'
+            ? data.find((pr) => pr.state === 'closed' && !isMerged(pr))
+            : data[0];
+      if (match === undefined) return undefined;
       return {
-        id: String(pr.number),
-        number: String(pr.number),
-        title: pr.title,
-        url: pr.html_url,
+        id: String(match.number),
+        number: String(match.number),
+        title: match.title,
+        url: match.html_url,
         sourceBranch,
-        targetBranch: pr.base.ref,
-        draft: pr.draft ?? false,
+        targetBranch: match.base.ref,
+        draft: match.draft ?? false,
+        state: prState(match),
       };
     },
 

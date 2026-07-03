@@ -23,7 +23,8 @@ const transport: ScmTransport = {
   async defaultBranch() {
     return 'release';
   },
-  async findPullRequestByBranch(sourceBranch: string) {
+  async findPullRequestByBranch(sourceBranch: string, stateFilter: string) {
+    // Echo the filter into the returned state so a test can assert the base passed it through.
     return sourceBranch === 'feature/existing'
       ? {
           id: 'pr-existing',
@@ -31,6 +32,7 @@ const transport: ScmTransport = {
           sourceBranch,
           targetBranch: 'release',
           draft: false,
+          state: (stateFilter === 'merged' ? 'merged' : 'open') as 'merged' | 'open',
         }
       : undefined;
   },
@@ -89,6 +91,26 @@ describe('BaseScmAdapter prStatus', () => {
     expect(status.state).toBe('open');
     expect(status.reviewDecision).toBe('approved');
     expect(status.checks.rollup).toBe('succeeded');
+  });
+});
+
+describe('BaseScmAdapter prForBranch', () => {
+  it('defaults the state filter to open and copies the transport-reported state', async () => {
+    const adapter = new BaseScmAdapter(withDraft, transport);
+    const pr = await adapter.prForBranch('feature/existing');
+    expect(pr?.id).toBe('pr-existing');
+    expect(pr?.state).toBe('open'); // default filter passed through
+  });
+
+  it('passes the explicit filter to the transport (merged -> drift probe)', async () => {
+    const adapter = new BaseScmAdapter(withDraft, transport);
+    const pr = await adapter.prForBranch('feature/existing', 'merged');
+    expect(pr?.state).toBe('merged');
+  });
+
+  it('returns undefined when the branch has no matching PR', async () => {
+    const adapter = new BaseScmAdapter(withDraft, transport);
+    expect(await adapter.prForBranch('feature/none')).toBeUndefined();
   });
 });
 

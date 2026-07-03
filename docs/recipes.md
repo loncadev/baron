@@ -140,7 +140,7 @@ to text.
 | `scm.pr.create` | `title`, `sourceBranch`, `targetBranch?`, `body?`, `draft?` | the PR |
 | `scm.pr.thread` | `pullRequestId`, `body` | the thread |
 | `scm.pr.status` | `pullRequestId` | normalized PR status (state, reviewDecision, mergeable, checks) |
-| `scm.pr.find` | `sourceBranch` | the open PR for that branch, or `null` (idempotency probe) |
+| `scm.pr.find` | `sourceBranch`, `state?` (`open` default / `merged` / `closed` / `all`) | the most recent matching PR (with `state`), or `null` |
 | `ci.run.trigger` | `pipelineId`, `ref?`, `variables?` | the triggered run |
 | `ci.run.cancel` | `runId` | the canceled run |
 | `deploy.deployments` | `environment?`, `limit?` | deployment list |

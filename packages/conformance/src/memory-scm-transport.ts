@@ -3,6 +3,8 @@ import type {
   NativePullRequest,
   NativePullRequestInput,
   NativeThread,
+  PrState,
+  PrStateFilter,
   ScmTransport,
 } from '@lonca/baron-core';
 
@@ -31,13 +33,22 @@ export function createMemoryScmTransport(): ScmTransport {
         sourceBranch: input.sourceBranch,
         targetBranch: input.targetBranch,
         draft: input.draft,
+        state: 'open',
       };
       prs.push(pr);
       return pr;
     },
 
-    async findPullRequestByBranch(sourceBranch: string): Promise<NativePullRequest | undefined> {
-      return prs.find((pr) => pr.sourceBranch === sourceBranch);
+    async findPullRequestByBranch(
+      sourceBranch: string,
+      stateFilter: PrStateFilter,
+    ): Promise<NativePullRequest | undefined> {
+      // Memory PRs are created open; a test drives merged/closed by setting `.state` on the record.
+      const forBranch = [...prs].reverse().filter((pr) => pr.sourceBranch === sourceBranch);
+      const state = (pr: NativePullRequest): PrState => pr.state ?? 'open';
+      return stateFilter === 'all'
+        ? forBranch[0]
+        : forBranch.find((pr) => state(pr) === stateFilter);
     },
 
     async addPullRequestThread(pullRequestId: string, _body: string): Promise<NativeThread> {

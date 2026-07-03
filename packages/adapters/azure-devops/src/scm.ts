@@ -7,6 +7,8 @@ import {
   type NativePullRequest,
   type NativePullRequestInput,
   type NativeThread,
+  type PrState,
+  type PrStateFilter,
   type PullRequestStatus,
   type ReviewDecision,
   type ScmManifest,
@@ -37,6 +39,28 @@ export const azureDevOpsScmManifest: ScmManifest = {
 };
 
 const ZERO_OBJECT_ID = '0000000000000000000000000000000000000000';
+
+/** Azure PR status -> normalized PrState (shared by findPullRequestByBranch + getPullRequestStatus). */
+function toPrState(status: AzurePrStatus | undefined): PrState {
+  if (status === AzurePrStatus.Completed) return 'merged';
+  if (status === AzurePrStatus.Abandoned) return 'closed';
+  if (status === AzurePrStatus.Active) return 'open';
+  return 'unknown';
+}
+
+/** Normalized state filter -> the Azure PR status to search by. `all` searches every status. */
+function toAzureStatusFilter(filter: PrStateFilter): AzurePrStatus {
+  switch (filter) {
+    case 'merged':
+      return AzurePrStatus.Completed;
+    case 'closed':
+      return AzurePrStatus.Abandoned;
+    case 'all':
+      return AzurePrStatus.All;
+    default:
+      return AzurePrStatus.Active;
+  }
+}
 
 type GitApi = Awaited<ReturnType<InstanceType<typeof azdev.WebApi>['getGitApi']>>;
 
@@ -129,13 +153,17 @@ export function createAzureDevOpsScmTransport(
       return { id: String(thread.id ?? '') };
     },
 
-    async findPullRequestByBranch(sourceBranch: string): Promise<NativePullRequest | undefined> {
+    async findPullRequestByBranch(
+      sourceBranch: string,
+      stateFilter: PrStateFilter,
+    ): Promise<NativePullRequest | undefined> {
       const git = await api();
+      // Newest first (getPullRequests returns creation-desc); take the most recent match.
       const matches = await git.getPullRequests(
         repository,
         {
           sourceRefName: `${REFS_HEADS}${sourceBranch}`,
-          status: AzurePrStatus.Active,
+          status: toAzureStatusFilter(stateFilter),
         },
         project,
         undefined,
@@ -155,20 +183,14 @@ export function createAzureDevOpsScmTransport(
         sourceBranch: stripRef(pr.sourceRefName),
         targetBranch: stripRef(pr.targetRefName),
         draft: pr.isDraft ?? false,
+        state: toPrState(pr.status),
       };
     },
 
     async getPullRequestStatus(pullRequestId: string): Promise<PullRequestStatus> {
       const git = await api();
       const pr = await git.getPullRequestById(Number(pullRequestId), project);
-      const state =
-        pr.status === AzurePrStatus.Completed
-          ? 'merged'
-          : pr.status === AzurePrStatus.Abandoned
-            ? 'closed'
-            : pr.status === AzurePrStatus.Active
-              ? 'open'
-              : 'unknown';
+      const state = toPrState(pr.status);
       // Azure reviewer votes: 10/5 approve, 0 none, -5 waiting-for-author, -10 rejected.
       const votes = (pr.reviewers ?? []).map((r) => r.vote ?? 0);
       const hasReject = votes.some((v) => v <= -10);

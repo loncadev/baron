@@ -8,6 +8,8 @@ import {
   type IssueQuery,
   type IssuesPort,
   type NotifyPort,
+  PR_STATE_FILTERS,
+  type PrStateFilter,
   RUN_STATUSES,
   type RunQuery,
   type RunStatus,
@@ -17,6 +19,7 @@ import {
   type WorkItemTypeRole,
   type WorkflowRole,
   isIssueLinkType,
+  isPrStateFilter,
   isRunStatus,
   isWorkItemTypeRole,
   isWorkflowRole,
@@ -127,6 +130,7 @@ const TYPE_ROLE_ENUM = [...WORK_ITEM_TYPE_ROLES];
 const LINK_TYPE_ENUM = [...ISSUE_LINK_TYPES];
 const FOLLOWUP_STATUS_ENUM = [...FOLLOWUP_STATUSES];
 const RUN_STATUS_ENUM = [...RUN_STATUSES];
+const PR_STATE_FILTER_ENUM = [...PR_STATE_FILTERS];
 
 /** Default cap for `baron_issue_query` so an unbounded listing can't overflow the agent's context. */
 const DEFAULT_QUERY_LIMIT = 50;
@@ -346,8 +350,9 @@ export const SCM_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   {
     name: SCM_TOOL_NAMES.prForBranch,
     description:
-      'Find the OPEN pull request whose source is the given branch (null when none). Check this ' +
-      'BEFORE opening a PR for a branch so a re-run updates/reports instead of duplicating.',
+      'Find the most recent pull request for a branch matching `state` (null when none), with its ' +
+      "normalized `state`. `open` (default) = the finish-flow idempotency probe (don't duplicate an " +
+      'open PR); `merged` = the drift probe (did this branch land while its item stayed in progress?).',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -357,6 +362,11 @@ export const SCM_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
           type: 'string',
           minLength: 1,
           description: 'Branch name (no refs/heads/).',
+        },
+        state: {
+          type: 'string',
+          enum: PR_STATE_FILTER_ENUM,
+          description: "Lifecycle to search: 'open' (default), 'merged', 'closed', or 'all'.",
         },
       },
     },
@@ -858,9 +868,19 @@ export function callScmTool(
       return run(() => port.prStatus(requireString(args, 'pullRequestId')));
     case SCM_TOOL_NAMES.prForBranch:
       return run(async () => {
+        const stateRaw = optionalString(args, 'state');
+        if (stateRaw !== undefined && !isPrStateFilter(stateRaw)) {
+          throw new BaronError(
+            `Invalid state '${stateRaw}'. Expected one of: ${PR_STATE_FILTERS.join(', ')}.`,
+            INVALID_ARGS,
+          );
+        }
         // Map "no PR" to an explicit null: run() reports undefined as {"ok":true}, which would
-        // read as success-with-a-PR; null tells the agent unambiguously "none exists yet".
-        const pr = await port.prForBranch(requireString(args, 'sourceBranch'));
+        // read as success-with-a-PR; null tells the agent unambiguously "none matches".
+        const pr = await port.prForBranch(
+          requireString(args, 'sourceBranch'),
+          stateRaw as PrStateFilter | undefined,
+        );
         return pr ?? null;
       });
     case SCM_TOOL_NAMES.prThread:

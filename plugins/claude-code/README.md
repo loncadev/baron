@@ -20,6 +20,7 @@ plugins/claude-code/
   skills/task-new/SKILL.md      # /baron:task-new    → CREATE a work item (type + parent)
   skills/task-start/SKILL.md    # /baron:task-start  → start an EXISTING item (canonical branch + in_progress)
   skills/task-finish/SKILL.md   # /baron:task-finish → push + draft PR (idempotent; role moves on merge)
+  skills/task-sync/SKILL.md     # /baron:task-sync   → sweep board↔PR drift (merged-but-stuck) + batch-fix
   skills/ship/SKILL.md          # /baron:ship        → runs the ship recipe
   skills/run-recipe/SKILL.md    # /baron:run-recipe  → runs any recipe by name (incl. project recipes)
 ```
