@@ -17,9 +17,16 @@ interface Rec {
   parentId: string | undefined;
   labels: string[];
   assignee: string | undefined;
+  iteration: string | undefined;
   url: string;
   links: Array<{ toId: string; type: string }>;
 }
+
+/** Two fixed iterations so the suite can exercise the sprint path; "Sprint 2" is current. */
+const MEMORY_ITERATIONS = [
+  { id: 'it-1', name: 'Sprint 1', path: 'Mem\\Sprint 1', current: false },
+  { id: 'it-2', name: 'Sprint 2', path: 'Mem\\Sprint 2', current: true },
+] as const;
 
 export interface MemoryTransportOptions {
   /** Which NativeTarget key carries the discriminator this provider reverses roles from. */
@@ -49,6 +56,7 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
     parentId: r.parentId,
     labels: [...r.labels],
     assignee: r.assignee,
+    iteration: r.iteration,
     url: r.url,
   });
 
@@ -72,6 +80,7 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
         parentId: input.parentId,
         labels: [...input.labels],
         assignee: undefined,
+        iteration: undefined,
         url: `mem://${id}`,
         links: [],
       };
@@ -115,6 +124,16 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
       return snapshot(rec);
     },
 
+    async listIterations() {
+      return MEMORY_ITERATIONS.map((it) => ({ ...it }));
+    },
+
+    async setIteration(id: string, iterationPath: string): Promise<NativeIssue> {
+      const rec = must(id);
+      rec.iteration = iterationPath;
+      return snapshot(rec);
+    },
+
     async queryIssues(query: NativeQuery): Promise<readonly NativeIssue[]> {
       const discriminator = query.target?.[opts.stateKey];
       const results: NativeIssue[] = [];
@@ -124,6 +143,7 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
         // '@me' resolves to a fixed fake identity so the suite can exercise the sentinel path.
         const wanted = query.assignee === '@me' ? 'me@example.com' : query.assignee;
         if (wanted !== undefined && rec.assignee !== wanted) continue;
+        if (query.iterationPath !== undefined && rec.iteration !== query.iterationPath) continue;
         results.push(snapshot(rec));
       }
       return query.limit !== undefined ? results.slice(0, query.limit) : results;

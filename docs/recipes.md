@@ -135,7 +135,9 @@ to text.
 | `issue.comment` | `id`, `body` | the comment |
 | `issue.link` | `fromId`, `toId`, `type` | — |
 | `issue.assign` | `id`, `assignee` (provider-native handle) | the issue |
-| `issue.query` | `role?`, `typeRole?`, `assignee?` (handle or `@me`), `limit?` | issue list |
+| `issue.iterations` | — | iteration list (each with a `current` flag) |
+| `issue.set-iteration` | `id`, `iteration` (path or `@current`) | the issue |
+| `issue.query` | `role?`, `typeRole?`, `assignee?` (handle or `@me`), `iteration?` (path or `@current`), `limit?` | issue list |
 | `scm.branch.create` | `name`, `fromBranch?` | the branch |
 | `scm.pr.create` | `title`, `sourceBranch`, `targetBranch?`, `body?`, `draft?` | the PR |
 | `scm.pr.thread` | `pullRequestId`, `body` | the thread |

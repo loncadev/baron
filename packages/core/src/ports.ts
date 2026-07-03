@@ -3,6 +3,7 @@ import type { CapabilityManifest } from './capabilities.js';
 import type { IssuesProviderConfig, NativeTarget } from './config.js';
 import { BaronError } from './errors.js';
 import type { Issue, IssueComment, IssueDraft, IssueQuery } from './issue.js';
+import { ITERATION_CURRENT, type Iteration } from './iteration.js';
 import type { IssueLinkType } from './links.js';
 import type { Logger } from './logger.js';
 import { silentLogger } from './logger.js';
@@ -36,6 +37,8 @@ export interface NativeIssue {
   readonly labels: readonly string[];
   /** Provider-native user handle of the assignee (Azure: email; GitHub: login), if any. */
   readonly assignee?: string | undefined;
+  /** The item's iteration/sprint path, when the provider has sprints. */
+  readonly iteration?: string | undefined;
   readonly url?: string | undefined;
 }
 
@@ -66,6 +69,8 @@ export interface NativeQuery {
   readonly nativeType?: string | undefined;
   /** Provider-native user handle, or the '@me' sentinel the transport resolves natively. */
   readonly assignee?: string | undefined;
+  /** Resolved iteration path (the '@current' sentinel is resolved to a path before this). */
+  readonly iterationPath?: string | undefined;
   readonly limit?: number | undefined;
 }
 
@@ -86,6 +91,10 @@ export interface IssuesTransport {
   queryIssues(query: NativeQuery): Promise<readonly NativeIssue[]>;
   /** Assign to a provider-native user handle. Only called when the manifest declares `assignment`. */
   assignIssue(id: string, assignee: string): Promise<NativeIssue>;
+  /** The provider's iterations/sprints. Only called when the manifest declares `sprints`. */
+  listIterations(): Promise<readonly Iteration[]>;
+  /** Move an item to an iteration by path. Only called when the manifest declares `sprints`. */
+  setIteration(id: string, iterationPath: string): Promise<NativeIssue>;
 }
 
 /** The normalized primitive surface the core exposes for the `issues` port. */
@@ -99,6 +108,12 @@ export interface IssuesPort {
   query(filter: IssueQuery): Promise<readonly Issue[]>;
   /** Assign the issue to a provider-native user handle (Azure: email; GitHub: login). */
   assign(id: string, assignee: string): Promise<Issue>;
+  /** The provider's iterations/sprints (empty when the provider has none). */
+  iterations(): Promise<readonly Iteration[]>;
+  /** The active iteration right now, or undefined (no sprint active / provider has none). */
+  currentIteration(): Promise<Iteration | undefined>;
+  /** Move the item to an iteration path, or {@link ITERATION_CURRENT} for the active sprint. */
+  setIteration(id: string, iteration: string): Promise<Issue>;
 }
 
 /**
@@ -234,6 +249,36 @@ export class BaseIssuesAdapter implements IssuesPort {
     return this.toIssue(await this.transport.assignIssue(id, assignee));
   }
 
+  async iterations(): Promise<readonly Iteration[]> {
+    if (!this.manifest.issues.sprints) {
+      resolveGap('sprints', this.manifest, this.cfg.gapPolicy, this.logger);
+      // A provider without sprints has none — 'degrade' returns empty (the gap was already warned).
+      return [];
+    }
+    return this.transport.listIterations();
+  }
+
+  async currentIteration(): Promise<Iteration | undefined> {
+    return (await this.iterations()).find((iteration) => iteration.current);
+  }
+
+  async setIteration(id: string, iteration: string): Promise<Issue> {
+    if (!this.manifest.issues.sprints) {
+      resolveGap('sprints', this.manifest, this.cfg.gapPolicy, this.logger);
+      // 'degrade' reaches here: the move is intentionally dropped (warned), return unchanged.
+      return this.get(id);
+    }
+    const path =
+      iteration === ITERATION_CURRENT ? (await this.currentIteration())?.path : iteration;
+    if (path === undefined) {
+      throw new BaronError(
+        'No active iteration to assign to — no sprint is current (set sprint dates in the provider).',
+        'NO_CURRENT_ITERATION',
+      );
+    }
+    return this.toIssue(await this.transport.setIteration(id, path));
+  }
+
   async query(filter: IssueQuery): Promise<readonly Issue[]> {
     const nativeType =
       filter.typeRole === undefined ? undefined : this.cfg.typeMap[filter.typeRole];
@@ -244,10 +289,18 @@ export class BaseIssuesAdapter implements IssuesPort {
         'TYPE_MAPPING',
       );
     }
+    // Resolve the '@current' iteration sentinel to a concrete path. When nothing is current, a
+    // "@current" filter can match nothing — return early rather than querying without the filter.
+    let iterationPath = filter.iteration;
+    if (iterationPath === ITERATION_CURRENT) {
+      iterationPath = (await this.currentIteration())?.path;
+      if (iterationPath === undefined) return [];
+    }
     const query = {
       ...(filter.role !== undefined ? { target: this.resolver.toNative(filter.role) } : {}),
       ...(nativeType !== undefined ? { nativeType } : {}),
       ...(filter.assignee !== undefined ? { assignee: filter.assignee } : {}),
+      ...(iterationPath !== undefined ? { iterationPath } : {}),
       ...(filter.limit !== undefined ? { limit: filter.limit } : {}),
     };
     const natives = await this.transport.queryIssues(query);
@@ -268,6 +321,7 @@ export class BaseIssuesAdapter implements IssuesPort {
       parentId: native.parentId,
       labels: native.labels,
       assignee: native.assignee,
+      iteration: native.iteration,
       branchName: deriveBranchName({ id: native.id, title: native.title, typeRole }),
       url: native.url,
       provider: this.cfg.provider,

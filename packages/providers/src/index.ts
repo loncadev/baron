@@ -133,6 +133,8 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
         organization: env.AZURE_DEVOPS_ORG ?? '',
         project: env.AZURE_DEVOPS_PROJECT ?? '',
         token: env.AZURE_DEVOPS_TOKEN ?? '',
+        // Iterations are team-scoped; optional, defaults to Azure's "${project} Team".
+        ...(env.AZURE_DEVOPS_TEAM ? { team: env.AZURE_DEVOPS_TEAM } : {}),
       });
     },
     createIntrospector(env) {

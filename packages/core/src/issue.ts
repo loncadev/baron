@@ -18,6 +18,8 @@ export interface Issue {
   readonly labels: readonly string[];
   /** Provider-native user handle of the assignee (Azure: email; GitHub: login), if any. */
   readonly assignee?: string | undefined;
+  /** The item's iteration/sprint path (Azure `System.IterationPath`), when the provider has sprints. */
+  readonly iteration?: string | undefined;
   /**
    * Canonical branch name for working on this item (`<prefix>/<id>-<slug>`), derived by the core
    * so every agent/recipe picks the same name. Undefined for container types (epic/initiative) and
@@ -50,6 +52,8 @@ export interface IssueQuery {
   readonly typeRole?: WorkItemTypeRole | undefined;
   /** Provider-native user handle, or {@link ASSIGNEE_ME} for the authenticated user. */
   readonly assignee?: string | undefined;
+  /** Iteration path, or {@link ITERATION_CURRENT} for the active sprint. */
+  readonly iteration?: string | undefined;
   readonly limit?: number | undefined;
 }
 

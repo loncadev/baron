@@ -20,6 +20,8 @@ A thin, read-only wrapper over `baron_issue_query` that maps everyday words to i
   "review" → `role: "in_review"`; `backlog` / "new" → `role: "backlog"`; `ready` → `role: "ready"`;
   `done` / "closed" → `role: "done"`; `blocked` → `role: "blocked"`.
 - **Type:** `bugs` → `typeRole: "bug"`; `tasks` → `task`; `stories` → `story`; `epics` → `epic`.
+- **Sprint:** `sprint` / "this sprint" / "aktif sprint" → `iteration: "@current"` (the active sprint);
+  a literal iteration path → that iteration. On providers without sprints this yields nothing.
 
 Filters are AND-combined. `baron_issue_query` returns a lightweight projection (no body); default cap
 is 50 — pass a higher `limit` only when the user asks for more.

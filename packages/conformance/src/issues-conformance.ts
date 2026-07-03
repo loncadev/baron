@@ -2,6 +2,7 @@ import {
   BRANCH_TYPE_PREFIXES,
   CapabilityGapError,
   type GapPolicy,
+  ITERATION_CURRENT,
   type IssuesPort,
   type RecordingLogger,
   RoleMappingError,
@@ -148,6 +149,34 @@ export function runIssuesConformance(target: IssuesConformanceTarget): void {
       }
       const fetched = await adapter.get(issue.id);
       expect(fetched.branchName).toBe(issue.branchName);
+    });
+
+    describe('iteration/sprint handling per manifest + policy', () => {
+      it('lists + assigns + queries iterations natively, or negotiates the gap', async () => {
+        const probe = target.build({});
+        if (probe.adapter.manifest.issues.sprints) {
+          const iterations = await probe.adapter.iterations();
+          expect(iterations.length).toBeGreaterThan(0);
+          const current = await probe.adapter.currentIteration();
+          expect(current?.current).toBe(true);
+
+          const issue = await probe.adapter.create({ title: 'sprintable', typeRole: 'task' });
+          // '@current' resolves to the active iteration's path in the core.
+          const moved = await probe.adapter.setIteration(issue.id, ITERATION_CURRENT);
+          expect(moved.iteration).toBe(current?.path);
+
+          const inSprint = await probe.adapter.query({ iteration: current?.path });
+          expect(inSprint.some((i) => i.id === issue.id)).toBe(true);
+          return;
+        }
+
+        // No sprints: strict errors loudly; degrade returns empty / unchanged, never silent.
+        await expect(probe.adapter.iterations()).rejects.toBeInstanceOf(CapabilityGapError);
+        const soft = target.build({ sprints: { kind: 'degrade' } });
+        expect(await soft.adapter.iterations()).toEqual([]);
+        expect(await soft.adapter.currentIteration()).toBeUndefined();
+        expect(soft.logger.entries.some((e) => e.level === 'warn')).toBe(true);
+      });
     });
 
     describe('assignment handling per manifest + policy', () => {

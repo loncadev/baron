@@ -178,6 +178,9 @@ Claude Code reads a project's `.mcp.json`. Create `<your-project>/.mcp.json`:
 
 - `BARON_ROOT` points the server at this project, so it reads `<your-project>/.baron/policy.json` +
   `credentials` no matter where it runs.
+- **Sprints (optional):** iterations are team-scoped. Baron defaults to Azure's `"<project> Team"`;
+  if your sprints live under a differently-named team, add `AZURE_DEVOPS_TEAM=<team name>` to
+  `.baron/credentials`.
 - **Windows:** if Claude Code can't find `pnpm`, set `"command": "pnpm.cmd"`.
 - **Once published:** replace `command`/`args` with `"command": "npx", "args": ["-y", "@lonca/baron-mcp-server@latest"]`
   (keep the `BARON_ROOT` env). The explicit `@latest` matters — a bare name makes `npx` reuse its

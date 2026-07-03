@@ -58,6 +58,8 @@ export const MCP_TOOL_NAMES = {
   comment: 'baron_issue_comment',
   link: 'baron_issue_link',
   assign: 'baron_issue_assign',
+  iterations: 'baron_issue_iterations',
+  setIteration: 'baron_issue_set_iteration',
   query: 'baron_issue_query',
 } as const;
 
@@ -251,6 +253,32 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
     },
   },
   {
+    name: MCP_TOOL_NAMES.iterations,
+    description:
+      "List the provider's iterations/sprints (each with a `current` flag). Empty when the provider " +
+      'has no sprints. Use it to find the active sprint or a target for set_iteration.',
+    inputSchema: { type: 'object', additionalProperties: false, properties: {} },
+  },
+  {
+    name: MCP_TOOL_NAMES.setIteration,
+    description:
+      "Move a work item to an iteration/sprint by path, or '@current' for the active sprint. " +
+      'Providers without sprints negotiate the gap per policy.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['id', 'iteration'],
+      properties: {
+        id: { type: 'string', minLength: 1 },
+        iteration: {
+          type: 'string',
+          minLength: 1,
+          description: "Iteration path (from iterations) or '@current' for the active sprint.",
+        },
+      },
+    },
+  },
+  {
     name: MCP_TOOL_NAMES.query,
     description:
       'List issues filtered by workflow role and/or type role (filters are AND-combined). Returns a ' +
@@ -267,6 +295,11 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
           description:
             "Filter by assignee: a provider-native handle (Azure: email; GitHub: login) or '@me' " +
             'for the authenticated user.',
+        },
+        iteration: {
+          type: 'string',
+          minLength: 1,
+          description: "Filter by iteration path, or '@current' for the active sprint.",
         },
         limit: {
           type: 'number',
@@ -720,12 +753,14 @@ function toQuery(args: Record<string, unknown> | undefined): IssueQuery {
     throw new BaronError("Argument 'limit' must be a positive number.", INVALID_ARGS);
   }
   const assignee = optionalString(args, 'assignee');
+  const iteration = optionalString(args, 'iteration');
   // Default the cap so an unbounded query (e.g. an early-project backlog spanning hundreds of items)
   // can't overflow the agent's context. The default is documented in the tool schema, not silent.
   return {
     ...(roleRaw !== undefined ? { role: roleRaw as WorkflowRole } : {}),
     ...(typeRoleRaw !== undefined ? { typeRole: typeRoleRaw as WorkItemTypeRole } : {}),
     ...(assignee !== undefined ? { assignee } : {}),
+    ...(iteration !== undefined ? { iteration } : {}),
     limit: limit !== undefined ? (limit as number) : DEFAULT_QUERY_LIMIT,
   };
 }
@@ -815,6 +850,12 @@ export function callTool(
       );
     case MCP_TOOL_NAMES.assign:
       return run(() => port.assign(requireString(args, 'id'), requireString(args, 'assignee')));
+    case MCP_TOOL_NAMES.iterations:
+      return run(() => port.iterations());
+    case MCP_TOOL_NAMES.setIteration:
+      return run(() =>
+        port.setIteration(requireString(args, 'id'), requireString(args, 'iteration')),
+      );
     case MCP_TOOL_NAMES.query:
       return run(() => port.query(toQuery(args)));
     default:

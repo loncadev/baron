@@ -249,6 +249,13 @@ async function dispatchOp(ports: RecipePorts, op: RecipeOp, params: Params): Pro
       return issues(ports, op).comment(reqStr(params, 'id', op), reqStr(params, 'body', op));
     case RECIPE_OPS.issueAssign:
       return issues(ports, op).assign(reqStr(params, 'id', op), reqStr(params, 'assignee', op));
+    case RECIPE_OPS.issueIterations:
+      return issues(ports, op).iterations();
+    case RECIPE_OPS.issueSetIteration:
+      return issues(ports, op).setIteration(
+        reqStr(params, 'id', op),
+        reqStr(params, 'iteration', op),
+      );
     case RECIPE_OPS.issueLink:
       return issues(ports, op).link(
         reqStr(params, 'fromId', op),
@@ -258,12 +265,14 @@ async function dispatchOp(ports: RecipePorts, op: RecipeOp, params: Params): Pro
     case RECIPE_OPS.issueQuery: {
       const limit = optNum(params, 'limit', op);
       const assignee = optStr(params, 'assignee', op);
+      const iteration = optStr(params, 'iteration', op);
       const query: IssueQuery = {
         ...(optStr(params, 'role', op) !== undefined ? { role: reqRole(params, 'role', op) } : {}),
         ...(optStr(params, 'typeRole', op) !== undefined
           ? { typeRole: reqTypeRole(params, 'typeRole', op) }
           : {}),
         ...(assignee !== undefined ? { assignee } : {}),
+        ...(iteration !== undefined ? { iteration } : {}),
         ...(limit !== undefined ? { limit } : {}),
       };
       return issues(ports, op).query(query);

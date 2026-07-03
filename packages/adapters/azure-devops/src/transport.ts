@@ -1,6 +1,7 @@
 import {
   ASSIGNEE_ME,
   type IssuesTransport,
+  type Iteration,
   type NativeComment,
   type NativeCreateInput,
   type NativeIssue,
@@ -20,6 +21,8 @@ export interface AzureDevOpsTransportOptions {
   readonly project: string;
   /** Personal access token. Read from env / secret-manager by the caller; never committed. */
   readonly token: string;
+  /** Team whose iterations/sprints are read. Defaults to Azure's `${project} Team` default team. */
+  readonly team?: string | undefined;
 }
 
 /** Work-item field reference names this transport reads/writes (provider-native, not role concepts). */
@@ -32,6 +35,7 @@ const FIELD = {
   TYPE: 'System.WorkItemType',
   TAGS: 'System.Tags',
   ASSIGNED_TO: 'System.AssignedTo',
+  ITERATION_PATH: 'System.IterationPath',
 } as const;
 
 /**
@@ -45,6 +49,7 @@ const QUERY_FIELDS: readonly string[] = [
   FIELD.TYPE,
   FIELD.TAGS,
   FIELD.ASSIGNED_TO,
+  FIELD.ITERATION_PATH,
 ];
 
 /** The relation that points to the PARENT in Azure's native hierarchy. */
@@ -62,6 +67,7 @@ const KANBAN_COLUMN_SUFFIX = '_Kanban.Column';
 const GET_WORK_ITEMS_BATCH = 200;
 
 type WitApi = Awaited<ReturnType<InstanceType<typeof azdev.WebApi>['getWorkItemTrackingApi']>>;
+type WorkApi = Awaited<ReturnType<InstanceType<typeof azdev.WebApi>['getWorkApi']>>;
 
 function fieldPath(refName: string): string {
   return `/fields/${refName}`;
@@ -82,6 +88,7 @@ export function buildWorkItemsWiql(
   state?: string,
   nativeType?: string,
   assignee?: string,
+  iterationPath?: string,
 ): string {
   const clauses = [`[${FIELD.TEAM_PROJECT}] = '${escapeWiql(project)}'`];
   if (state !== undefined) clauses.push(`[${FIELD.STATE}] = '${escapeWiql(state)}'`);
@@ -93,6 +100,10 @@ export function buildWorkItemsWiql(
         ? `[${FIELD.ASSIGNED_TO}] = @Me`
         : `[${FIELD.ASSIGNED_TO}] = '${escapeWiql(assignee)}'`,
     );
+  }
+  if (iterationPath !== undefined) {
+    // UNDER matches the iteration and any child iterations (a leaf sprint matches exactly).
+    clauses.push(`[${FIELD.ITERATION_PATH}] UNDER '${escapeWiql(iterationPath)}'`);
   }
   return `SELECT [${FIELD.ID}] FROM WorkItems WHERE ${clauses.join(' AND ')}`;
 }
@@ -119,15 +130,20 @@ function parseTags(raw: unknown): string[] {
  */
 export function createAzureDevOpsTransport(options: AzureDevOpsTransportOptions): IssuesTransport {
   const { organization, project, token } = options;
+  // Azure names the default team "{Project} Team"; iterations are team-scoped, so default to it.
+  const team = options.team ?? `${project} Team`;
   const orgUrl = `https://dev.azure.com/${organization}`;
+  const webApi = new azdev.WebApi(orgUrl, azdev.getPersonalAccessTokenHandler(token));
 
   let witApi: Promise<WitApi> | undefined;
   const api = (): Promise<WitApi> => {
-    witApi ??= new azdev.WebApi(
-      orgUrl,
-      azdev.getPersonalAccessTokenHandler(token),
-    ).getWorkItemTrackingApi();
+    witApi ??= webApi.getWorkItemTrackingApi();
     return witApi;
+  };
+  let workApi: Promise<WorkApi> | undefined;
+  const work = (): Promise<WorkApi> => {
+    workApi ??= webApi.getWorkApi();
+    return workApi;
   };
 
   const toNative = (item: WorkItem, discriminator?: string): NativeIssue => {
@@ -140,6 +156,7 @@ export function createAzureDevOpsTransport(options: AzureDevOpsTransportOptions)
       | { uniqueName?: string; displayName?: string }
       | undefined;
     const assignee = assignedTo?.uniqueName ?? assignedTo?.displayName;
+    const iterationPath = fields[FIELD.ITERATION_PATH];
     return {
       id: String(item.id ?? ''),
       key: `AB#${item.id ?? ''}`,
@@ -150,6 +167,8 @@ export function createAzureDevOpsTransport(options: AzureDevOpsTransportOptions)
       parentId: parseTrailingId(parent?.url),
       labels: parseTags(fields[FIELD.TAGS]),
       assignee: assignee !== undefined && assignee.length > 0 ? assignee : undefined,
+      iteration:
+        typeof iterationPath === 'string' && iterationPath.length > 0 ? iterationPath : undefined,
       url: item.url ?? undefined,
     };
   };
@@ -257,6 +276,40 @@ export function createAzureDevOpsTransport(options: AzureDevOpsTransportOptions)
       return toNative(updated);
     },
 
+    async listIterations(): Promise<readonly Iteration[]> {
+      const workApi = await work();
+      const iterations = await workApi.getTeamIterations({ project, team });
+      const now = Date.now();
+      return (iterations ?? []).map((it): Iteration => {
+        const start = it.attributes?.startDate;
+        const finish = it.attributes?.finishDate;
+        // Current = within [start, finish] by date. Undated iterations are never "current" — mirrors
+        // Azure's own "no active sprint until dates are set" behaviour (the reference's warn case).
+        const current =
+          start != null && finish != null && start.getTime() <= now && now <= finish.getTime();
+        return {
+          id: String(it.id ?? it.path ?? ''),
+          name: it.name ?? '',
+          // System.IterationPath is backslash-separated; getTeamIterations returns a forward-slash
+          // node path — normalize so setIteration's value round-trips as a valid IterationPath.
+          path: (it.path ?? it.name ?? '').replace(/\//g, '\\'),
+          ...(start != null ? { startDate: start.toISOString() } : {}),
+          ...(finish != null ? { finishDate: finish.toISOString() } : {}),
+          current,
+        };
+      });
+    },
+
+    async setIteration(id: string, iterationPath: string): Promise<NativeIssue> {
+      const witApi = await api();
+      const updated = await witApi.updateWorkItem(
+        null,
+        [{ op: Operation.Add, path: fieldPath(FIELD.ITERATION_PATH), value: iterationPath }],
+        Number(id),
+      );
+      return toNative(updated);
+    },
+
     async linkIssues(fromId: string, toId: string, nativeLinkType: string): Promise<void> {
       const witApi = await api();
       await witApi.updateWorkItem(
@@ -279,6 +332,7 @@ export function createAzureDevOpsTransport(options: AzureDevOpsTransportOptions)
         query.target?.[TARGET.STATE],
         query.nativeType,
         query.assignee,
+        query.iterationPath,
       );
 
       const result = await witApi.queryByWiql({ query: wiql }, { project }, undefined, query.limit);

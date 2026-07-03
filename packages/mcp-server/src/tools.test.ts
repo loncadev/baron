@@ -305,7 +305,7 @@ function parse(text: string): Record<string, unknown> {
 }
 
 describe('TOOL_DEFINITIONS', () => {
-  it('exposes the seven implemented issue primitives', () => {
+  it('exposes the implemented issue primitives', () => {
     expect(TOOL_DEFINITIONS.map((t) => t.name)).toEqual([
       MCP_TOOL_NAMES.create,
       MCP_TOOL_NAMES.get,
@@ -313,6 +313,8 @@ describe('TOOL_DEFINITIONS', () => {
       MCP_TOOL_NAMES.comment,
       MCP_TOOL_NAMES.link,
       MCP_TOOL_NAMES.assign,
+      MCP_TOOL_NAMES.iterations,
+      MCP_TOOL_NAMES.setIteration,
       MCP_TOOL_NAMES.query,
     ]);
   });
@@ -565,6 +567,35 @@ describe('baron_issue_assign', () => {
 
   it('rejects a missing assignee as INVALID_ARGS', async () => {
     const result = await callTool(githubPort(), MCP_TOOL_NAMES.assign, { id: '1' });
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent?.code).toBe('INVALID_ARGS');
+  });
+});
+
+describe('iteration tools', () => {
+  const port = {
+    iterations: async () => [{ id: 'i2', name: 'Sprint 2', path: 'P\\Sprint 2', current: true }],
+    setIteration: async (id: string, iteration: string) => ({ id, iteration, key: `#${id}` }),
+  } as unknown as IssuesPort;
+
+  it('lists iterations with a current flag', async () => {
+    const result = await callTool(port, MCP_TOOL_NAMES.iterations, {});
+    expect(result.isError).toBeUndefined();
+    const iterations = JSON.parse(result.content[0]?.text ?? '[]') as Array<{ current: boolean }>;
+    expect(iterations.some((i) => i.current)).toBe(true);
+  });
+
+  it('sets an iteration (marshals id + iteration, incl. @current)', async () => {
+    const result = await callTool(port, MCP_TOOL_NAMES.setIteration, {
+      id: '5',
+      iteration: '@current',
+    });
+    expect(result.isError).toBeUndefined();
+    expect(parse(result.content[0]?.text ?? '{}').iteration).toBe('@current');
+  });
+
+  it('rejects set_iteration without an iteration as INVALID_ARGS', async () => {
+    const result = await callTool(port, MCP_TOOL_NAMES.setIteration, { id: '5' });
     expect(result.isError).toBe(true);
     expect(result.structuredContent?.code).toBe('INVALID_ARGS');
   });

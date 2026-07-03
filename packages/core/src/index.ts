@@ -11,6 +11,7 @@ export * from './introspection.js';
 export * from './proposal.js';
 export * from './role-resolver.js';
 export * from './issue.js';
+export * from './iteration.js';
 export * from './ports.js';
 export * from './scm.js';
 export * from './ci.js';

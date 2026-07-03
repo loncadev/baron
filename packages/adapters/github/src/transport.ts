@@ -168,6 +168,22 @@ export function createGithubTransport(options: GithubTransportOptions): IssuesTr
       );
     },
 
+    async listIterations(): Promise<never> {
+      // Unreachable: githubManifest.issues.sprints is false, so the core negotiates the gap (the
+      // issues port returns [] / degrades) and never calls this. GitHub issues have no sprints.
+      throw new BaronError(
+        'GitHub issues have no native iterations/sprints; handled by the gap policy, not the transport.',
+        'NOT_SUPPORTED',
+      );
+    },
+
+    async setIteration(): Promise<never> {
+      throw new BaronError(
+        'GitHub issues have no native iterations/sprints; handled by the gap policy, not the transport.',
+        'NOT_SUPPORTED',
+      );
+    },
+
     async queryIssues(query: NativeQuery): Promise<readonly NativeIssue[]> {
       const stateValue = query.target?.[TARGET.STATE];
       const label = query.target?.[TARGET.LABEL];

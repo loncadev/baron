@@ -36,6 +36,11 @@ inputs, the local git, and the briefing.
 5. **Assign if unassigned** (optional but recommended): if the returned issue has no `assignee`,
    call `baron_issue_assign` with the user's provider handle (Azure: email; GitHub: login) — derive
    it from `git config user.email` or ask.
+6. **Pull into the active sprint if needed** (sprint providers only): compare the item's `iteration`
+   with the active sprint. If it's in a *past* iteration or has none while a sprint is active
+   (`baron_issue_iterations` → the one with `current: true`), ask whether to pull it in, and on yes
+   call `baron_issue_set_iteration { id, iteration: "@current" }`. If no sprint is current, skip
+   silently. (This is the "scope creep" checkpoint — the user opts in by pulling mid-sprint.)
 6. **Brief the user**: key, title, old→new role, branch, url — then proceed with the implementation
    the user asked for.
 
