@@ -32,8 +32,9 @@ function githubScmPort(): ScmPort {
 }
 
 /** Drive the server through the real MCP protocol over a linked in-memory transport pair. */
-async function connectClient(ports: McpPorts): Promise<Client> {
-  const server = createMcpServer(ports);
+async function connectClient(ports: McpPorts, notice?: string): Promise<Client> {
+  // A fixed updateNotice keeps the suite network-free (the default checker calls the npm registry).
+  const server = createMcpServer(ports, { updateNotice: () => notice });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);
   const client = new Client({ name: 'baron-test-client', version: '0.0.0' }, { capabilities: {} });
@@ -85,6 +86,18 @@ describe('createMcpServer (end-to-end over the MCP protocol)', () => {
     expect(names).toContain(SCM_TOOL_NAMES.branchCreate);
     expect(names).toContain(SCM_TOOL_NAMES.prCreate);
     expect(names).toContain(SCM_TOOL_NAMES.prThread);
+  });
+
+  it('appends an outdated notice as a separate content block over the real protocol', async () => {
+    const client = await connectClient({ issues: githubPort() }, '⚠️ baron outdated');
+    const result = (await client.callTool({
+      name: MCP_TOOL_NAMES.create,
+      arguments: { title: 'x', typeRole: 'task' },
+    })) as ToolCallResult;
+    expect(result.content).toHaveLength(2);
+    // First block stays parseable JSON; the notice rides its own block.
+    expect(JSON.parse(result.content?.[0]?.text ?? '').title).toBe('x');
+    expect(result.content?.[1]?.text).toBe('⚠️ baron outdated');
   });
 
   it('creates an issue through a tool call (result shape passes SDK validation)', async () => {

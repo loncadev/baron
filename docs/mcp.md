@@ -54,6 +54,16 @@ policy.
 Tool inputs are plain JSON Schema; the `role` / `typeRole` / link-type / status fields are enums
 sourced from the core's abstract vocabulary, so they never expose provider-native states.
 
+## Update notice
+
+At startup the server checks the npm registry (once, in the background, 4s timeout) for a newer
+`@lonca/baron-mcp-server`. When one exists, every successful tool result carries an extra content
+block: `⚠️ @lonca/baron-mcp-server v0.3.0 outdated → v0.4.0 available. Restart the baron MCP
+server…` — the first block stays untouched parseable JSON, and error results are never decorated.
+An `@latest` npx launcher picks the new version up on the next restart. Offline/air-gapped
+installs stay silent (a failed check is never an error); set `BARON_NO_UPDATE_CHECK=1` to disable
+the check entirely.
+
 ## Errors: `isError`, not a thrown protocol error
 
 A primitive that hits a capability gap or bad input returns an **`isError` tool result** whose text
