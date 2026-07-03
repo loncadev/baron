@@ -29,7 +29,9 @@ Issues port: `baron_issue_create`, `baron_issue_get`, `baron_issue_transition`,
 email, GitHub login), `baron_issue_iterations` + `baron_issue_set_iteration` (sprints — each
 iteration has a `current` flag; move by path or `@current`; providers without sprints negotiate the
 gap), `baron_issue_query` (filters: `role`, `typeRole`, `assignee` — a handle or `@me`; `iteration`
-— a path or `@current` for the active sprint). Every returned issue carries `branchName` — the
+— a path or `@current` for the active sprint). Note: on GitHub, an `@me`/assignee filter is
+*eventually consistent* — a just-assigned item can take a few seconds to appear (Azure's `@me` is
+immediate); don't conclude "not assigned" from a query run right after an assign. Every returned issue carries `branchName` — the
 canonical `<prefix>/<id>-<slug>` branch derived by the core; use it verbatim, never invent branch
 names (unset for epics/initiatives = don't branch on those) — plus its current `iteration` path when
 the provider has sprints.
