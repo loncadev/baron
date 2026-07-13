@@ -15,7 +15,7 @@ import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const VERSION = '0.8.0';
+const VERSION = '0.9.0';
 const REPO = 'https://github.com/loncadev/baron';
 const BASE_KEYWORDS = ['baron', 'ai-agents', 'mcp', 'work-orchestration', 'devops'];
 
