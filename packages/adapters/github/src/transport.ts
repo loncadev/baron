@@ -15,6 +15,11 @@ export interface GithubTransportOptions {
   readonly repo: string;
   /** Fine-grained PAT or token. Read from env / secret-manager by the caller; never committed. */
   readonly token: string;
+  /**
+   * Integration branch to fork from and target PRs at when omitted; defaults to the repo default
+   * branch. Only the scm transport reads it (the issues transport ignores it).
+   */
+  readonly baseBranch?: string | undefined;
 }
 
 /** GitHub's binary issue states. */

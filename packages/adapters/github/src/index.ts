@@ -50,6 +50,7 @@ export const exampleGithubTypeMap: TypeMap = {
   story: 'issue',
   task: 'issue',
   subtask: 'issue',
+  bug: 'issue',
 };
 
 /** GitHub has no native typed links; links are emulated/degraded per the gap policy, so this is empty. */

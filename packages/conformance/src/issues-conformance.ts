@@ -54,6 +54,18 @@ export function runIssuesConformance(target: IssuesConformanceTarget): void {
       expect(issue.typeRole).toBeDefined();
     });
 
+    it('create preserves the body for a bug (body must not be dropped for any type role)', async () => {
+      // A bug carries repro steps as its body; some providers route that to a type-specific native
+      // field (Azure -> ReproSteps). Whatever the routing, the body must survive create for a bug
+      // exactly as for a task — a dropped bug body would be a silent gap (invariant #5).
+      const { adapter } = target.build({});
+      const repro = '1. do X\n2. observe Y\nExpected: Z';
+      const bug = await adapter.create({ title: 'boom', typeRole: 'bug', body: repro });
+      expect(bug.typeRole).toBeDefined();
+      const reloaded = await adapter.get(bug.id);
+      expect(reloaded.body).toBe(repro);
+    });
+
     it('transition to a mapped role resolves that role back', async () => {
       const { adapter } = target.build(emulateStates);
       const issue = await adapter.create({ title: 'x', typeRole: 'task' });

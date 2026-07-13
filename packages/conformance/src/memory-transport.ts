@@ -13,6 +13,8 @@ interface Rec {
   title: string;
   body: string | undefined;
   nativeType: string;
+  /** The abstract type role the adapter forwarded (bugs route their body to a native field). */
+  typeRole: string;
   discriminator: string;
   parentId: string | undefined;
   labels: string[];
@@ -76,6 +78,7 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
         title: input.title,
         body: input.body,
         nativeType: input.nativeType,
+        typeRole: input.typeRole,
         discriminator: opts.defaultDiscriminator,
         parentId: input.parentId,
         labels: [...input.labels],

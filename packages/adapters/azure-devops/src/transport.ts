@@ -36,6 +36,7 @@ const FIELD = {
   TAGS: 'System.Tags',
   ASSIGNED_TO: 'System.AssignedTo',
   ITERATION_PATH: 'System.IterationPath',
+  REPRO_STEPS: 'Microsoft.VSTS.TCM.ReproSteps',
 } as const;
 
 /**
@@ -135,6 +136,10 @@ export function createAzureDevOpsTransport(options: AzureDevOpsTransportOptions)
   const orgUrl = `https://dev.azure.com/${organization}`;
   const webApi = new azdev.WebApi(orgUrl, azdev.getPersonalAccessTokenHandler(token));
 
+  // A clickable Boards URL (the item's own `url` field is the REST API endpoint, not a web page).
+  const workItemWebUrl = (id: string): string =>
+    `${orgUrl}/${encodeURIComponent(project)}/_workitems/edit/${id}`;
+
   let witApi: Promise<WitApi> | undefined;
   const api = (): Promise<WitApi> => {
     witApi ??= webApi.getWorkItemTrackingApi();
@@ -150,7 +155,8 @@ export function createAzureDevOpsTransport(options: AzureDevOpsTransportOptions)
     const fields = item.fields ?? {};
     const parent = item.relations?.find((relation) => relation.rel === PARENT_REL);
     const state = String(fields[FIELD.STATE] ?? '');
-    const description = fields[FIELD.DESCRIPTION];
+    // Bugs carry their body in ReproSteps, other types in Description — surface whichever is present.
+    const description = fields[FIELD.DESCRIPTION] ?? fields[FIELD.REPRO_STEPS];
     // AssignedTo is an IdentityRef object on reads; the stable, writable handle is uniqueName (email).
     const assignedTo = fields[FIELD.ASSIGNED_TO] as
       | { uniqueName?: string; displayName?: string }
@@ -169,7 +175,7 @@ export function createAzureDevOpsTransport(options: AzureDevOpsTransportOptions)
       assignee: assignee !== undefined && assignee.length > 0 ? assignee : undefined,
       iteration:
         typeof iterationPath === 'string' && iterationPath.length > 0 ? iterationPath : undefined,
-      url: item.url ?? undefined,
+      url: item.id != null ? workItemWebUrl(String(item.id)) : (item.url ?? undefined),
     };
   };
 
@@ -183,7 +189,10 @@ export function createAzureDevOpsTransport(options: AzureDevOpsTransportOptions)
         { op: Operation.Add, path: fieldPath(FIELD.TITLE), value: input.title },
       ];
       if (input.body !== undefined) {
-        ops.push({ op: Operation.Add, path: fieldPath(FIELD.DESCRIPTION), value: input.body });
+        // A Bug's primary body field is ReproSteps (what the triage/QA view shows), not Description —
+        // route the abstract body there for the bug type role so repro steps land where Azure expects.
+        const bodyField = input.typeRole === 'bug' ? FIELD.REPRO_STEPS : FIELD.DESCRIPTION;
+        ops.push({ op: Operation.Add, path: fieldPath(bodyField), value: input.body });
       }
       if (input.labels.length > 0) {
         // System.Tags is the inverse of parseTags on read; without this, labels (and any emulated

@@ -31,7 +31,7 @@ export const githubScmManifest: ScmManifest = {
  * thread would need a diff location, which the abstract primitive does not carry).
  */
 export function createGithubScmTransport(options: GithubTransportOptions): ScmTransport {
-  const { owner, repo, token } = options;
+  const { owner, repo, token, baseBranch } = options;
   const octokit = new Octokit({ auth: token });
 
   return {
@@ -119,6 +119,8 @@ export function createGithubScmTransport(options: GithubTransportOptions): ScmTr
     },
 
     async defaultBranch(): Promise<string> {
+      // A configured integration branch wins over the repo default (branch from + PR to it).
+      if (baseBranch !== undefined && baseBranch.length > 0) return baseBranch;
       const { data } = await octokit.rest.repos.get({ owner, repo });
       return data.default_branch;
     },

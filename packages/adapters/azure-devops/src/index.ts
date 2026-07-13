@@ -50,6 +50,7 @@ export const exampleAzureDevOpsTypeMap: TypeMap = {
   story: 'Product Backlog Item',
   task: 'Task',
   subtask: 'Task',
+  bug: 'Bug',
 };
 
 /** Abstract link types onto Azure's fixed native link reference names. */

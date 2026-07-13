@@ -46,6 +46,8 @@ export interface NativeCreateInput {
   readonly title: string;
   readonly body?: string | undefined;
   readonly nativeType: string;
+  /** The abstract type role, so an adapter can route to a type-specific native field (Bug repro). */
+  readonly typeRole: WorkItemTypeRole;
   readonly parentId?: string | undefined;
   readonly labels: readonly string[];
 }
@@ -169,6 +171,7 @@ export class BaseIssuesAdapter implements IssuesPort {
       title: draft.title,
       body: draft.body,
       nativeType,
+      typeRole: draft.typeRole,
       parentId: nativeParentId,
       labels,
     });

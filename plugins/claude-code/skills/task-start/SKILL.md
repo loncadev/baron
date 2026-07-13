@@ -41,11 +41,18 @@ inputs, the local git, and the briefing.
    (`baron_issue_iterations` → the one with `current: true`), ask whether to pull it in, and on yes
    call `baron_issue_set_iteration { id, iteration: "@current" }`. If no sprint is current, skip
    silently. (This is the "scope creep" checkpoint — the user opts in by pulling mid-sprint.)
-6. **Brief the user**: key, title, old→new role, branch, url — then proceed with the implementation
-   the user asked for.
+7. **Brief, then get to work — do not pause for permission.** Print a one-line briefing (key, title,
+   old→new role, branch, url) and immediately continue into the implementation the user asked for.
+   "Start task X" means *start it* — the branch is cut and the card is `in_progress`, so begin the
+   actual work. Only stop if a real blocker forces a decision (see below); otherwise a "shall I
+   continue?" prompt here is exactly the friction to avoid.
 
 ## Rules
 
+- **Auto-proceed after starting.** Once the recipe succeeds and the checkout is on the branch, keep
+  going into the work without a confirmation turn. Pause only when something genuinely needs the
+  user: a dirty tree (step 2), a missing/ambiguous id, a `RECIPE_*`/`ROLE_MAPPING`/branch error, or
+  a real implementation fork you can't resolve. "Nothing to decide" ⇒ don't ask, just work.
 - Call `baron_recipe_run` **once**. Do NOT hand-compose `baron_issue_get`/`baron_scm_branch_create`.
 - A failure carrying `RECIPE_INPUT_MISSING` / `ROLE_MAPPING` / branch-name errors: surface the code
   and stop. In particular, an epic/initiative has **no branch name by design** — ask the user for a

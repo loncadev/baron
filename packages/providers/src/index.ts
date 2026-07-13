@@ -157,6 +157,9 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
         project: env.AZURE_DEVOPS_PROJECT ?? '',
         repository: env.AZURE_DEVOPS_REPO ?? '',
         token: env.AZURE_DEVOPS_TOKEN ?? '',
+        ...(env.AZURE_DEVOPS_BASE_BRANCH !== undefined
+          ? { baseBranch: env.AZURE_DEVOPS_BASE_BRANCH }
+          : {}),
       });
     },
     ciManifest: azureDevOpsCiManifest,
@@ -210,6 +213,7 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
         owner: env.GITHUB_OWNER ?? '',
         repo: env.GITHUB_REPO ?? '',
         token: env.GITHUB_TOKEN ?? '',
+        ...(env.GITHUB_BASE_BRANCH !== undefined ? { baseBranch: env.GITHUB_BASE_BRANCH } : {}),
       });
     },
     ciManifest: githubCiManifest,

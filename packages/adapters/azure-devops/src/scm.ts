@@ -30,6 +30,12 @@ export interface AzureDevOpsScmTransportOptions {
   readonly repository: string;
   /** Personal access token. Read from env / secret-manager by the caller; never committed. */
   readonly token: string;
+  /**
+   * Integration branch to fork from and target PRs at when a recipe omits the branch. Many teams
+   * merge into `dev` while the repo default is `release`/`main`, so this is configurable; defaults
+   * to the repository's default branch when unset.
+   */
+  readonly baseBranch?: string | undefined;
 }
 
 /** Azure Repos supports draft PRs and first-class PR comment threads. */
@@ -72,7 +78,7 @@ type GitApi = Awaited<ReturnType<InstanceType<typeof azdev.WebApi>['getGitApi']>
 export function createAzureDevOpsScmTransport(
   options: AzureDevOpsScmTransportOptions,
 ): ScmTransport {
-  const { organization, project, repository, token } = options;
+  const { organization, project, repository, token, baseBranch } = options;
   const orgUrl = `https://dev.azure.com/${organization}`;
 
   let gitApi: Promise<GitApi> | undefined;
@@ -222,6 +228,9 @@ export function createAzureDevOpsScmTransport(
     },
 
     defaultBranch(): Promise<string> {
+      // A configured integration branch (e.g. 'dev') wins over the repo default (often 'release'),
+      // so branch.create forks from it and pr.create targets it — matching the team's real flow.
+      if (baseBranch !== undefined && baseBranch.length > 0) return Promise.resolve(baseBranch);
       cachedDefaultBranch ??= (async () => {
         const git = await api();
         const repo = await git.getRepository(repository, project);
