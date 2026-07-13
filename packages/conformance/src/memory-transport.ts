@@ -123,7 +123,9 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
 
     async assignIssue(id: string, assignee: string): Promise<NativeIssue> {
       const rec = must(id);
-      rec.assignee = assignee;
+      // '@me' resolves to the same fixed fake identity the query path uses, so a round-trip of
+      // assign('@me') → query({assignee:'@me'}) is coherent and the sentinel is exercised on write.
+      rec.assignee = assignee === '@me' ? 'me@example.com' : assignee;
       return snapshot(rec);
     },
 

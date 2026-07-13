@@ -94,4 +94,21 @@ describe('parseRecipe', () => {
     });
     expect(recipe.steps).toHaveLength(2);
   });
+
+  it('parses when: on a require step (conditional guard)', () => {
+    const recipe = parseRecipe({
+      name: 'r',
+      steps: [
+        {
+          require: { truthy: '${takeover}', message: 'assigned — confirm takeover' },
+          when: { truthy: '${issue.assignee}' },
+        },
+      ],
+    });
+    const step = recipe.steps[0];
+    expect(step).toMatchObject({
+      require: { truthy: '${takeover}' },
+      when: { truthy: '${issue.assignee}' },
+    });
+  });
 });

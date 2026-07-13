@@ -13,6 +13,14 @@ steps:
   - require:
       truthy: "${issue.branchName}"
       message: "${issue.key} (${issue.nativeType}) has no canonical branch — containers (epic/initiative) and unmapped types are never branched. Pick a child story/task/bug."
+  # Never silently take over someone else's work: if the item is already assigned, starting it
+  # requires an explicit `takeover` (the task-start skill asks the human first, then passes it). The
+  # guard only fires WHEN there is an assignee, so unassigned items start freely.
+  - require:
+      truthy: "${takeover}"
+      message: "${issue.key} is assigned to ${issue.assignee}. Re-run task-start confirming takeover to start it as yours, or pick another item."
+    when:
+      truthy: "${issue.assignee}"
   # ${issue.branchName} is the core-derived canonical name (<prefix>/<id>-<slug>) — every agent and
   # recipe derives the SAME name for the same item.
   - do: scm.branch.create
@@ -25,8 +33,15 @@ steps:
     with:
       id: ${issue.id}
       role: in_progress
+  # Starting a task makes it yours: assign the current user (@me). The takeover guard above already
+  # cleared any prior assignee, so this reflects who is actually doing the work.
+  - do: issue.assign
+    as: issue
+    with:
+      id: ${issue.id}
+      assignee: "@me"
   - do: issue.comment
     with:
       id: ${issue.id}
       body: "Branch created: ${branch.name}."
-  - message: "${issue.key} is in progress on ${branch.name}."
+  - message: "${issue.key} is in progress on ${branch.name}, assigned to you."

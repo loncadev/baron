@@ -447,6 +447,8 @@ export async function runRecipe(
     }
 
     if (isRequireStep(step)) {
+      // A `when` makes the guard conditional: skip enforcement unless the precondition holds.
+      if (step.when !== undefined && !evalCondition(step.when, context)) continue;
       const { message, ...condition } = step.require;
       if (!evalCondition(condition, context)) {
         // The message is authored for the human: interpolated, actionable, and it STOPS the run —

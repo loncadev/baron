@@ -172,6 +172,50 @@ steps:
     expect(asker.notes.some((n) => n.includes('branch is'))).toBe(true);
   });
 
+  it('when: on a require makes the guard conditional — skipped when the precondition is falsy', async () => {
+    const recipe = loadRecipe(`
+name: conditional-guard
+steps:
+  - do: issue.create
+    as: issue
+    with: { title: "no assignee", typeRole: task }
+  - require:
+      truthy: "\${takeover}"
+      message: "assigned to \${issue.assignee} — pass takeover"
+    when:
+      truthy: "\${issue.assignee}"
+  - message: "started"
+`);
+    // A freshly created issue has no assignee → the guard's when is falsy → it must NOT fire, even
+    // though takeover was not passed.
+    const asker = scriptedAsker();
+    await runRecipe(recipe, { ports: allPorts(), asker });
+    expect(asker.notes.some((n) => n === 'started')).toBe(true);
+  });
+
+  it('when: on a require still STOPS when the precondition holds and the guard fails', async () => {
+    const recipe = loadRecipe(`
+name: conditional-guard-fires
+steps:
+  - require:
+      truthy: "\${takeover}"
+      message: "assigned to \${who} — pass takeover"
+    when:
+      truthy: "\${who}"
+`);
+    // Precondition holds (who is set) and takeover was not passed → the guard fires and stops.
+    await expect(
+      runRecipe(recipe, {
+        ports: allPorts(),
+        asker: scriptedAsker(),
+        inputs: { who: 'someone@else.com' },
+      }),
+    ).rejects.toMatchObject({
+      code: 'RECIPE_REQUIRE',
+      message: expect.stringContaining('someone'),
+    });
+  });
+
   it('when: skips do/message steps without failing (falsy vs truthy branches)', async () => {
     const recipe = loadRecipe(`
 name: branchy

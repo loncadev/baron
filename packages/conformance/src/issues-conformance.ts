@@ -1,4 +1,5 @@
 import {
+  ASSIGNEE_ME,
   BRANCH_TYPE_PREFIXES,
   CapabilityGapError,
   type GapPolicy,
@@ -199,6 +200,11 @@ export function runIssuesConformance(target: IssuesConformanceTarget): void {
         if (probe.adapter.manifest.issues.assignment) {
           const assigned = await probe.adapter.assign(issue.id, 'dev@example.com');
           expect(assigned.assignee).toBe('dev@example.com');
+          // The '@me' sentinel must resolve to a concrete current-user handle on write (task-start
+          // assigns the starter with it) — never persisted literally as '@me'.
+          const mine = await probe.adapter.assign(issue.id, ASSIGNEE_ME);
+          expect(mine.assignee).toBeTruthy();
+          expect(mine.assignee).not.toBe(ASSIGNEE_ME);
           return;
         }
 

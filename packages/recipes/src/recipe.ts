@@ -77,6 +77,11 @@ export interface StepCondition {
 /** A guard: when the condition is false the run STOPS with the (interpolated) message. */
 export interface RequireStep {
   readonly require: StepCondition & { readonly message: string };
+  /**
+   * Enforce the guard only when this condition holds; otherwise the guard is skipped (no stop).
+   * Lets a guard be conditional — e.g. "require takeover WHEN the item is already assigned".
+   */
+  readonly when?: StepCondition;
 }
 
 export interface DoStep {
@@ -213,7 +218,11 @@ function parseRequire(raw: Record<string, unknown>, where: string): RequireStep 
     fail(`${where}: require.message must be a non-empty string (it is what the user sees).`);
   }
   const { message, ...condition } = req;
-  return { require: { ...parseCondition(condition, `${where}.require`), message } };
+  const when = parseWhen(raw, where);
+  return {
+    require: { ...parseCondition(condition, `${where}.require`), message },
+    ...(when !== undefined ? { when } : {}),
+  };
 }
 
 function parseWhen(raw: Record<string, unknown>, where: string): StepCondition | undefined {

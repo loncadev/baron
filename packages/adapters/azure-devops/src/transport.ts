@@ -1,5 +1,6 @@
 import {
   ASSIGNEE_ME,
+  BaronError,
   type IssuesTransport,
   type Iteration,
   type NativeComment,
@@ -151,6 +152,32 @@ export function createAzureDevOpsTransport(options: AzureDevOpsTransportOptions)
     return workApi;
   };
 
+  // Resolve the '@me' assignment sentinel to the token owner's identity. Unlike WIQL reads (which
+  // ride the @Me macro server-side), System.AssignedTo needs a concrete handle, so we read it from
+  // the connection's authenticated user. Prefer the account/UPN (email); fall back to the display
+  // name, which AssignedTo also accepts. Cached — one lookup per transport.
+  let cachedMe: Promise<string> | undefined;
+  const resolveCurrentUser = (): Promise<string> => {
+    cachedMe ??= (async () => {
+      const connection = await webApi.connect();
+      const user = connection.authenticatedUser;
+      const properties = (user?.properties ?? {}) as Record<
+        string,
+        { $value?: string } | undefined
+      >;
+      const handle =
+        properties.Account?.$value ?? properties.Mail?.$value ?? user?.providerDisplayName;
+      if (handle === undefined || handle.length === 0) {
+        throw new BaronError(
+          "Could not resolve the current Azure DevOps user for '@me' assignment; assign by explicit email instead.",
+          'ASSIGNEE_ME_UNRESOLVED',
+        );
+      }
+      return handle;
+    })();
+    return cachedMe;
+  };
+
   const toNative = (item: WorkItem, discriminator?: string): NativeIssue => {
     const fields = item.fields ?? {};
     const parent = item.relations?.find((relation) => relation.rel === PARENT_REL);
@@ -276,10 +303,11 @@ export function createAzureDevOpsTransport(options: AzureDevOpsTransportOptions)
 
     async assignIssue(id: string, assignee: string): Promise<NativeIssue> {
       const witApi = await api();
-      // System.AssignedTo accepts an email/uniqueName string; Azure resolves it to the identity.
+      // '@me' resolves to the token owner; anything else is a literal email/uniqueName Azure resolves.
+      const handle = assignee === ASSIGNEE_ME ? await resolveCurrentUser() : assignee;
       const updated = await witApi.updateWorkItem(
         null,
-        [{ op: Operation.Add, path: fieldPath(FIELD.ASSIGNED_TO), value: assignee }],
+        [{ op: Operation.Add, path: fieldPath(FIELD.ASSIGNED_TO), value: handle }],
         Number(id),
       );
       return toNative(updated);
