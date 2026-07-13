@@ -28,6 +28,16 @@ export function runScmConformance(target: ScmConformanceTarget): void {
       expect(branch.sha).toBeTruthy();
     });
 
+    it('createBranch is idempotent — a second call returns the branch without failing', async () => {
+      // A resumed task-start re-creates the canonical branch; it must not abort (which would skip the
+      // downstream transition/assign), so a repeat create returns the same branch.
+      const { adapter } = target.build();
+      const first = await adapter.createBranch({ name: 'feature/resume', fromBranch: 'main' });
+      const second = await adapter.createBranch({ name: 'feature/resume', fromBranch: 'main' });
+      expect(second.name).toBe(first.name);
+      expect(second.sha).toBeTruthy();
+    });
+
     it('createPullRequest returns a normalized PR and honors draft when supported', async () => {
       const { adapter } = target.build();
       const pr = await adapter.createPullRequest({

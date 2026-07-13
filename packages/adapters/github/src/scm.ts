@@ -37,6 +37,15 @@ export function createGithubScmTransport(options: GithubTransportOptions): ScmTr
   return {
     async createBranch(name: string, fromBranch: string): Promise<NativeBranch> {
       // getRef takes the ref WITHOUT a leading 'refs/'; createRef requires it WITH 'refs/'.
+      // Idempotent: a resumed task-start finds the branch already there — return it, don't fail
+      // (getRef 404s for a missing branch, so a rejection means "not found" → create it).
+      const existing = await octokit.rest.git
+        .getRef({ owner, repo, ref: `heads/${name}` })
+        .then((r) => r.data)
+        .catch(() => undefined);
+      if (existing !== undefined) {
+        return { name, sha: existing.object.sha, url: existing.url };
+      }
       const base = await octokit.rest.git.getRef({ owner, repo, ref: `heads/${fromBranch}` });
       const created = await octokit.rest.git.createRef({
         owner,

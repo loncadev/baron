@@ -52,11 +52,23 @@ your job is the inputs, the local git, the ownership check, and the briefing.
    (`baron_issue_iterations` → the one with `current: true`), ask whether to pull it in, and on yes
    call `baron_issue_set_iteration { id, iteration: "@current" }`. If no sprint is current, skip
    silently. (This is the "scope creep" checkpoint — the user opts in by pulling mid-sprint.)
-7. **Brief, then get to work — do not pause for permission.** Print a one-line briefing (key, title,
-   old→new role, branch, url) and immediately continue into the implementation the user asked for.
-   "Start task X" means *start it* — the branch is cut and the card is `in_progress`, so begin the
-   actual work. Only stop if a real blocker forces a decision (see below); otherwise a "shall I
-   continue?" prompt here is exactly the friction to avoid.
+7. **Understand the work before coding — read the whole item, not just the title.** Baron's read
+   already gives you the `body` (a Bug's repro steps, otherwise the description), type, labels, and
+   parent. Gather the rest so you start *informed*, using the provider's read/explore tools:
+   - **Comments / discussion** on the item — decisions, gotchas, prior attempts, review feedback.
+   - **Attachments** (specs, screenshots, logs, stack traces) — open the ones that look relevant.
+   - **Extra native fields the body doesn't carry** — a Bug's *System Info*, *Acceptance Criteria*,
+     and any custom fields.
+
+   On Azure use the azure-devops explorer (`wit_get_work_item` with `expand: all`,
+   `wit_list_work_item_comments`, attachment fetch); on GitHub read the issue body +
+   `issues.listComments`. Then write a one-paragraph summary of what the task actually needs — that
+   summary is your starting point, not the title alone.
+8. **Brief, then get to work — do not pause for permission.** Print a one-line briefing (key, title,
+   old→new role, branch, url) plus the context summary from step 7, and immediately continue into the
+   implementation the user asked for. "Start task X" means *start it* — the branch is cut and the card
+   is `in_progress`, so begin the actual work. Only stop if a real blocker forces a decision (see
+   below); otherwise a "shall I continue?" prompt here is exactly the friction to avoid.
 
 ## Rules
 
@@ -74,6 +86,6 @@ your job is the inputs, the local git, the ownership check, and the briefing.
 - A failure carrying `RECIPE_INPUT_MISSING` / `ROLE_MAPPING` / branch-name errors: surface the code
   and stop. In particular, an epic/initiative has **no branch name by design** — ask the user for a
   child story/task/bug instead of inventing a branch.
-- If the branch already exists on the provider (create fails saying so), this is a RESUME: skip to
-  step 4 (fetch + switch) and continue — do not create `-v2` variants without asking.
-- Re-running on an item already `in_progress` is safe (transition is idempotent).
+- **Resume is safe and idempotent.** Re-running task-start on an item already started re-cuts
+  nothing: `scm.branch.create` returns the existing branch, `in_progress` and the `@me` assignment
+  re-assert cleanly. Just fetch + switch to the canonical branch — never invent `-v2` variants.

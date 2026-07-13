@@ -96,6 +96,13 @@ export function createAzureDevOpsScmTransport(
   return {
     async createBranch(name: string, fromBranch: string): Promise<NativeBranch> {
       const git = await api();
+      // Idempotent: if the branch already exists (a resumed task-start), return it instead of
+      // failing, so the caller flows on to transition/assign rather than aborting here. getBranch
+      // throws for a missing branch, so a rejection means "not found" → fall through to create.
+      const existing = await git.getBranch(repository, name, project).catch(() => undefined);
+      if (existing?.commit?.commitId !== undefined) {
+        return { name, sha: existing.commit.commitId };
+      }
       const base = await git.getBranch(repository, fromBranch, project);
       const baseSha = base.commit?.commitId;
       if (baseSha === undefined) {

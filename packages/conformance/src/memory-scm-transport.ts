@@ -17,10 +17,20 @@ export function createMemoryScmTransport(): ScmTransport {
   let prSeq = 0;
   let threadSeq = 0;
   const prs: NativePullRequest[] = [];
+  const branches = new Map<string, NativeBranch>();
 
   return {
     async createBranch(name: string, fromBranch: string): Promise<NativeBranch> {
-      return { name, sha: `sha-${fromBranch}->${name}`, url: `mem://branch/${name}` };
+      // Idempotent (contract): a second create of the same name returns the existing branch.
+      const existing = branches.get(name);
+      if (existing !== undefined) return existing;
+      const branch: NativeBranch = {
+        name,
+        sha: `sha-${fromBranch}->${name}`,
+        url: `mem://branch/${name}`,
+      };
+      branches.set(name, branch);
+      return branch;
     },
 
     async createPullRequest(input: NativePullRequestInput): Promise<NativePullRequest> {

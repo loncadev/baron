@@ -156,6 +156,11 @@ export interface PullRequestStatus {
 }
 
 export interface ScmTransport {
+  /**
+   * Create the branch and return it. **Idempotent**: if a branch of that name already exists, return
+   * the existing ref instead of failing — a resumed task-start (branch cut on a prior run) must flow
+   * on to the transition/assign steps, not abort at branch creation.
+   */
   createBranch(name: string, fromBranch: string): Promise<NativeBranch>;
   createPullRequest(input: NativePullRequestInput): Promise<NativePullRequest>;
   addPullRequestThread(pullRequestId: string, body: string): Promise<NativeThread>;
@@ -176,6 +181,7 @@ export interface ScmTransport {
 /** The normalized primitive surface the core exposes for the `scm` port. */
 export interface ScmPort {
   readonly manifest: ScmManifest;
+  /** Create (or, if it already exists, return) the branch — idempotent, so start/resume re-runs safely. */
   createBranch(draft: BranchDraft): Promise<BranchRef>;
   createPullRequest(draft: PullRequestDraft): Promise<PullRequest>;
   addPullRequestThread(pullRequestId: string, body: string): Promise<PullRequestThread>;
