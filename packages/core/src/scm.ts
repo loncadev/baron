@@ -26,6 +26,11 @@ export interface BranchRef {
   readonly name: string;
   readonly sha: string;
   readonly url?: string | undefined;
+  /**
+   * False when the branch already existed and was returned as-is (a resume). Lets a caller tell a
+   * real creation from a no-op — e.g. only announce "branch created" on the run that created it.
+   */
+  readonly created: boolean;
 }
 
 /** A normalized pull request, independent of the backing provider. */
@@ -78,6 +83,8 @@ export interface NativeBranch {
   readonly name: string;
   readonly sha: string;
   readonly url?: string | undefined;
+  /** True when this call created the ref; false when it already existed (idempotent no-op). */
+  readonly created: boolean;
 }
 
 export interface NativePullRequest {
@@ -214,7 +221,7 @@ export class BaseScmAdapter implements ScmPort {
     // master); fall back to the provider's default branch so recipes stay portable (decision #4).
     const fromBranch = draft.fromBranch ?? (await this.transport.defaultBranch());
     const native = await this.transport.createBranch(draft.name, fromBranch);
-    return { name: native.name, sha: native.sha, url: native.url };
+    return { name: native.name, sha: native.sha, url: native.url, created: native.created };
   }
 
   async createPullRequest(draft: PullRequestDraft): Promise<PullRequest> {

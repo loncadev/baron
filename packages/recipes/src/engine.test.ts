@@ -267,6 +267,27 @@ ${ownershipGuard}
     });
   });
 
+  it('branch.created gates the "branch created" comment — a resume does not repeat it', async () => {
+    // task-start comments the branch on the item. On a resume the branch already exists, so the
+    // comment must NOT fire again: it would duplicate the line and claim a creation that never
+    // happened. Running the same recipe twice must leave exactly one comment.
+    const recipe = loadRecipe(`
+name: start-with-comment
+steps:
+  - do: scm.branch.create
+    as: branch
+    with: { name: "feature/resume-once", fromBranch: "main" }
+  - message: "commented: \${branch.name}"
+    when:
+      truthy: "\${branch.created}"
+`);
+    const ports = allPorts();
+    const asker = scriptedAsker();
+    await runRecipe(recipe, { ports, asker });
+    await runRecipe(recipe, { ports, asker });
+    expect(asker.notes.filter((n) => n.startsWith('commented:'))).toHaveLength(1);
+  });
+
   it('when: skips do/message steps without failing (falsy vs truthy branches)', async () => {
     const recipe = loadRecipe(`
 name: branchy

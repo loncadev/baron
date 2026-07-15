@@ -21,13 +21,15 @@ export function createMemoryScmTransport(): ScmTransport {
 
   return {
     async createBranch(name: string, fromBranch: string): Promise<NativeBranch> {
-      // Idempotent (contract): a second create of the same name returns the existing branch.
+      // Idempotent (contract): a second create of the same name returns the existing branch, and
+      // reports created:false so callers can tell a real creation from a resume no-op.
       const existing = branches.get(name);
-      if (existing !== undefined) return existing;
+      if (existing !== undefined) return { ...existing, created: false };
       const branch: NativeBranch = {
         name,
         sha: `sha-${fromBranch}->${name}`,
         url: `mem://branch/${name}`,
+        created: true,
       };
       branches.set(name, branch);
       return branch;

@@ -101,7 +101,7 @@ export function createAzureDevOpsScmTransport(
       // throws for a missing branch, so a rejection means "not found" → fall through to create.
       const existing = await git.getBranch(repository, name, project).catch(() => undefined);
       if (existing?.commit?.commitId !== undefined) {
-        return { name, sha: existing.commit.commitId };
+        return { name, sha: existing.commit.commitId, created: false };
       }
       const base = await git.getBranch(repository, fromBranch, project);
       const baseSha = base.commit?.commitId;
@@ -130,7 +130,7 @@ export function createAzureDevOpsScmTransport(
           'BRANCH_CREATE_FAILED',
         );
       }
-      return { name, sha: baseSha };
+      return { name, sha: baseSha, created: true };
     },
 
     async createPullRequest(input: NativePullRequestInput): Promise<NativePullRequest> {

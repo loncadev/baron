@@ -3,6 +3,14 @@ description: Create a NEW work item (type + optional parent + optional starting 
 steps:
   - ask: { as: title, type: text, message: "Work item title?" }
   - ask: { as: typeRole, type: choice, message: "Type role?", choices: [task, bug, story] }
+  # Without this the item is created title-only: a bug's repro steps had nowhere to go and callers
+  # resorted to dumping them in a comment. The adapter routes the body to the type's native field
+  # (a bug's repro steps -> Azure ReproSteps; everything else -> Description).
+  - ask:
+      as: body
+      type: text
+      message: "Description (for a bug: repro steps, expected vs observed)? Empty to skip."
+      optional: true
   - ask: { as: parentId, type: text, message: "Parent id (empty for none)?", optional: true }
   - do: issue.create
     as: issue
@@ -11,5 +19,6 @@ steps:
       typeRole: ${typeRole}
       # Exactly-one-reference interpolation: an unanswered optional ask stays truly unset,
       # so hierarchy/gap negotiation only runs when a parent was actually given.
+      body: ${body}
       parentId: ${parentId}
   - message: "Created ${issue.key} (${issue.nativeType}): ${issue.title}"

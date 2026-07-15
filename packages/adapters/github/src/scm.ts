@@ -44,7 +44,7 @@ export function createGithubScmTransport(options: GithubTransportOptions): ScmTr
         .then((r) => r.data)
         .catch(() => undefined);
       if (existing !== undefined) {
-        return { name, sha: existing.object.sha, url: existing.url };
+        return { name, sha: existing.object.sha, url: existing.url, created: false };
       }
       const base = await octokit.rest.git.getRef({ owner, repo, ref: `heads/${fromBranch}` });
       const created = await octokit.rest.git.createRef({
@@ -53,7 +53,7 @@ export function createGithubScmTransport(options: GithubTransportOptions): ScmTr
         ref: `refs/heads/${name}`,
         sha: base.data.object.sha,
       });
-      return { name, sha: created.data.object.sha, url: created.data.url };
+      return { name, sha: created.data.object.sha, url: created.data.url, created: true };
     },
 
     async createPullRequest(input: NativePullRequestInput): Promise<NativePullRequest> {

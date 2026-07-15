@@ -6,7 +6,7 @@ import { BaseScmAdapter, type ScmManifest, type ScmTransport } from './scm.js';
 const transport: ScmTransport = {
   // echo fromBranch into sha so a test can assert which base the port resolved
   async createBranch(name: string, fromBranch: string) {
-    return { name, sha: `sha:${fromBranch}` };
+    return { name, sha: `sha:${fromBranch}`, created: true };
   },
   async createPullRequest(input) {
     return {
