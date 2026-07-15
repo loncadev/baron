@@ -10,3 +10,8 @@ coverage/
 .env
 .env.*
 !.env.example
+
+# Dogfood runs against a real project: the notes carry that project's internals (work-item ids,
+# people's emails, org/repo names). They live here so the project under test never sees them, and
+# they stay out of this public repo.
+dogfood/
