@@ -301,6 +301,10 @@ export function createAzureDevOpsTransport(options: AzureDevOpsTransportOptions)
       };
     },
 
+    currentUser(): Promise<string> {
+      return resolveCurrentUser();
+    },
+
     async assignIssue(id: string, assignee: string): Promise<NativeIssue> {
       const witApi = await api();
       // '@me' resolves to the token owner; anything else is a literal email/uniqueName Azure resolves.

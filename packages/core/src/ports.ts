@@ -93,6 +93,12 @@ export interface IssuesTransport {
   queryIssues(query: NativeQuery): Promise<readonly NativeIssue[]>;
   /** Assign to a provider-native user handle. Only called when the manifest declares `assignment`. */
   assignIssue(id: string, assignee: string): Promise<NativeIssue>;
+  /**
+   * The token owner's native handle — what `@me` resolves to. MUST be the same form the transport
+   * reports in {@link NativeIssue.assignee}, so `assign('@me')` followed by a read compares equal;
+   * ownership checks ("is this item mine?") depend on that round-trip holding.
+   */
+  currentUser(): Promise<string>;
   /** The provider's iterations/sprints. Only called when the manifest declares `sprints`. */
   listIterations(): Promise<readonly Iteration[]>;
   /** Move an item to an iteration by path. Only called when the manifest declares `sprints`. */
@@ -104,6 +110,8 @@ export interface IssuesPort {
   readonly manifest: CapabilityManifest;
   create(draft: IssueDraft): Promise<Issue>;
   get(id: string): Promise<Issue>;
+  /** The caller's own handle (what `@me` resolves to) — lets a recipe ask "is this item mine?". */
+  whoAmI(): Promise<string>;
   transition(id: string, role: WorkflowRole): Promise<Issue>;
   comment(id: string, body: string): Promise<IssueComment>;
   link(fromId: string, toId: string, type: IssueLinkType): Promise<void>;
@@ -241,6 +249,10 @@ export class BaseIssuesAdapter implements IssuesPort {
       }
     }
     // 'degrade' intentionally drops the link; resolveGap already logged a warning.
+  }
+
+  whoAmI(): Promise<string> {
+    return this.transport.currentUser();
   }
 
   async assign(id: string, assignee: string): Promise<Issue> {

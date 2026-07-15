@@ -12,6 +12,7 @@ export const RECIPE_OPS = {
   issueComment: 'issue.comment',
   issueLink: 'issue.link',
   issueAssign: 'issue.assign',
+  issueWhoami: 'issue.whoami',
   issueIterations: 'issue.iterations',
   issueSetIteration: 'issue.set-iteration',
   issueQuery: 'issue.query',

@@ -249,6 +249,8 @@ async function dispatchOp(ports: RecipePorts, op: RecipeOp, params: Params): Pro
       return issues(ports, op).comment(reqStr(params, 'id', op), reqStr(params, 'body', op));
     case RECIPE_OPS.issueAssign:
       return issues(ports, op).assign(reqStr(params, 'id', op), reqStr(params, 'assignee', op));
+    case RECIPE_OPS.issueWhoami:
+      return issues(ports, op).whoAmI();
     case RECIPE_OPS.issueIterations:
       return issues(ports, op).iterations();
     case RECIPE_OPS.issueSetIteration:

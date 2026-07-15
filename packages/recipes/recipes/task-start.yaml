@@ -13,12 +13,16 @@ steps:
   - require:
       truthy: "${issue.branchName}"
       message: "${issue.key} (${issue.nativeType}) has no canonical branch — containers (epic/initiative) and unmapped types are never branched. Pick a child story/task/bug."
-  # Never silently take over someone else's work: if the item is already assigned, starting it
-  # requires an explicit `takeover` (the task-start skill asks the human first, then passes it). The
-  # guard only fires WHEN there is an assignee, so unassigned items start freely.
+  - do: issue.whoami
+    as: me
+  # Never silently take over SOMEONE ELSE's work. The guard fires only when the item is assigned to
+  # a person who isn't the caller — an unassigned item (when: falsy) and your own item (equals) both
+  # start freely, so re-running task-start on work you already own stays idempotent.
+  # Taking over is an explicit, discoverable act: assign the item to yourself (issue.assign '@me' —
+  # what the skill does after asking the human), then start it. No hidden recipe input.
   - require:
-      truthy: "${takeover}"
-      message: "${issue.key} is assigned to ${issue.assignee}. Re-run task-start confirming takeover to start it as yours, or pick another item."
+      equals: ["${issue.assignee}", "${me}"]
+      message: "${issue.key} is assigned to ${issue.assignee}, not you (${me}). Assign it to yourself first to take it over, or pick another item."
     when:
       truthy: "${issue.assignee}"
   # ${issue.branchName} is the core-derived canonical name (<prefix>/<id>-<slug>) — every agent and

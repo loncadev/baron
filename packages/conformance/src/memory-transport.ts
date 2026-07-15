@@ -24,6 +24,9 @@ interface Rec {
   links: Array<{ toId: string; type: string }>;
 }
 
+/** The fixed fake identity '@me' resolves to — shared by currentUser/assign/query so they cohere. */
+const MEMORY_ME = 'me@example.com';
+
 /** Two fixed iterations so the suite can exercise the sprint path; "Sprint 2" is current. */
 const MEMORY_ITERATIONS = [
   { id: 'it-1', name: 'Sprint 1', path: 'Mem\\Sprint 1', current: false },
@@ -121,11 +124,15 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
       rec.links.push({ toId, type: nativeLinkType });
     },
 
+    currentUser(): Promise<string> {
+      return Promise.resolve(MEMORY_ME);
+    },
+
     async assignIssue(id: string, assignee: string): Promise<NativeIssue> {
       const rec = must(id);
-      // '@me' resolves to the same fixed fake identity the query path uses, so a round-trip of
-      // assign('@me') → query({assignee:'@me'}) is coherent and the sentinel is exercised on write.
-      rec.assignee = assignee === '@me' ? 'me@example.com' : assignee;
+      // '@me' resolves to the same fixed fake identity currentUser/query use, so a round-trip of
+      // assign('@me') → get().assignee === currentUser() holds — the ownership check depends on it.
+      rec.assignee = assignee === '@me' ? MEMORY_ME : assignee;
       return snapshot(rec);
     },
 
@@ -146,7 +153,7 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
         if (discriminator !== undefined && rec.discriminator !== discriminator) continue;
         if (query.nativeType !== undefined && rec.nativeType !== query.nativeType) continue;
         // '@me' resolves to a fixed fake identity so the suite can exercise the sentinel path.
-        const wanted = query.assignee === '@me' ? 'me@example.com' : query.assignee;
+        const wanted = query.assignee === '@me' ? MEMORY_ME : query.assignee;
         if (wanted !== undefined && rec.assignee !== wanted) continue;
         if (query.iterationPath !== undefined && rec.iteration !== query.iterationPath) continue;
         results.push(snapshot(rec));

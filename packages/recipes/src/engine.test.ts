@@ -216,6 +216,57 @@ steps:
     });
   });
 
+  // The task-start ownership guard: start freely when the item is unassigned or already YOURS, stop
+  // only when it belongs to someone else. Resuming your own work must never trip it (the v0.9 bug:
+  // task-start assigns to @me, so every re-run then looked like a takeover and locked the item).
+  const ownershipGuard = `
+  - do: issue.whoami
+    as: me
+  - require:
+      equals: ["\${issue.assignee}", "\${me}"]
+      message: "assigned to \${issue.assignee}, not you (\${me})"
+    when:
+      truthy: "\${issue.assignee}"
+  - message: "started"
+`;
+
+  it('ownership guard: an item assigned to YOU starts (resume stays idempotent)', async () => {
+    const recipe = loadRecipe(`
+name: own-item
+steps:
+  - do: issue.create
+    as: issue
+    with: { title: "mine", typeRole: task }
+  - do: issue.assign
+    as: issue
+    with: { id: "\${issue.id}", assignee: "@me" }
+${ownershipGuard}
+`);
+    const asker = scriptedAsker();
+    await runRecipe(recipe, { ports: allPorts(), asker });
+    expect(asker.notes.some((n) => n === 'started')).toBe(true);
+  });
+
+  it('ownership guard: an item assigned to SOMEONE ELSE stops before any mutation', async () => {
+    const recipe = loadRecipe(`
+name: other-item
+steps:
+  - do: issue.create
+    as: issue
+    with: { title: "theirs", typeRole: task }
+  - do: issue.assign
+    as: issue
+    with: { id: "\${issue.id}", assignee: "someone@else.com" }
+${ownershipGuard}
+`);
+    await expect(
+      runRecipe(recipe, { ports: allPorts(), asker: scriptedAsker() }),
+    ).rejects.toMatchObject({
+      code: 'RECIPE_REQUIRE',
+      message: expect.stringContaining('someone@else.com'),
+    });
+  });
+
   it('when: skips do/message steps without failing (falsy vs truthy branches)', async () => {
     const recipe = loadRecipe(`
 name: branchy

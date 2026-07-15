@@ -135,6 +135,11 @@ export function createGithubTransport(options: GithubTransportOptions): IssuesTr
       });
     },
 
+    currentUser(): Promise<string> {
+      // Same resolver '@me' assignment uses, so the handle matches what reads report (login).
+      return resolveAssignee(ASSIGNEE_ME);
+    },
+
     async addComment(id: string, body: string): Promise<NativeComment> {
       const { data } = await octokit.rest.issues.createComment({
         owner,

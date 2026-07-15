@@ -19,29 +19,26 @@ your job is the inputs, the local git, the ownership check, and the briefing.
    integer). Ask only if genuinely absent.
 2. **Preflight local git** (local git is YOUR job, not Baron's): run `git status --porcelain` — if
    dirty, stop and ask the user to commit/stash first. Never start work on a dirty tree.
-3. **Ownership check — never silently take over someone else's work.** Read the item first with
-   `baron_issue_get { id: "<id>" }` and look at `assignee`:
-   - **Unassigned** → proceed to step 4 with no `takeover`.
-   - **Assigned to you** (`assignee` matches `git config user.email`, or the GitHub login) → proceed
-     with `takeover: true`; this is a claim/resume, no need to ask.
-   - **Assigned to someone else** → **ask the user before starting** (AskUserQuestion: "AB#N is
-     assigned to `<assignee>`. Take it over and start?" → Take over / Cancel). On *Take over*,
-     proceed with `takeover: true`. On *Cancel*, stop — do **not** start. If you cannot tell whose it
-     is, treat it as someone else's and ask.
-
-   Starting **assigns the item to you** (the recipe does `issue.assign @me` after moving it to
-   `in_progress`), so whoever runs task-start becomes the owner.
-4. **Run the recipe** — call `baron_recipe_run` exactly once, passing `takeover` as decided above:
+3. **Run the recipe** — call `baron_recipe_run` with the only input it declares:
 
    ```json
-   { "name": "task-start", "inputs": { "issueId": "<id>", "takeover": true } }
+   { "name": "task-start", "inputs": { "issueId": "<id>" } }
    ```
 
-   (Omit `takeover` for an unassigned item.) The engine loads the item, creates the **canonical
-   branch** (`<prefix>/<id>-<slug>`, derived by Baron's core so every agent picks the same name),
-   moves it to `in_progress`, assigns it to you, and comments the branch on the item. If the item is
-   assigned and you did not pass `takeover`, the recipe **stops** (`RECIPE_REQUIRE`) — that is the
-   engine-level backstop for the ownership rule; go back to step 3 and ask.
+   The engine loads the item, creates the **canonical branch** (`<prefix>/<id>-<slug>`, derived by
+   Baron's core so every agent picks the same name), moves it to `in_progress`, **assigns it to you**
+   (`issue.assign @me`), and comments the branch on the item. Starting a task makes it yours.
+4. **If it stops on the ownership guard, ask — never take over silently.** The recipe refuses only
+   when the item is assigned to *someone else*, with `RECIPE_REQUIRE`:
+   *"AB#N is assigned to `<them>`, not you (`<you>`). Assign it to yourself first…"*. On that error:
+   - **Ask the user** (AskUserQuestion: "AB#N is assigned to `<them>`. Take it over and start?" →
+     Take over / Cancel).
+   - On **Take over** → `baron_issue_assign { id: "<id>", assignee: "@me" }`, then re-run the recipe
+     from step 3 (the guard now passes because the item is yours).
+   - On **Cancel** → stop. Do not start, do not reassign.
+
+   An unassigned item, or one already yours, never hits this — it just starts. So re-running
+   task-start on your own work is silent and idempotent.
 5. **Sync the local checkout** to the branch Baron created on the provider:
 
    ```bash
@@ -73,16 +70,17 @@ your job is the inputs, the local git, the ownership check, and the briefing.
 ## Rules
 
 - **Ask before taking over someone else's item; never silently reassign.** The one prompt task-start
-  is allowed (and required) to make before starting is the step-3 ownership question. An unassigned
-  item or one already yours starts without asking.
+  is allowed (and required) to make is the step-4 ownership question, and only when the guard fires.
+  An unassigned item or one already yours starts without asking.
 - **Auto-proceed after starting.** Once the recipe succeeds and the checkout is on the branch, keep
   going into the work without a confirmation turn. Pause only when something genuinely needs the
-  user: a dirty tree (step 2), the ownership question (step 3), a missing/ambiguous id, a
+  user: a dirty tree (step 2), the ownership question (step 4), a missing/ambiguous id, a
   `RECIPE_*`/`ROLE_MAPPING`/branch error, or a real implementation fork you can't resolve. "Nothing
   to decide" ⇒ don't ask, just work.
 - Run the **mutation** as one `baron_recipe_run` call — do NOT hand-compose
-  `baron_scm_branch_create`/`baron_issue_transition`/`baron_issue_assign`. The only primitive you call
-  yourself is the read-only `baron_issue_get` for the step-3 ownership check.
+  `baron_scm_branch_create`/`baron_issue_transition`. `task-start` declares exactly one input,
+  `issueId`; there is no hidden takeover flag. Taking over is the explicit
+  `baron_issue_assign { assignee: "@me" }` in step 4.
 - A failure carrying `RECIPE_INPUT_MISSING` / `ROLE_MAPPING` / branch-name errors: surface the code
   and stop. In particular, an epic/initiative has **no branch name by design** — ask the user for a
   child story/task/bug instead of inventing a branch.

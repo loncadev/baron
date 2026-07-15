@@ -205,6 +205,14 @@ export function runIssuesConformance(target: IssuesConformanceTarget): void {
           const mine = await probe.adapter.assign(issue.id, ASSIGNEE_ME);
           expect(mine.assignee).toBeTruthy();
           expect(mine.assignee).not.toBe(ASSIGNEE_ME);
+          // The ownership round-trip: what '@me' writes must read back EQUAL to whoAmI(). Ownership
+          // checks ("is this item mine?" — task-start's takeover guard) compare exactly these two, so
+          // an adapter whose write-handle and read-handle differ in form would wrongly report every
+          // self-owned item as someone else's.
+          const me = await probe.adapter.whoAmI();
+          expect(me).toBeTruthy();
+          const reloaded = await probe.adapter.get(issue.id);
+          expect(reloaded.assignee).toBe(me);
           return;
         }
 
