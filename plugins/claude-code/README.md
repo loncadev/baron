@@ -35,7 +35,37 @@ plugins/claude-code/
    `GITHUB_OWNER` / `GITHUB_REPO` / `GITHUB_TOKEN` or
    `AZURE_DEVOPS_ORG` / `AZURE_DEVOPS_PROJECT` / `AZURE_DEVOPS_REPO` / `AZURE_DEVOPS_TOKEN`.
 
-## Install (local, for development)
+## Install
+
+From the marketplace this repo publishes (`.claude-plugin/marketplace.json` at the repo root):
+
+```
+/plugin marketplace add loncadev/baron
+/plugin install baron@baron
+```
+
+That single install gives you both halves — the `baron` MCP server **and** the skills — so they can
+never drift apart. Skills arrive namespaced (`/baron:task-start`). Later, pick up new releases with:
+
+```
+/plugin marketplace update baron
+/plugin update baron@baron
+```
+
+**Do not copy `skills/` into a project's `.claude/skills/`.** A local copy is a *fork*: it keeps its
+own `/task-start` name alongside the plugin's `/baron:task-start`, so both stay callable and the local
+one silently rots while Baron ships fixes. Install the plugin instead.
+
+**Do not add a `version` to `plugin.json`.** With it omitted, every commit to this repo is a new
+version and installs stay current. A pinned version that someone forgets to bump freezes every
+existing user on a cached copy — with no error to reveal it.
+
+If the project also defines a `baron` server in its own `.mcp.json`, remove that entry once the plugin
+is installed: the plugin already provides the server, and two servers of the same name collide. The
+server resolves its project root from `BARON_ROOT`, falling back to the working directory — which is
+the project dir under Claude Code, so no env is needed.
+
+### Local development
 
 ```
 claude --plugin-dir ./plugins/claude-code
