@@ -32,9 +32,13 @@ describe('runInit', () => {
 
     const written = fs.read(policyPath(ROOT));
     expect(written).toBeDefined();
-    const config = resolveIssuesConfig(parsePolicy(JSON.parse(written as string)));
+    const policy = parsePolicy(JSON.parse(written as string));
+    const config = resolveIssuesConfig(policy);
     expect(config.provider).toBe('github');
     expect(config.roleMap.states.in_progress).toEqual({ label: 'in-progress' });
+    // scm must be bound to the same provider — task-start/finish need branches + PRs, and a
+    // from-scratch setup should not have to hand-edit policy.json to get them.
+    expect(policy.providers.scm).toBe('github');
 
     const example = fs.read(credentialsExamplePath(ROOT));
     expect(example).toContain('GITHUB_TOKEN=');

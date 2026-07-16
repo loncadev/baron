@@ -37,14 +37,23 @@ export interface InitResult {
 }
 
 /**
- * Assemble a single-issues-provider policy from a proposal. The gap policy is only emitted when the
- * provider actually has gaps, so a fully-capable provider produces a clean file.
+ * Assemble a policy from a proposal. Binds the provider to `issues`, and to `scm` too when it offers
+ * a source-control adapter (`bindScm`) — the task-start/finish flow needs branches + PRs, and making
+ * every user hand-add `providers.scm` after init was a dead-end the from-scratch setup kept hitting.
+ * A mixed setup (issues here, scm elsewhere) is still possible by editing the file. The gap policy is
+ * only emitted when the provider actually has gaps, so a fully-capable provider produces a clean file.
  */
-export function assemblePolicy(proposal: ProviderProposal): BaronPolicyFile {
+export function assemblePolicy(
+  proposal: ProviderProposal,
+  opts: { bindScm?: boolean } = {},
+): BaronPolicyFile {
   const hasGaps = Object.keys(proposal.gapPolicy).length > 0;
   const object = {
     version: 1 as const,
-    providers: { issues: proposal.provider },
+    providers: {
+      issues: proposal.provider,
+      ...(opts.bindScm === true ? { scm: proposal.provider } : {}),
+    },
     roleMap: { [proposal.provider]: proposal.roleMap },
     typeMap: { [proposal.provider]: proposal.typeMap },
     ...(hasGaps ? { gapPolicy: { [proposal.provider]: proposal.gapPolicy } } : {}),
@@ -55,7 +64,15 @@ export function assemblePolicy(proposal: ProviderProposal): BaronPolicyFile {
 
 function credentialsTemplate(descriptor: ProviderDescriptor): string {
   const header = `# Credentials for '${descriptor.id}'. Copy this file to '${BARON_DIR}/credentials'\n# (gitignored) or export these in your environment. Never commit real values.\n`;
-  const lines = (descriptor.credentialEnvKeys ?? []).map((key) => `${key}=`).join('\n');
+  // Union of the issues + scm credential keys (deduped), so a policy that binds both ports lists
+  // every variable the user must fill — e.g. Azure's scm adds AZURE_DEVOPS_REPO over the issues set.
+  const keys = [
+    ...new Set([
+      ...(descriptor.credentialEnvKeys ?? []),
+      ...(descriptor.scmCredentialEnvKeys ?? []),
+    ]),
+  ];
+  const lines = keys.map((key) => `${key}=`).join('\n');
   return `${header}${lines}\n`;
 }
 
@@ -75,7 +92,9 @@ function scaffoldCredentials(fs: FileSystem, root: string, descriptor: ProviderD
   }
 }
 
-function summarizeProposal(prompter: Prompter, proposal: ProviderProposal): void {
+function summarizeProposal(prompter: Prompter, proposal: ProviderProposal, bindScm: boolean): void {
+  const ports = bindScm ? 'issues + scm (branches/PRs)' : 'issues';
+  prompter.note(`Binding provider '${proposal.provider}' to: ${ports}.`);
   prompter.note(`Proposed mapping for issues provider '${proposal.provider}':`);
   for (const [role, target] of Object.entries(proposal.roleMap.states)) {
     prompter.note(`  role ${role} -> ${JSON.stringify(target)}`);
@@ -130,7 +149,11 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
   const introspection = await introspector.introspect();
   const proposal = proposePolicy(introspection, manifest);
 
-  summarizeProposal(options.prompter, proposal);
+  // Bind scm to the same provider when it ships an scm adapter — the task-start/finish flow needs it.
+  const bindScm =
+    descriptor.scmManifest !== undefined && descriptor.createScmTransport !== undefined;
+
+  summarizeProposal(options.prompter, proposal, bindScm);
 
   const confirmed =
     options.force === true ||
@@ -139,7 +162,7 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
     return { written: false, policyPath: path, proposal };
   }
 
-  const policy = assemblePolicy(proposal);
+  const policy = assemblePolicy(proposal, { bindScm });
   options.fs.mkdirp(`${options.root}/${BARON_DIR}`);
   options.fs.write(path, serializePolicy(policy));
   scaffoldCredentials(options.fs, options.root, descriptor);
