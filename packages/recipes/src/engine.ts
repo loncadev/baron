@@ -243,6 +243,14 @@ async function dispatchOp(ports: RecipePorts, op: RecipeOp, params: Params): Pro
       });
     case RECIPE_OPS.issueGet:
       return issues(ports, op).get(reqStr(params, 'id', op));
+    case RECIPE_OPS.issueUpdate: {
+      const title = optStr(params, 'title', op);
+      const body = optStr(params, 'body', op);
+      return issues(ports, op).update(reqStr(params, 'id', op), {
+        ...(title !== undefined ? { title } : {}),
+        ...(body !== undefined ? { body } : {}),
+      });
+    }
     case RECIPE_OPS.issueTransition:
       return issues(ports, op).transition(reqStr(params, 'id', op), reqRole(params, 'role', op));
     case RECIPE_OPS.issueComment:

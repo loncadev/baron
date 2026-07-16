@@ -67,6 +67,41 @@ export function runIssuesConformance(target: IssuesConformanceTarget): void {
       expect(reloaded.body).toBe(repro);
     });
 
+    it('update patches title/body and leaves omitted fields alone', async () => {
+      const { adapter } = target.build({});
+      const issue = await adapter.create({
+        title: 'typo in titel',
+        typeRole: 'task',
+        body: 'keep me',
+      });
+
+      const retitled = await adapter.update(issue.id, { title: 'typo in title, fixed' });
+      expect(retitled.title).toBe('typo in title, fixed');
+      // A title-only patch must not wipe the body — this is a patch, not a replace.
+      expect((await adapter.get(issue.id)).body).toBe('keep me');
+
+      const rebodied = await adapter.update(issue.id, { body: 'a fuller description' });
+      expect((await adapter.get(issue.id)).body).toBe('a fuller description');
+      expect(rebodied.title).toBe('typo in title, fixed');
+    });
+
+    it("update routes a bug's body the same way create does", async () => {
+      // Providers that give bugs their own body field (Azure -> ReproSteps) must route an EDITED body
+      // there too; if update wrote to the create-field instead, the repro would read back stale.
+      const { adapter } = target.build({});
+      const bug = await adapter.create({ title: 'boom', typeRole: 'bug', body: 'first repro' });
+      await adapter.update(bug.id, { body: 'corrected repro' });
+      expect((await adapter.get(bug.id)).body).toBe('corrected repro');
+    });
+
+    it('update with no fields is refused rather than silently doing nothing', async () => {
+      const { adapter } = target.build({});
+      const issue = await adapter.create({ title: 'x', typeRole: 'task' });
+      await expect(adapter.update(issue.id, {})).rejects.toMatchObject({
+        code: 'ISSUE_UPDATE_EMPTY',
+      });
+    });
+
     it('transition to a mapped role resolves that role back', async () => {
       const { adapter } = target.build(emulateStates);
       const issue = await adapter.create({ title: 'x', typeRole: 'task' });

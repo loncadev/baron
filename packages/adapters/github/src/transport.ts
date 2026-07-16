@@ -7,6 +7,7 @@ import {
   type NativeIssue,
   type NativeQuery,
   type NativeTarget,
+  type NativeUpdateInput,
 } from '@lonca/baron-core';
 import { Octokit } from 'octokit';
 
@@ -133,6 +134,18 @@ export function createGithubTransport(options: GithubTransportOptions): IssuesTr
         issue_number: Number(id),
         labels: [label],
       });
+    },
+
+    async updateIssue(id: string, update: NativeUpdateInput): Promise<NativeIssue> {
+      // GitHub has one body field for every type, so typeRole needs no routing here.
+      const { data } = await octokit.rest.issues.update({
+        owner,
+        repo,
+        issue_number: Number(id),
+        ...(update.title !== undefined ? { title: update.title } : {}),
+        ...(update.body !== undefined ? { body: update.body } : {}),
+      });
+      return toNative(data as IssueResponse);
     },
 
     currentUser(): Promise<string> {

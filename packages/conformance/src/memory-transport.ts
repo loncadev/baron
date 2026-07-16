@@ -5,6 +5,7 @@ import type {
   NativeIssue,
   NativeQuery,
   NativeTarget,
+  NativeUpdateInput,
 } from '@lonca/baron-core';
 
 interface Rec {
@@ -122,6 +123,15 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
       const rec = must(fromId);
       must(toId);
       rec.links.push({ toId, type: nativeLinkType });
+    },
+
+    async updateIssue(id: string, update: NativeUpdateInput): Promise<NativeIssue> {
+      const rec = must(id);
+      // A patch: only the keys present change. (One body field here, so typeRole needs no routing —
+      // the live adapters use it to pick the type's native field.)
+      if (update.title !== undefined) rec.title = update.title;
+      if (update.body !== undefined) rec.body = update.body;
+      return snapshot(rec);
     },
 
     currentUser(): Promise<string> {

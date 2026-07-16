@@ -69,6 +69,7 @@ describe('createMcpServer (end-to-end over the MCP protocol)', () => {
       [
         MCP_TOOL_NAMES.create,
         MCP_TOOL_NAMES.get,
+        MCP_TOOL_NAMES.update,
         MCP_TOOL_NAMES.transition,
         MCP_TOOL_NAMES.comment,
         MCP_TOOL_NAMES.link,

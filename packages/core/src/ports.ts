@@ -52,6 +52,19 @@ export interface NativeCreateInput {
   readonly labels: readonly string[];
 }
 
+/** Fields an edit may change. Omitted keys are left untouched — this is a patch, not a replace. */
+export interface IssueUpdate {
+  readonly title?: string | undefined;
+  readonly body?: string | undefined;
+}
+
+/** Native edit input: the patch plus the item's resolved type role, so the body lands in the
+ * type's native field (a bug's body is its repro steps). The base adapter resolves the role — an
+ * adapter never reverses it itself (invariant #4). Undefined when the provider's type is ambiguous. */
+export interface NativeUpdateInput extends IssueUpdate {
+  readonly typeRole?: WorkItemTypeRole | undefined;
+}
+
 /** A raw comment as a provider transport speaks it (before normalization to {@link IssueComment}). */
 export interface NativeComment {
   readonly id: string;
@@ -91,6 +104,8 @@ export interface IssuesTransport {
   /** Create a native typed link. Only called when the manifest declares `issueLinks`. */
   linkIssues(fromId: string, toId: string, nativeLinkType: string): Promise<void>;
   queryIssues(query: NativeQuery): Promise<readonly NativeIssue[]>;
+  /** Apply a field patch (title/body). Only the provided keys change. */
+  updateIssue(id: string, update: NativeUpdateInput): Promise<NativeIssue>;
   /** Assign to a provider-native user handle. Only called when the manifest declares `assignment`. */
   assignIssue(id: string, assignee: string): Promise<NativeIssue>;
   /**
@@ -110,6 +125,11 @@ export interface IssuesPort {
   readonly manifest: CapabilityManifest;
   create(draft: IssueDraft): Promise<Issue>;
   get(id: string): Promise<Issue>;
+  /**
+   * Edit an existing item's title/body. A patch: omitted fields are left alone. The body lands in
+   * the field the item's type uses (a bug's body is its repro steps), same as on create.
+   */
+  update(id: string, update: IssueUpdate): Promise<Issue>;
   /** The caller's own handle (what `@me` resolves to) — lets a recipe ask "is this item mine?". */
   whoAmI(): Promise<string>;
   transition(id: string, role: WorkflowRole): Promise<Issue>;
@@ -249,6 +269,25 @@ export class BaseIssuesAdapter implements IssuesPort {
       }
     }
     // 'degrade' intentionally drops the link; resolveGap already logged a warning.
+  }
+
+  async update(id: string, update: IssueUpdate): Promise<Issue> {
+    if (update.title === undefined && update.body === undefined) {
+      throw new BaronError(
+        "Nothing to update: pass a 'title' and/or a 'body'.",
+        'ISSUE_UPDATE_EMPTY',
+      );
+    }
+    // The body's destination depends on the item's type (a bug's body is its repro steps), and only
+    // the live item knows its type — so read it and resolve the role here. Skip the read when the
+    // patch is title-only: the destination is then type-independent.
+    let typeRole: WorkItemTypeRole | undefined;
+    if (update.body !== undefined) {
+      const current = await this.transport.getIssue(id);
+      typeRole = this.reverseTypeRole(current.nativeType);
+    }
+    const native = await this.transport.updateIssue(id, { ...update, typeRole });
+    return this.toIssue(native);
   }
 
   whoAmI(): Promise<string> {

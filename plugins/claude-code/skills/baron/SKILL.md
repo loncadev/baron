@@ -24,7 +24,10 @@ Baron translates these to each provider's native states/types/links and negotiat
 
 ## MCP tools (this plugin registers the `baron` MCP server)
 
-Issues port: `baron_issue_create`, `baron_issue_get`, `baron_issue_transition`,
+Issues port: `baron_issue_create`, `baron_issue_get`, `baron_issue_update` (edit title/body — a
+patch, omitted fields keep their value; the body lands in the field the type uses, so a bug's body
+is its repro steps. Use it to fix a title or fill in a description after creation; it does NOT move
+the role or the assignee), `baron_issue_transition`,
 `baron_issue_comment`, `baron_issue_link`, `baron_issue_assign` (provider-native handle: Azure
 email, GitHub login), `baron_issue_iterations` + `baron_issue_set_iteration` (sprints — each
 iteration has a `current` flag; move by path or `@current`; providers without sprints negotiate the

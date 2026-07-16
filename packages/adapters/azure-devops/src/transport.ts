@@ -8,6 +8,7 @@ import {
   type NativeIssue,
   type NativeQuery,
   type NativeTarget,
+  type NativeUpdateInput,
 } from '@lonca/baron-core';
 import * as azdev from 'azure-devops-node-api';
 import {
@@ -299,6 +300,21 @@ export function createAzureDevOpsTransport(options: AzureDevOpsTransportOptions)
         createdAt: comment.createdDate?.toISOString(),
         url: comment.url,
       };
+    },
+
+    async updateIssue(id: string, update: NativeUpdateInput): Promise<NativeIssue> {
+      const witApi = await api();
+      const ops: JsonPatchOperation[] = [];
+      if (update.title !== undefined) {
+        ops.push({ op: Operation.Add, path: fieldPath(FIELD.TITLE), value: update.title });
+      }
+      if (update.body !== undefined) {
+        // Mirror createIssue: a bug's body is its repro steps, everything else's is the description.
+        const bodyField = update.typeRole === 'bug' ? FIELD.REPRO_STEPS : FIELD.DESCRIPTION;
+        ops.push({ op: Operation.Add, path: fieldPath(bodyField), value: update.body });
+      }
+      const updated = await witApi.updateWorkItem(null, ops, Number(id));
+      return toNative(updated);
     },
 
     currentUser(): Promise<string> {

@@ -54,6 +54,7 @@ export interface McpPorts {
 export const MCP_TOOL_NAMES = {
   create: 'baron_issue_create',
   get: 'baron_issue_get',
+  update: 'baron_issue_update',
   transition: 'baron_issue_transition',
   comment: 'baron_issue_comment',
   link: 'baron_issue_link',
@@ -179,6 +180,24 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
       additionalProperties: false,
       required: ['id'],
       properties: { id: { type: 'string', minLength: 1 } },
+    },
+  },
+  {
+    name: MCP_TOOL_NAMES.update,
+    description:
+      "Edit an existing issue's title and/or body. A patch: whatever you omit is left untouched. " +
+      "The body goes to the field the item's type uses — a bug's body is its repro steps. Use this " +
+      'to correct a title or fill in a description after creation; it does not change role or ' +
+      'assignee (use baron_issue_transition / baron_issue_assign).',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['id'],
+      properties: {
+        id: { type: 'string', minLength: 1 },
+        title: { type: 'string', minLength: 1 },
+        body: { type: 'string' },
+      },
     },
   },
   {
@@ -836,6 +855,16 @@ export function callTool(
       return run(() => port.create(toDraft(args)));
     case MCP_TOOL_NAMES.get:
       return run(() => port.get(requireString(args, 'id')));
+    case MCP_TOOL_NAMES.update: {
+      const title = optionalString(args, 'title');
+      const body = optionalString(args, 'body');
+      return run(() =>
+        port.update(requireString(args, 'id'), {
+          ...(title !== undefined ? { title } : {}),
+          ...(body !== undefined ? { body } : {}),
+        }),
+      );
+    }
     case MCP_TOOL_NAMES.transition:
       return run(() => port.transition(requireString(args, 'id'), requireRole(args)));
     case MCP_TOOL_NAMES.comment:

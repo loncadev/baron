@@ -8,6 +8,7 @@ import { parse as parseYaml } from 'yaml';
 export const RECIPE_OPS = {
   issueCreate: 'issue.create',
   issueGet: 'issue.get',
+  issueUpdate: 'issue.update',
   issueTransition: 'issue.transition',
   issueComment: 'issue.comment',
   issueLink: 'issue.link',
