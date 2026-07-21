@@ -235,6 +235,74 @@ function summarizeProposal(prompter: Prompter, proposal: ProviderProposal, bindS
   }
 }
 
+// A marker-delimited steering block so re-running init refreshes it in place rather than duplicating,
+// and a human's edits outside the markers are never touched.
+const STEERING_BEGIN = '<!-- baron:begin — managed by `baron init`; edit outside these markers -->';
+const STEERING_END = '<!-- baron:end -->';
+
+/** Agent steering: teaches an agent to drive work through Baron's abstract vocabulary, not raw
+ * provider writes. Harness-neutral (AGENTS.md), so any agent that reads it benefits. */
+function steeringBlock(): string {
+  const body = `## Work tracking — route through Baron
+
+Track work through **Baron**, not raw provider writes: it normalizes issues and source control across
+providers behind one contract, so speak its abstract vocabulary, never a vendor's native states.
+
+- **Roles, not native states.** Move work by role: \`backlog → ready → in_progress → in_review → done\`,
+  plus \`blocked\`. Types are roles too: \`initiative\`, \`epic\`, \`story\`, \`task\`, \`bug\`, \`subtask\`.
+  Say "move it to in_progress", never "set the state to Active" — Baron maps the role to the provider.
+- **Tools:** \`baron_issue_*\` (create / get / update / transition / comment / assign / link / query),
+  \`baron_scm_*\` (branch / PR), \`baron_recipe_run\`, and \`baron_learning_*\` / \`baron_followup_*\` for
+  durable decisions and follow-ups.
+- **Daily loop — prefer the skills:** \`/baron:task-new\` (create), \`/baron:task-start <id>\` (cut the
+  canonical branch, move to in_progress, assign you), \`/baron:task-finish\` (draft PR), \`/baron:task-move\`,
+  \`/baron:task-list\`, \`/baron:task-sync\`. Each item's canonical branch is Baron-derived — use it
+  verbatim, never invent one.
+- Reading/exploring a provider natively is fine, but make every work-item **change** through Baron so the
+  role mapping, gap policy, and knowledge loop apply.`;
+  return `${STEERING_BEGIN}\n${body}\n${STEERING_END}`;
+}
+
+/**
+ * Write (or refresh) the Baron steering block in AGENTS.md so an agent knows to drive work through
+ * Baron. Idempotent: an existing marked block is replaced in place; anything outside the markers is
+ * preserved; a fresh file is created. Asks first (it's the user's file) unless `force`. Returns
+ * whether it wrote.
+ */
+async function ensureAgentsSteering(
+  fs: FileSystem,
+  prompter: Prompter,
+  root: string,
+  force: boolean,
+): Promise<boolean> {
+  const path = `${root}/AGENTS.md`;
+  const current = fs.read(path);
+  const hasBlock = current?.includes(STEERING_BEGIN) === true && current.includes(STEERING_END);
+  const verb =
+    current === undefined
+      ? 'Create'
+      : hasBlock
+        ? 'Refresh the Baron block in'
+        : 'Add a Baron block to';
+  const ok =
+    force || (await prompter.confirm(`${verb} AGENTS.md (agent steering for Baron)?`, true));
+  if (!ok) return false;
+
+  let next: string;
+  if (current === undefined) {
+    next = `${steeringBlock()}\n`;
+  } else if (hasBlock) {
+    const start = current.indexOf(STEERING_BEGIN);
+    const end = current.indexOf(STEERING_END) + STEERING_END.length;
+    next = current.slice(0, start) + steeringBlock() + current.slice(end);
+  } else {
+    const sep = current.length === 0 || current.endsWith('\n') ? '\n' : '\n\n';
+    next = `${current}${sep}${steeringBlock()}\n`;
+  }
+  fs.write(path, next);
+  return true;
+}
+
 /** Up-front "here is exactly what I will do" so a first run earns trust before it touches anything. */
 function announcePlan(prompter: Prompter, provider: string): void {
   prompter.note(`\nbaron init — configuring Baron for '${provider}' in this project. It will:`);
@@ -245,8 +313,9 @@ function announcePlan(prompter: Prompter, provider: string): void {
   );
   prompter.note('    you confirm it;');
   prompter.note(
-    `  • write ${BARON_DIR}/policy.json — the confirmed mapping, COMMITTED (no secrets).`,
+    `  • write ${BARON_DIR}/policy.json — the confirmed mapping, COMMITTED (no secrets);`,
   );
+  prompter.note('  • offer to add a Baron steering block to AGENTS.md (so an agent uses Baron).');
   prompter.note(
     'The only thing it creates on your provider is your workflow labels (GitHub); it never touches',
   );
@@ -322,7 +391,15 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
   options.fs.write(path, serializePolicy(policy));
   scaffoldCredentials(options.fs, options.root, descriptor);
 
+  const steered = await ensureAgentsSteering(
+    options.fs,
+    options.prompter,
+    options.root,
+    options.force === true,
+  );
+
   options.prompter.note(`\nWrote ${BARON_DIR}/policy.json (commit it — it holds no secrets).`);
+  if (steered) options.prompter.note('Added a Baron steering block to AGENTS.md.');
   options.prompter.note('Next steps:');
   options.prompter.note(
     '  • Drive it from Claude Code: `/plugin marketplace add loncadev/baron` then `/plugin install baron@baron`.',

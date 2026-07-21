@@ -129,6 +129,46 @@ describe('runInit', () => {
     expect(fs.read(policyPath(ROOT))).toContain('"providers"');
   });
 
+  it('writes a Baron steering block to AGENTS.md when confirmed', async () => {
+    const fs = memoryFileSystem();
+    // Two confirms: [write policy, add AGENTS.md steering].
+    const result = await runInit({
+      root: ROOT,
+      issuesProvider: 'github',
+      fs,
+      env: GH_ENV,
+      prompter: scriptedPrompter([true, true]),
+      introspector: createMemoryIntrospector(githubIntrospectionFixture),
+    });
+    expect(result.written).toBe(true);
+    const agents = fs.read(`${ROOT}/AGENTS.md`) as string;
+    expect(agents).toContain('Work tracking — route through Baron');
+    expect(agents).toContain('<!-- baron:begin');
+    expect(agents).toContain('<!-- baron:end -->');
+  });
+
+  it('refreshes the steering block idempotently, preserving surrounding content', async () => {
+    // A pre-existing AGENTS.md with the user's own content + a stale Baron block.
+    const stale =
+      '# My project\n\nSome rules.\n\n<!-- baron:begin — managed by `baron init`; edit outside these markers -->\nOLD STALE BARON TEXT\n<!-- baron:end -->\n\nMore of my rules.\n';
+    const fs = memoryFileSystem({ [`${ROOT}/AGENTS.md`]: stale });
+    await runInit({
+      root: ROOT,
+      issuesProvider: 'github',
+      fs,
+      env: GH_ENV,
+      prompter: scriptedPrompter([true, true]),
+      introspector: createMemoryIntrospector(githubIntrospectionFixture),
+    });
+    const agents = fs.read(`${ROOT}/AGENTS.md`) as string;
+    expect(agents).toContain('# My project'); // user content preserved
+    expect(agents).toContain('More of my rules.');
+    expect(agents).not.toContain('OLD STALE BARON TEXT'); // stale block replaced
+    expect(agents).toContain('route through Baron');
+    // Exactly one block — no duplication.
+    expect(agents.match(/<!-- baron:begin/g)).toHaveLength(1);
+  });
+
   it('gathers missing credentials in one run: detects owner/repo from git, prompts for the token', async () => {
     // No credentials pre-set. init must write .baron/credentials itself: owner/repo from the git
     // remote, the token from a (hidden) prompt — so the user runs one command, not "hand-make the
