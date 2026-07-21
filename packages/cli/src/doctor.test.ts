@@ -11,6 +11,17 @@ import { runInit } from './init.js';
 
 const ROOT = '/repo';
 
+/** A complete credential set for both P0 providers, so init's credential gathering is a no-op. */
+const FULL_ENV = {
+  GITHUB_OWNER: 'o',
+  GITHUB_REPO: 'r',
+  GITHUB_TOKEN: 't',
+  AZURE_DEVOPS_ORG: 'o',
+  AZURE_DEVOPS_PROJECT: 'p',
+  AZURE_DEVOPS_REPO: 'r',
+  AZURE_DEVOPS_TOKEN: 't',
+};
+
 /** Seed a memory fs with a freshly-written policy for the given provider/fixture. */
 async function seededFs(provider: string, fixture = githubIntrospectionFixture) {
   const fs = memoryFileSystem();
@@ -18,6 +29,7 @@ async function seededFs(provider: string, fixture = githubIntrospectionFixture) 
     root: ROOT,
     issuesProvider: provider,
     fs,
+    env: FULL_ENV,
     prompter: scriptedPrompter([]),
     force: true,
     introspector: createMemoryIntrospector(fixture),

@@ -7,11 +7,19 @@ import {
   proposePolicy,
   serializePolicy,
 } from '@lonca/baron-core';
-import { type Env, type ProviderDescriptor, getProviderDescriptor } from '@lonca/baron-providers';
+import {
+  type Env,
+  type ProviderDescriptor,
+  getProviderDescriptor,
+  mergeCredentials,
+  parseCredentials,
+} from '@lonca/baron-providers';
 import {
   BARON_DIR,
   CREDENTIALS_IGNORE_ENTRY,
   credentialsExamplePath,
+  credentialsPath,
+  gitConfigPath,
   gitignorePath,
   policyPath,
 } from './paths.js';
@@ -76,13 +84,8 @@ function credentialsTemplate(descriptor: ProviderDescriptor): string {
   return `${header}${lines}\n`;
 }
 
-/** Scaffold a credentials template (if absent) and ensure the real credentials file is gitignored. */
-function scaffoldCredentials(fs: FileSystem, root: string, descriptor: ProviderDescriptor): void {
-  const examplePath = credentialsExamplePath(root);
-  if (!fs.exists(examplePath)) {
-    fs.write(examplePath, credentialsTemplate(descriptor));
-  }
-
+/** Add the credentials file to .gitignore if it isn't already — a secret must never be committed. */
+function ensureGitignored(fs: FileSystem, root: string): void {
   const ignorePath = gitignorePath(root);
   const current = fs.read(ignorePath) ?? '';
   const lines = current.split('\n').map((l) => l.trim());
@@ -90,6 +93,109 @@ function scaffoldCredentials(fs: FileSystem, root: string, descriptor: ProviderD
     const prefix = current.length === 0 || current.endsWith('\n') ? current : `${current}\n`;
     fs.write(ignorePath, `${prefix}${CREDENTIALS_IGNORE_ENTRY}\n`);
   }
+}
+
+/** Scaffold a credentials template (if absent) and ensure the real credentials file is gitignored. */
+function scaffoldCredentials(fs: FileSystem, root: string, descriptor: ProviderDescriptor): void {
+  const examplePath = credentialsExamplePath(root);
+  if (!fs.exists(examplePath)) {
+    fs.write(examplePath, credentialsTemplate(descriptor));
+  }
+  ensureGitignored(fs, root);
+}
+
+/** Credential keys that hold a secret and must be entered hidden (never echoed to the terminal). */
+const SECRET_KEY = /TOKEN|SECRET|PASSWORD|PAT|API[_-]?KEY/i;
+
+/**
+ * Best-effort owner/repo from a repo's `.git/config` origin remote, so a GitHub setup doesn't have
+ * to retype what git already knows. Handles both `https://github.com/owner/repo(.git)` and
+ * `git@github.com:owner/repo(.git)`. Keyed by the exact env-var names, so it's a no-op for any
+ * provider that doesn't use them.
+ */
+function detectGitCoordinates(configText: string | undefined): Record<string, string> {
+  if (configText === undefined) return {};
+  const url = configText.match(/\[remote "origin"\][\s\S]*?url\s*=\s*(\S+)/)?.[1];
+  const gh = url?.match(/github\.com[/:]([^/]+)\/(.+?)(?:\.git)?$/);
+  return gh ? { GITHUB_OWNER: gh[1] as string, GITHUB_REPO: gh[2] as string } : {};
+}
+
+function writeCredentialsFile(
+  fs: FileSystem,
+  root: string,
+  descriptor: ProviderDescriptor,
+  values: Record<string, string>,
+  orderedKeys: readonly string[],
+): void {
+  const header = `# Baron credentials for '${descriptor.id}' — gitignored, NEVER commit. Written by \`baron init\`.\n`;
+  // Emit the required keys in order first, then any extras already in the file, so the layout is stable.
+  const keys = [...orderedKeys, ...Object.keys(values).filter((k) => !orderedKeys.includes(k))];
+  const body = keys.map((k) => `${k}=${values[k] ?? ''}`).join('\n');
+  fs.write(credentialsPath(root), `${header}${body}\n`);
+}
+
+/**
+ * Gather the provider's credentials so `baron init` is a single command instead of "hand-create
+ * .baron/credentials, THEN run init". Keys already set (env or an existing file) are kept; GitHub
+ * owner/repo are auto-detected from the git remote; the rest are prompted (secrets entered hidden).
+ * The file is written (gitignored) and the effective env is returned for introspection. A key left
+ * blank fails loudly rather than introspecting with an empty token.
+ */
+async function ensureCredentials(
+  fs: FileSystem,
+  prompter: Prompter,
+  root: string,
+  descriptor: ProviderDescriptor,
+  env: Env,
+): Promise<Env> {
+  const required = [
+    ...new Set([
+      ...(descriptor.credentialEnvKeys ?? []),
+      ...(descriptor.scmCredentialEnvKeys ?? []),
+    ]),
+  ];
+  const existing = mergeCredentials(env, fs.read(credentialsPath(root)));
+  const missing = required.filter((key) => {
+    const v = existing[key];
+    return v === undefined || v === '';
+  });
+  if (missing.length === 0) return existing;
+
+  const detected = detectGitCoordinates(fs.read(gitConfigPath(root)));
+  const fileValues: Record<string, string> = {
+    ...(fs.read(credentialsPath(root)) !== undefined
+      ? parseCredentials(fs.read(credentialsPath(root)) as string)
+      : {}),
+  };
+
+  prompter.note(`Setting up ${CREDENTIALS_IGNORE_ENTRY} (gitignored) for '${descriptor.id}':`);
+  for (const key of missing) {
+    const auto = detected[key];
+    if (auto !== undefined) {
+      prompter.note(`  ${key} = ${auto}  (detected from git remote)`);
+      fileValues[key] = auto;
+      continue;
+    }
+    const secret = SECRET_KEY.test(key);
+    const answer = await prompter.text(`  ${key}${secret ? ' (hidden)' : ''}:`, { secret });
+    fileValues[key] = answer.trim();
+  }
+
+  writeCredentialsFile(fs, root, descriptor, fileValues, required);
+  ensureGitignored(fs, root);
+
+  const effective = mergeCredentials(env, fs.read(credentialsPath(root)));
+  const stillMissing = required.filter((key) => {
+    const v = effective[key];
+    return v === undefined || v === '';
+  });
+  if (stillMissing.length > 0) {
+    throw new BaronError(
+      `Missing credential(s): ${stillMissing.join(', ')}. Fill them in ${CREDENTIALS_IGNORE_ENTRY} and re-run \`baron init\`.`,
+      'CREDENTIALS_MISSING',
+    );
+  }
+  return effective;
 }
 
 function summarizeProposal(prompter: Prompter, proposal: ProviderProposal, bindScm: boolean): void {
@@ -145,7 +251,19 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
     }
   }
 
-  const introspector = options.introspector ?? createIntrospector(options.env ?? {});
+  // Make init a single command: gather any missing credentials (auto-detecting GitHub owner/repo
+  // from the git remote, prompting for the token) and write .baron/credentials, so the user need not
+  // hand-create that file before running. An injected introspector (tests) still needs a complete
+  // env, so gathering runs either way. Skipped entirely when nothing is missing.
+  const effectiveEnv = await ensureCredentials(
+    options.fs,
+    options.prompter,
+    options.root,
+    descriptor,
+    options.env ?? {},
+  );
+
+  const introspector = options.introspector ?? createIntrospector(effectiveEnv);
   const introspection = await introspector.introspect();
   const proposal = proposePolicy(introspection, manifest);
 

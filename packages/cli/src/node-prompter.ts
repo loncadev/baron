@@ -18,4 +18,26 @@ export const nodePrompter: Prompter = {
       rl.close();
     }
   },
+  async text(question, opts) {
+    const rl = createInterface({ input: stdin, output: stdout, terminal: true });
+    // For a secret, mute the keystroke echo: the prompt itself is written once, then every further
+    // write (the typed characters) is swallowed so a token never lands in the terminal or scrollback.
+    if (opts?.secret === true) {
+      let promptShown = false;
+      const muted = rl as unknown as { _writeToOutput?: (chunk: string) => void };
+      muted._writeToOutput = (chunk: string) => {
+        if (!promptShown) {
+          stdout.write(chunk);
+          promptShown = true;
+        }
+      };
+    }
+    try {
+      const answer = await rl.question(`${question} `);
+      if (opts?.secret === true) stdout.write('\n'); // the muted Enter left the cursor mid-line
+      return answer.trim();
+    } finally {
+      rl.close();
+    }
+  },
 };

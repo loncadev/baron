@@ -18,4 +18,6 @@ export interface Prompter {
   note(message: string): void;
   /** Ask a yes/no question; `defaultYes` is the answer for an empty response. */
   confirm(question: string, defaultYes: boolean): Promise<boolean>;
+  /** Ask for a free-text value; `secret: true` hides the echo (tokens/PATs must not print). */
+  text(question: string, opts?: { secret?: boolean }): Promise<string>;
 }

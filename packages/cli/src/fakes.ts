@@ -24,15 +24,20 @@ export interface ScriptedPrompter extends Prompter {
   readonly notes: string[];
 }
 
-export function scriptedPrompter(answers: readonly boolean[]): ScriptedPrompter {
+export function scriptedPrompter(
+  answers: readonly boolean[],
+  texts: readonly string[] = [],
+): ScriptedPrompter {
   const notes: string[] = [];
   let cursor = 0;
+  let textCursor = 0;
   return {
     notes,
     note: (message) => {
       notes.push(message);
     },
     confirm: async () => answers[cursor++] ?? false,
+    text: async () => texts[textCursor++] ?? '',
   };
 }
 

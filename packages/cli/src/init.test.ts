@@ -10,11 +10,22 @@ import { runInit } from './init.js';
 import {
   CREDENTIALS_IGNORE_ENTRY,
   credentialsExamplePath,
+  credentialsPath,
+  gitConfigPath,
   gitignorePath,
   policyPath,
 } from './paths.js';
 
 const ROOT = '/repo';
+
+/** A complete credential set so ensureCredentials is a no-op (the introspector is injected anyway). */
+const GH_ENV = { GITHUB_OWNER: 'o', GITHUB_REPO: 'r', GITHUB_TOKEN: 't' };
+const AZ_ENV = {
+  AZURE_DEVOPS_ORG: 'o',
+  AZURE_DEVOPS_PROJECT: 'p',
+  AZURE_DEVOPS_REPO: 'r',
+  AZURE_DEVOPS_TOKEN: 't',
+};
 
 describe('runInit', () => {
   it('writes a loader-valid policy after confirmation and scaffolds credentials', async () => {
@@ -24,6 +35,7 @@ describe('runInit', () => {
       root: ROOT,
       issuesProvider: 'github',
       fs,
+      env: GH_ENV,
       prompter,
       introspector: createMemoryIntrospector(githubIntrospectionFixture),
     });
@@ -51,6 +63,7 @@ describe('runInit', () => {
       root: ROOT,
       issuesProvider: 'github',
       fs: ghFs,
+      env: GH_ENV,
       prompter: scriptedPrompter([true]),
       introspector: createMemoryIntrospector(githubIntrospectionFixture),
     });
@@ -61,6 +74,7 @@ describe('runInit', () => {
       root: ROOT,
       issuesProvider: 'azure-devops',
       fs: azFs,
+      env: AZ_ENV,
       prompter: scriptedPrompter([true]),
       introspector: createMemoryIntrospector(azureIntrospectionFixture),
     });
@@ -78,6 +92,7 @@ describe('runInit', () => {
       root: ROOT,
       issuesProvider: 'github',
       fs,
+      env: GH_ENV,
       prompter: scriptedPrompter([false]),
       introspector: createMemoryIntrospector(githubIntrospectionFixture),
     });
@@ -91,6 +106,7 @@ describe('runInit', () => {
       root: ROOT,
       issuesProvider: 'github',
       fs,
+      env: GH_ENV,
       prompter: scriptedPrompter([false]), // decline the overwrite
       introspector: createMemoryIntrospector(githubIntrospectionFixture),
     });
@@ -104,12 +120,54 @@ describe('runInit', () => {
       root: ROOT,
       issuesProvider: 'github',
       fs,
+      env: GH_ENV,
       prompter: scriptedPrompter([]),
       force: true,
       introspector: createMemoryIntrospector(githubIntrospectionFixture),
     });
     expect(result.written).toBe(true);
     expect(fs.read(policyPath(ROOT))).toContain('"providers"');
+  });
+
+  it('gathers missing credentials in one run: detects owner/repo from git, prompts for the token', async () => {
+    // No credentials pre-set. init must write .baron/credentials itself: owner/repo from the git
+    // remote, the token from a (hidden) prompt — so the user runs one command, not "hand-make the
+    // file, then init".
+    const fs = memoryFileSystem({
+      [gitConfigPath(ROOT)]: '[remote "origin"]\n\turl = https://github.com/acme/widgets.git\n',
+    });
+    const prompter = scriptedPrompter([true], ['ghp_secret_value']); // confirm write; token answer
+    const result = await runInit({
+      root: ROOT,
+      issuesProvider: 'github',
+      fs,
+      env: {},
+      prompter,
+      introspector: createMemoryIntrospector(githubIntrospectionFixture),
+    });
+    expect(result.written).toBe(true);
+    const creds = fs.read(credentialsPath(ROOT)) as string;
+    expect(creds).toContain('GITHUB_OWNER=acme'); // detected, not typed
+    expect(creds).toContain('GITHUB_REPO=widgets');
+    expect(creds).toContain('GITHUB_TOKEN=ghp_secret_value');
+    expect(fs.read(gitignorePath(ROOT))).toContain(CREDENTIALS_IGNORE_ENTRY);
+  });
+
+  it('fails loudly when a required credential is left blank rather than introspecting with it empty', async () => {
+    const fs = memoryFileSystem({
+      [gitConfigPath(ROOT)]: '[remote "origin"]\n\turl = git@github.com:acme/widgets.git\n',
+    });
+    const prompter = scriptedPrompter([], ['']); // empty token
+    await expect(
+      runInit({
+        root: ROOT,
+        issuesProvider: 'github',
+        fs,
+        env: {},
+        prompter,
+        introspector: createMemoryIntrospector(githubIntrospectionFixture),
+      }),
+    ).rejects.toMatchObject({ code: 'CREDENTIALS_MISSING' });
   });
 
   it('does not duplicate the gitignore entry when it already exists', async () => {
@@ -120,6 +178,7 @@ describe('runInit', () => {
       root: ROOT,
       issuesProvider: 'github',
       fs,
+      env: GH_ENV,
       prompter: scriptedPrompter([true]),
       introspector: createMemoryIntrospector(githubIntrospectionFixture),
     });
