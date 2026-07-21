@@ -199,13 +199,16 @@ export function createGithubTransport(options: GithubTransportOptions): IssuesTr
     },
 
     async assignIssue(id: string, assignee: string): Promise<NativeIssue> {
+      // '@me' must resolve to the token owner's login — GitHub rejects the literal '@me' as an
+      // assignee (it's not a real login), which broke task-start's `issue.assign @me` on GitHub.
+      const login = await resolveAssignee(assignee);
       // Baron's single-assignee model maps to GitHub's assignees ARRAY: setting replaces the set
       // with exactly this login (update, not addAssignees, so a previous assignee doesn't linger).
       const { data } = await octokit.rest.issues.update({
         owner,
         repo,
         issue_number: Number(id),
-        assignees: [assignee],
+        assignees: [login],
       });
       return toNative(data);
     },
