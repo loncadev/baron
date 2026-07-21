@@ -44,12 +44,13 @@ steps:
     with:
       id: ${issue.id}
       assignee: "@me"
-  # Only on the run that actually cut the branch: a resume would otherwise repeat this comment and
-  # claim a creation that did not happen, filling the card's history with the same line.
+  # Post a "started" note on the item so anyone watching sees work has begun — who is on it and where.
+  # Gated on branch.created so it fires ONCE (on the real start); a resume stays silent rather than
+  # repeating the note on every re-run.
   - do: issue.comment
     when:
       truthy: "${branch.created}"
     with:
       id: ${issue.id}
-      body: "Branch created: ${branch.name}."
+      body: "▶ Started work — moved to in_progress, assigned to ${me}, on branch `${branch.name}`."
   - message: "${issue.key} is in progress on ${branch.name}, assigned to you."
