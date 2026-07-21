@@ -60,6 +60,13 @@ one silently rots while Baron ships fixes. Install the plugin instead.
 version and installs stay current. A pinned version that someone forgets to bump freezes every
 existing user on a cached copy — with no error to reveal it.
 
+**Keep the marketplace plugin `source` as `git-subdir`, not a relative path.** A relative
+`"./plugins/claude-code"` makes the installed plugin *local* (bundled inside the marketplace clone),
+so `/plugin update baron@baron` fails with "Local plugins cannot be updated remotely." The
+`git-subdir` source (in `.claude-plugin/marketplace.json`) makes it git-backed and remotely
+updatable while the plugin still lives in this repo. Users then update with
+`/plugin marketplace update baron` && `/plugin update baron@baron`.
+
 If the project also defines a `baron` server in its own `.mcp.json`, remove that entry once the plugin
 is installed: the plugin already provides the server, and two servers of the same name collide. The
 server resolves its project root from `BARON_ROOT`, falling back to the working directory — which is
