@@ -47,7 +47,7 @@ For each in-flight item, correlate it to its branch's PR via the **core-derived 
 - **Read-only until the user confirms.** Detection never mutates; only step 4 does, and only on an
   explicit batch-confirm.
 - Never invent a branch — use the issue's `branchName` verbatim; skip items without one.
-- A `dry-run` argument (or the user asking to "just show" / "sadece göster") means report and STOP —
+- A `dry-run` argument (or the user asking to only preview / "just show me") means report and STOP —
   no transitions.
 - Surface any `isError` code with its hint; a single item's failure must not abort the whole sweep —
   report it and continue with the rest.
