@@ -35,6 +35,25 @@ Commands:
 
 Providers: ${KNOWN_PROVIDERS.join(', ')}`;
 
+/**
+ * The brand banner shown at the top of every run. Printed to STDERR so it never pollutes stdout
+ * (recipe output / anything a script might parse), and suppressed by BARON_NO_BANNER for CI quiet.
+ */
+const BANNER = `
+  ██████    █████   ██████    █████   ██   ██
+  ██   ██  ██   ██  ██   ██  ██   ██  ███  ██
+  ██████   ███████  ██████   ██   ██  ██ █ ██
+  ██   ██  ██   ██  ██  ██   ██   ██  ██  ███
+  ██████   ██   ██  ██   ██   █████   ██   ██
+
+  work-orchestration for AI coding agents · by Lonca
+`;
+
+function printBanner(ports: CliPorts): void {
+  if (ports.env.BARON_NO_BANNER !== undefined && ports.env.BARON_NO_BANNER !== '') return;
+  ports.err(BANNER);
+}
+
 /** Minimal, dependency-free flag parser: `--key value` pairs and bare `--flag` booleans. */
 function parseFlags(args: readonly string[]): {
   flags: Record<string, string>;
@@ -129,6 +148,8 @@ async function cmdRun(flags: Record<string, string>, ports: CliPorts): Promise<n
 export async function runCli(argv: readonly string[], ports: CliPorts): Promise<number> {
   const [command, ...rest] = argv;
   const { flags } = parseFlags(rest);
+
+  printBanner(ports);
 
   try {
     switch (command) {
