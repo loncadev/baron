@@ -43,10 +43,13 @@ describe('runCli', () => {
     expect(err.join('\n')).toContain("Unknown command 'frobnicate'");
   });
 
-  it('exits 2 when init is missing --provider', async () => {
+  it('prompts for the provider (not a usage error) when init omits --provider', async () => {
+    // Missing --provider no longer exits 2: init asks. Here the default provider is chosen, then the
+    // run fails later on absent credentials (exit 1) — proving it proceeded past provider selection.
     const { ports, err } = harness();
-    expect(await runCli(['init'], ports)).toBe(2);
-    expect(err.join('\n')).toContain('--provider');
+    const code = await runCli(['init'], ports);
+    expect(code).toBe(1);
+    expect(err.join('\n')).toContain('CREDENTIALS_MISSING');
   });
 
   it('surfaces a BaronError as a non-zero exit with the error code', async () => {

@@ -39,10 +39,12 @@ export interface ScriptedPrompter extends Prompter {
 export function scriptedPrompter(
   answers: readonly boolean[],
   texts: readonly string[] = [],
+  choices: readonly string[] = [],
 ): ScriptedPrompter {
   const notes: string[] = [];
   let cursor = 0;
   let textCursor = 0;
+  let choiceCursor = 0;
   return {
     notes,
     note: (message) => {
@@ -50,6 +52,8 @@ export function scriptedPrompter(
     },
     confirm: async () => answers[cursor++] ?? false,
     text: async () => texts[textCursor++] ?? '',
+    // A scripted choice, or the default (first option) when none is queued.
+    choice: async (_question, options) => choices[choiceCursor++] ?? (options[0] as string),
   };
 }
 

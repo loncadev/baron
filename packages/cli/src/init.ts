@@ -9,6 +9,7 @@ import {
 } from '@lonca/baron-core';
 import {
   type Env,
+  KNOWN_PROVIDERS,
   type ProviderDescriptor,
   getProviderDescriptor,
   mergeCredentials,
@@ -27,8 +28,8 @@ import type { FileSystem, Prompter } from './ports.js';
 
 export interface InitOptions {
   readonly root: string;
-  /** Provider to bind to the issues port. */
-  readonly issuesProvider: string;
+  /** Provider to bind to the issues port. When omitted, init prompts the user to pick one. */
+  readonly issuesProvider?: string;
   readonly fs: FileSystem;
   readonly prompter: Prompter;
   /** Injected introspector (tests). When absent, built from the registry + env credentials. */
@@ -332,6 +333,15 @@ async function ensureAgentsSteering(
   return true;
 }
 
+/** Ask which provider to bind when `--provider` was omitted — only those with an issues adapter. */
+async function promptForProvider(prompter: Prompter): Promise<string> {
+  const providers = KNOWN_PROVIDERS.filter((id) => {
+    const d = getProviderDescriptor(id);
+    return d.manifest !== undefined && d.createIntrospector !== undefined;
+  });
+  return prompter.choice('Which provider hosts your work items?', providers);
+}
+
 /** Up-front "here is exactly what I will do" so a first run earns trust before it touches anything. */
 function announcePlan(prompter: Prompter, provider: string): void {
   prompter.note(`\nbaron init — configuring Baron for '${provider}' in this project. It will:`);
@@ -358,16 +368,18 @@ function announcePlan(prompter: Prompter, provider: string): void {
  * network in tests.
  */
 export async function runInit(options: InitOptions): Promise<InitResult> {
-  const descriptor = getProviderDescriptor(options.issuesProvider);
+  // Missing --provider isn't a hard error: like a modern init, ask which provider to bind.
+  const issuesProvider = options.issuesProvider ?? (await promptForProvider(options.prompter));
+  const descriptor = getProviderDescriptor(issuesProvider);
   const { createIntrospector, manifest } = descriptor;
   if (createIntrospector === undefined || manifest === undefined) {
     throw new BaronError(
-      `Provider '${options.issuesProvider}' has no issues adapter to initialize.`,
+      `Provider '${issuesProvider}' has no issues adapter to initialize.`,
       'ISSUES_UNSUPPORTED',
     );
   }
   const path = policyPath(options.root);
-  announcePlan(options.prompter, options.issuesProvider);
+  announcePlan(options.prompter, issuesProvider);
 
   if (options.fs.exists(path) && options.force !== true) {
     const overwrite = await options.prompter.confirm(
@@ -426,7 +438,7 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
     options.root,
     options.force === true,
     {
-      provider: options.issuesProvider,
+      provider: issuesProvider,
       rolesRideLabels: proposal.roleMap.stateKey === 'label',
       sprints: manifest.issues.sprints,
       hierarchy: manifest.issues.hierarchy,

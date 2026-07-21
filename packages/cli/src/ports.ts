@@ -20,4 +20,6 @@ export interface Prompter {
   confirm(question: string, defaultYes: boolean): Promise<boolean>;
   /** Ask for a free-text value; `secret: true` hides the echo (tokens/PATs must not print). */
   text(question: string, opts?: { secret?: boolean }): Promise<string>;
+  /** Pick one of `options` (a numbered menu in the real prompter); the first is the default. */
+  choice(question: string, options: readonly string[]): Promise<string>;
 }

@@ -129,6 +129,22 @@ describe('runInit', () => {
     expect(fs.read(policyPath(ROOT))).toContain('"providers"');
   });
 
+  it('prompts for the provider when issuesProvider is omitted, then proceeds', async () => {
+    const fs = memoryFileSystem();
+    // No provider passed. The scripted choice picks 'github'; two confirms follow (policy, steering).
+    const result = await runInit({
+      root: ROOT,
+      fs,
+      env: GH_ENV,
+      prompter: scriptedPrompter([true, true], [], ['github']),
+      introspector: createMemoryIntrospector(githubIntrospectionFixture),
+    });
+    expect(result.written).toBe(true);
+    expect(
+      resolveIssuesConfig(parsePolicy(JSON.parse(fs.read(policyPath(ROOT)) as string))).provider,
+    ).toBe('github');
+  });
+
   it('writes a Baron steering block to AGENTS.md when confirmed', async () => {
     const fs = memoryFileSystem();
     // Two confirms: [write policy, add AGENTS.md steering].

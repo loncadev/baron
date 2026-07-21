@@ -31,12 +31,13 @@ export interface CliPorts {
 const USAGE = `baron — platform-agnostic work-orchestration
 
 Usage:
-  baron init --provider <id> [--root <dir>] [--force]
+  baron init [--provider <id>] [--root <dir>] [--force]
   baron doctor [--root <dir>]
   baron run --recipe <path> [--root <dir>]
 
 Commands:
-  init     Introspect a provider, propose a role/type/gap map, confirm, and write .baron/policy.json
+  init     Set up Baron for a project: gather credentials, propose a role map, write .baron/policy.json
+           (prompts you to pick a provider when --provider is omitted)
   doctor   Validate .baron/policy.json against the live provider and report drift
   run      Execute a YAML recipe against the policy's live ports
 
@@ -93,16 +94,11 @@ function effectiveEnv(ports: CliPorts, root: string): Env {
 }
 
 async function cmdInit(flags: Record<string, string>, ports: CliPorts): Promise<number> {
-  const issuesProvider = flags.provider;
-  if (issuesProvider === undefined) {
-    ports.err('init requires --provider <id>.');
-    ports.err(USAGE);
-    return 2;
-  }
   const root = flags.root ?? '.';
+  // --provider is optional: runInit prompts for it (a numbered menu) when it's omitted.
   const result = await runInit({
     root,
-    issuesProvider,
+    ...(flags.provider !== undefined ? { issuesProvider: flags.provider } : {}),
     fs: ports.fs,
     prompter: ports.prompter,
     env: effectiveEnv(ports, root),
