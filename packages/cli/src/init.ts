@@ -168,21 +168,36 @@ async function ensureCredentials(
       : {}),
   };
 
-  prompter.note(`Setting up ${CREDENTIALS_IGNORE_ENTRY} (gitignored) for '${descriptor.id}':`);
+  prompter.note(
+    `\nSetting up credentials → ${CREDENTIALS_IGNORE_ENTRY} (gitignored, never committed).`,
+  );
+  // Show the provider's token guidance (where to get it, which permissions) — but only when a value
+  // must actually be typed, so an all-autodetected run stays quiet.
+  const willPrompt = missing.some((key) => detected[key] === undefined);
+  if (willPrompt && descriptor.credentialsHelp !== undefined) {
+    prompter.note('');
+    for (const line of descriptor.credentialsHelp) prompter.note(line);
+    prompter.note('');
+  }
+
   for (const key of missing) {
     const auto = detected[key];
     if (auto !== undefined) {
-      prompter.note(`  ${key} = ${auto}  (detected from git remote)`);
+      prompter.note(`  ${key} = ${auto}  (detected from your git remote)`);
       fileValues[key] = auto;
       continue;
     }
     const secret = SECRET_KEY.test(key);
-    const answer = await prompter.text(`  ${key}${secret ? ' (hidden)' : ''}:`, { secret });
+    const answer = await prompter.text(
+      `  ${key}${secret ? ' (paste the token — input hidden)' : ''}:`,
+      { secret },
+    );
     fileValues[key] = answer.trim();
   }
 
   writeCredentialsFile(fs, root, descriptor, fileValues, required);
   ensureGitignored(fs, root);
+  prompter.note(`Saved ${CREDENTIALS_IGNORE_ENTRY} (gitignored — your token is not committed).`);
 
   const effective = mergeCredentials(env, fs.read(credentialsPath(root)));
   const stillMissing = required.filter((key) => {
@@ -217,9 +232,24 @@ function summarizeProposal(prompter: Prompter, proposal: ProviderProposal, bindS
   }
 }
 
+/** Up-front "here is exactly what I will do" so a first run earns trust before it touches anything. */
+function announcePlan(prompter: Prompter, provider: string): void {
+  prompter.note(`\nbaron init — configuring Baron for '${provider}' in this project. It will:`);
+  prompter.note('  • detect what it can from your git remote, and ask for a provider token;');
+  prompter.note(`  • write ${BARON_DIR}/credentials — your token, GITIGNORED, never committed;`);
+  prompter.note(
+    '  • introspect your provider and PROPOSE a role mapping — nothing is written until',
+  );
+  prompter.note('    you confirm it;');
+  prompter.note(
+    `  • write ${BARON_DIR}/policy.json — the confirmed mapping, COMMITTED (no secrets).`,
+  );
+  prompter.note('It never writes to your provider and never prints or commits your token.\n');
+}
+
 /**
- * `baron init`: introspect the issues provider, propose a role/type/gap mapping, let a human confirm
- * it, then write `.baron/policy.json` (committed) and scaffold credentials (gitignored). All I/O
+ * `baron init`: explain the plan, gather credentials (gitignored), introspect the provider, propose a
+ * role/type/gap mapping, let a human confirm it, then write `.baron/policy.json` (committed). All I/O
  * goes through injected ports so the flow is exercised end-to-end without touching a real disk or
  * network in tests.
  */
@@ -233,6 +263,7 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
     );
   }
   const path = policyPath(options.root);
+  announcePlan(options.prompter, options.issuesProvider);
 
   if (options.fs.exists(path) && options.force !== true) {
     const overwrite = await options.prompter.confirm(
@@ -284,6 +315,13 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
   options.fs.mkdirp(`${options.root}/${BARON_DIR}`);
   options.fs.write(path, serializePolicy(policy));
   scaffoldCredentials(options.fs, options.root, descriptor);
+
+  options.prompter.note(`\nWrote ${BARON_DIR}/policy.json (commit it — it holds no secrets).`);
+  options.prompter.note('Next steps:');
+  options.prompter.note(
+    '  • Drive it from Claude Code: `/plugin marketplace add loncadev/baron` then `/plugin install baron@baron`.',
+  );
+  options.prompter.note('  • Or validate the setup now: `baron doctor`.');
 
   return { written: true, policyPath: path, proposal };
 }

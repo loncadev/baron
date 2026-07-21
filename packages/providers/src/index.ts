@@ -90,6 +90,12 @@ export type Env = Record<string, string | undefined>;
  */
 export interface ProviderDescriptor {
   readonly id: string;
+  /**
+   * Human onboarding help shown by `baron init` before it asks for a token: where to create one and
+   * exactly which permissions it needs. Provider-specific, so each provider owns its own guidance —
+   * a new user should never have to guess which token to make.
+   */
+  readonly credentialsHelp?: readonly string[];
   // A provider implements SOME ports, not all (e.g. Slack is notify-only) — every port group is
   // optional, and the matching build*Port throws *_UNSUPPORTED when its group is absent.
   // issues port
@@ -125,6 +131,14 @@ export interface ProviderDescriptor {
 const DESCRIPTORS: Record<string, ProviderDescriptor> = {
   [AZURE_DEVOPS_PROVIDER]: {
     id: AZURE_DEVOPS_PROVIDER,
+    credentialsHelp: [
+      'Azure DevOps needs a Personal Access Token (PAT).',
+      '  1. Create one at: https://dev.azure.com/{your-org}/_usersSettings/tokens',
+      '  2. Scopes: Work Items = Read, write, & manage; Code = Read & Write (branches + PRs).',
+      '  3. Copy the token — you only see it once.',
+      "  ORG / PROJECT / REPO are coordinates, not secrets; only the token is secret. If you're in the",
+      '  repo now, they may be prefilled — otherwise enter them when asked.',
+    ],
     manifest: azureDevOpsManifest,
     credentialEnvKeys: ['AZURE_DEVOPS_ORG', 'AZURE_DEVOPS_PROJECT', 'AZURE_DEVOPS_TOKEN'],
     linkMap: exampleAzureDevOpsLinkMap,
@@ -189,6 +203,17 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
   },
   [GITHUB_PROVIDER]: {
     id: GITHUB_PROVIDER,
+    credentialsHelp: [
+      'GitHub needs a fine-grained personal access token (PAT).',
+      '  1. Create one at: https://github.com/settings/personal-access-tokens/new',
+      '  2. Repository access: "Only select repositories" → the repo you are setting up.',
+      '  3. Repository permissions (all Read and write):',
+      '       Contents  (cut branches, read the default branch)',
+      '       Issues    (create / update / comment / assign / label)',
+      '       Pull requests  (open PRs + threads)',
+      '     Metadata (Read) is added automatically; add Checks (Read) for PR-status / ship flows.',
+      '  4. Generate and copy the token — it starts with github_pat_ and is shown once.',
+    ],
     manifest: githubManifest,
     credentialEnvKeys: ['GITHUB_OWNER', 'GITHUB_REPO', 'GITHUB_TOKEN'],
     linkMap: exampleGithubLinkMap,

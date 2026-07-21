@@ -151,6 +151,11 @@ describe('runInit', () => {
     expect(creds).toContain('GITHUB_REPO=widgets');
     expect(creds).toContain('GITHUB_TOKEN=ghp_secret_value');
     expect(fs.read(gitignorePath(ROOT))).toContain(CREDENTIALS_IGNORE_ENTRY);
+    // Trust + guidance: before prompting for a token, init must tell the user where to get one and
+    // that the token is never committed — a first-time user should not have to guess which token.
+    const said = prompter.notes.join('\n');
+    expect(said).toContain('github.com/settings/personal-access-tokens');
+    expect(said).toMatch(/gitignored|never committed/i);
   });
 
   it('fails loudly when a required credential is left blank rather than introspecting with it empty', async () => {
