@@ -195,6 +195,9 @@ async function ensureCredentials(
     fileValues[key] = answer.trim();
   }
 
+  // The .baron dir may not exist yet on a fresh project — create it before writing the credentials
+  // file (the policy write later does its own mkdirp, but that runs after this).
+  fs.mkdirp(`${root}/${BARON_DIR}`);
   writeCredentialsFile(fs, root, descriptor, fileValues, required);
   ensureGitignored(fs, root);
   prompter.note(`Saved ${CREDENTIALS_IGNORE_ENTRY} (gitignored — your token is not committed).`);

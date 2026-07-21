@@ -1,3 +1,4 @@
+import { BARON_DIR } from '@lonca/baron-providers';
 import type { RecipeAsker } from '@lonca/baron-recipes';
 import type { FileSystem, Prompter } from './ports.js';
 
@@ -8,14 +9,25 @@ export interface MemoryFileSystem extends FileSystem {
 
 export function memoryFileSystem(seed: Record<string, string> = {}): MemoryFileSystem {
   const files = new Map<string, string>(Object.entries(seed));
+  const dirs = new Set<string>();
   return {
     files,
     read: (path) => files.get(path),
     write: (path, content) => {
+      // Model the real fs faithfully for the .baron dir: writing into it before it's created is
+      // ENOENT (writeFileSync doesn't mkdir parents) — the exact failure a fresh `baron init` hit.
+      const parent = path.slice(0, path.lastIndexOf('/'));
+      if (parent.endsWith(`/${BARON_DIR}`) && !dirs.has(parent)) {
+        throw Object.assign(new Error(`ENOENT: no such file or directory, open '${path}'`), {
+          code: 'ENOENT',
+        });
+      }
       files.set(path, content);
     },
-    exists: (path) => files.has(path),
-    mkdirp: () => {},
+    exists: (path) => files.has(path) || dirs.has(path),
+    mkdirp: (path) => {
+      dirs.add(path);
+    },
   };
 }
 
