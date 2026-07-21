@@ -145,6 +145,11 @@ describe('runInit', () => {
     expect(agents).toContain('Work tracking — route through Baron');
     expect(agents).toContain('<!-- baron:begin');
     expect(agents).toContain('<!-- baron:end -->');
+    // Provider-specific note derived from the manifest: GitHub roles ride labels and has no sprints,
+    // so the agent is told that empty sprint results are expected, not a bug.
+    expect(agents).toContain('provider: `github`');
+    expect(agents).toContain('roles ride labels');
+    expect(agents).toContain('sprints are NOT available');
   });
 
   it('refreshes the steering block idempotently, preserving surrounding content', async () => {

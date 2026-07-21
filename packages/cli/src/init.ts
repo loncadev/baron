@@ -240,9 +240,31 @@ function summarizeProposal(prompter: Prompter, proposal: ProviderProposal, bindS
 const STEERING_BEGIN = '<!-- baron:begin — managed by `baron init`; edit outside these markers -->';
 const STEERING_END = '<!-- baron:end -->';
 
-/** Agent steering: teaches an agent to drive work through Baron's abstract vocabulary, not raw
- * provider writes. Harness-neutral (AGENTS.md), so any agent that reads it benefits. */
-function steeringBlock(): string {
+/** The provider facts that change how an agent should behave — derived from the manifest + role map,
+ * so the steering's "on this provider" note is always accurate, never guessed. */
+interface SteeringContext {
+  readonly provider: string;
+  /** Roles ride labels (GitHub) vs the provider's native states (Azure). */
+  readonly rolesRideLabels: boolean;
+  readonly sprints: boolean;
+  readonly hierarchy: boolean;
+}
+
+/**
+ * Agent steering: teaches an agent to drive work through Baron's abstract vocabulary, not raw
+ * provider writes. Harness-neutral (AGENTS.md), so any agent that reads it benefits. The abstract
+ * core is provider-independent; a short "on this provider" note (derived from the manifest) tells the
+ * agent which capabilities exist here — so a degraded capability's empty result isn't mistaken for a
+ * bug (the exact confusion a flat provider caused in dogfooding).
+ */
+function steeringBlock(ctx: SteeringContext): string {
+  const roles = ctx.rolesRideLabels
+    ? 'labels (Baron provisions `in-progress` / `in-review` / `done`)'
+    : "the provider's native states";
+  const sprints = ctx.sprints
+    ? 'available (`baron_issue_iterations`, filter by `@current`)'
+    : 'NOT available — sprint queries degrade to empty. That empty is expected here, not a bug';
+  const hierarchy = ctx.hierarchy ? 'native parent/child' : 'emulated via a `parent:<id>` label';
   const body = `## Work tracking — route through Baron
 
 Track work through **Baron**, not raw provider writes: it normalizes issues and source control across
@@ -259,7 +281,12 @@ providers behind one contract, so speak its abstract vocabulary, never a vendor'
   \`/baron:task-list\`, \`/baron:task-sync\`. Each item's canonical branch is Baron-derived — use it
   verbatim, never invent one.
 - Reading/exploring a provider natively is fine, but make every work-item **change** through Baron so the
-  role mapping, gap policy, and knowledge loop apply.`;
+  role mapping, gap policy, and knowledge loop apply.
+
+**On this project (provider: \`${ctx.provider}\`):** roles ride ${roles}; sprints are ${sprints};
+parent/child is ${hierarchy}. Where a capability is missing Baron negotiates it (error / emulate /
+degrade) and logs it — an empty or emulated result from a degraded capability is expected behavior,
+not a silent failure to report as a bug.`;
   return `${STEERING_BEGIN}\n${body}\n${STEERING_END}`;
 }
 
@@ -274,6 +301,7 @@ async function ensureAgentsSteering(
   prompter: Prompter,
   root: string,
   force: boolean,
+  ctx: SteeringContext,
 ): Promise<boolean> {
   const path = `${root}/AGENTS.md`;
   const current = fs.read(path);
@@ -288,16 +316,17 @@ async function ensureAgentsSteering(
     force || (await prompter.confirm(`${verb} AGENTS.md (agent steering for Baron)?`, true));
   if (!ok) return false;
 
+  const block = steeringBlock(ctx);
   let next: string;
   if (current === undefined) {
-    next = `${steeringBlock()}\n`;
+    next = `${block}\n`;
   } else if (hasBlock) {
     const start = current.indexOf(STEERING_BEGIN);
     const end = current.indexOf(STEERING_END) + STEERING_END.length;
-    next = current.slice(0, start) + steeringBlock() + current.slice(end);
+    next = current.slice(0, start) + block + current.slice(end);
   } else {
     const sep = current.length === 0 || current.endsWith('\n') ? '\n' : '\n\n';
-    next = `${current}${sep}${steeringBlock()}\n`;
+    next = `${current}${sep}${block}\n`;
   }
   fs.write(path, next);
   return true;
@@ -396,6 +425,12 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
     options.prompter,
     options.root,
     options.force === true,
+    {
+      provider: options.issuesProvider,
+      rolesRideLabels: proposal.roleMap.stateKey === 'label',
+      sprints: manifest.issues.sprints,
+      hierarchy: manifest.issues.hierarchy,
+    },
   );
 
   options.prompter.note(`\nWrote ${BARON_DIR}/policy.json (commit it — it holds no secrets).`);
