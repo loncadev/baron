@@ -51,6 +51,7 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
   let seq = 0;
   let commentSeq = 0;
   const store = new Map<string, Rec>();
+  const provisionedLabels = new Set<string>();
 
   const snapshot = (r: Rec): NativeIssue => ({
     id: r.id,
@@ -111,6 +112,12 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
     async addLabel(id: string, label: string): Promise<void> {
       const rec = must(id);
       if (!rec.labels.includes(label)) rec.labels.push(label);
+    },
+
+    async ensureLabels(labels): Promise<void> {
+      // Idempotent provisioning: record each name once (a repeat is a no-op), mirroring a real
+      // create-if-missing without a network.
+      for (const label of labels) provisionedLabels.add(label.name);
     },
 
     async addComment(id: string, body: string): Promise<NativeComment> {

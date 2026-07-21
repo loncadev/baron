@@ -67,6 +67,18 @@ export function runIssuesConformance(target: IssuesConformanceTarget): void {
       expect(reloaded.body).toBe(repro);
     });
 
+    it('ensureLabels provisions idempotently (safe to call repeatedly)', async () => {
+      // Provisioning role labels must be safe to run on every init: creating what's missing, a no-op
+      // for what exists. A native-state provider (no transport ensureLabels) simply does nothing.
+      const { adapter } = target.build({});
+      const specs = [
+        { name: 'in-progress', color: 'fbca04', description: 'Baron: in progress' },
+        { name: 'done', color: '0e8a16', description: 'Baron: done' },
+      ];
+      await expect(adapter.ensureLabels(specs)).resolves.toBeUndefined();
+      await expect(adapter.ensureLabels(specs)).resolves.toBeUndefined(); // idempotent
+    });
+
     it('update patches title/body and leaves omitted fields alone', async () => {
       const { adapter } = target.build({});
       const issue = await adapter.create({

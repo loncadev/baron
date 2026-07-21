@@ -247,7 +247,10 @@ function announcePlan(prompter: Prompter, provider: string): void {
   prompter.note(
     `  • write ${BARON_DIR}/policy.json — the confirmed mapping, COMMITTED (no secrets).`,
   );
-  prompter.note('It never writes to your provider and never prints or commits your token.\n');
+  prompter.note(
+    'The only thing it creates on your provider is your workflow labels (GitHub); it never touches',
+  );
+  prompter.note('your existing issues or PRs, and never prints or commits your token.\n');
 }
 
 /**

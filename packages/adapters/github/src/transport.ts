@@ -136,6 +136,35 @@ export function createGithubTransport(options: GithubTransportOptions): IssuesTr
       });
     },
 
+    async ensureLabels(labels): Promise<void> {
+      if (labels.length === 0) return;
+      // List once, create only the missing — idempotent, and it never clobbers a color the user
+      // already set. (Without this, GitHub auto-creates a role label grey + description-less on first
+      // transition; provisioning makes them deliberate.)
+      const existing = new Set(
+        (
+          await octokit.paginate(octokit.rest.issues.listLabelsForRepo, {
+            owner,
+            repo,
+            per_page: 100,
+          })
+        ).map((label) => label.name.toLowerCase()),
+      );
+      for (const spec of labels) {
+        if (existing.has(spec.name.toLowerCase())) continue;
+        // Swallow a 422 (a race, or created between the list and now) — the goal is "exists", reached.
+        await octokit.rest.issues
+          .createLabel({
+            owner,
+            repo,
+            name: spec.name,
+            color: spec.color,
+            description: spec.description,
+          })
+          .catch(() => undefined);
+      }
+    },
+
     async updateIssue(id: string, update: NativeUpdateInput): Promise<NativeIssue> {
       // GitHub has one body field for every type, so typeRole needs no routing here.
       const { data } = await octokit.rest.issues.update({

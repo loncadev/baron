@@ -1,6 +1,6 @@
 import { deriveBranchName } from './branch-name.js';
 import type { CapabilityManifest } from './capabilities.js';
-import type { IssuesProviderConfig, NativeTarget } from './config.js';
+import type { IssuesProviderConfig, LabelSpec, NativeTarget } from './config.js';
 import { BaronError } from './errors.js';
 import type { Issue, IssueComment, IssueDraft, IssueQuery } from './issue.js';
 import { ITERATION_CURRENT, type Iteration } from './iteration.js';
@@ -100,6 +100,12 @@ export interface IssuesTransport {
   applyTarget(id: string, target: NativeTarget): Promise<NativeIssue>;
   /** Add a label additively WITHOUT touching the role discriminator (used by link emulation). */
   addLabel(id: string, label: string): Promise<void>;
+  /**
+   * Create the given labels if they don't already exist (idempotent). Only providers whose roles ride
+   * labels (GitHub) implement it; on native-state providers (Azure) it is absent and the base adapter
+   * no-ops. Lets Baron provision role labels deliberately instead of relying on grey auto-creation.
+   */
+  ensureLabels?(labels: readonly LabelSpec[]): Promise<void>;
   addComment(id: string, body: string): Promise<NativeComment>;
   /** Create a native typed link. Only called when the manifest declares `issueLinks`. */
   linkIssues(fromId: string, toId: string, nativeLinkType: string): Promise<void>;
@@ -138,6 +144,12 @@ export interface IssuesPort {
   query(filter: IssueQuery): Promise<readonly Issue[]>;
   /** Assign the issue to a provider-native user handle (Azure: email; GitHub: login). */
   assign(id: string, assignee: string): Promise<Issue>;
+  /**
+   * Provision the given labels (idempotent). A no-op on providers whose roles are native states.
+   * `baron init` calls this to create a repo's workflow labels deliberately (named colors) so a
+   * transition never depends on the provider silently auto-creating a grey one.
+   */
+  ensureLabels(labels: readonly LabelSpec[]): Promise<void>;
   /** The provider's iterations/sprints (empty when the provider has none). */
   iterations(): Promise<readonly Iteration[]>;
   /** The active iteration right now, or undefined (no sprint active / provider has none). */
@@ -292,6 +304,11 @@ export class BaseIssuesAdapter implements IssuesPort {
 
   whoAmI(): Promise<string> {
     return this.transport.currentUser();
+  }
+
+  async ensureLabels(labels: readonly LabelSpec[]): Promise<void> {
+    // Native-state providers have no ensureLabels transport method: nothing to provision.
+    await this.transport.ensureLabels?.(labels);
   }
 
   async assign(id: string, assignee: string): Promise<Issue> {

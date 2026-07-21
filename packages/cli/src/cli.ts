@@ -1,13 +1,20 @@
-import { BaronError } from '@lonca/baron-core';
+import {
+  BaronError,
+  parsePolicyJson,
+  resolveIssuesConfig,
+  roleLabelSpecs,
+} from '@lonca/baron-core';
 import {
   type Env,
   KNOWN_PROVIDERS,
+  buildIssuesPort,
   credentialsPath,
   mergeCredentials,
 } from '@lonca/baron-providers';
 import type { RecipeAsker } from '@lonca/baron-recipes';
 import { runDoctor } from './doctor.js';
 import { runInit } from './init.js';
+import { policyPath } from './paths.js';
 import type { FileSystem, Prompter } from './ports.js';
 import { runRecipeFile } from './run.js';
 
@@ -101,12 +108,39 @@ async function cmdInit(flags: Record<string, string>, ports: CliPorts): Promise<
     env: effectiveEnv(ports, root),
     force: flags.force === 'true',
   });
-  if (result.written) {
-    ports.out(`Wrote ${result.policyPath}.`);
-  } else {
+  if (!result.written) {
     ports.out('Aborted; no changes written.');
+    return 0;
   }
+  ports.out(`Wrote ${result.policyPath}.`);
+  await provisionRoleLabels(ports, root);
   return 0;
+}
+
+/**
+ * After init writes the policy, provision the provider's workflow labels so a transition never
+ * depends on a provider silently auto-creating a grey one. A no-op for native-state providers
+ * (roleLabelSpecs is empty). Best-effort: a failure here doesn't undo a valid setup — the labels
+ * would just be auto-created on first use — so it warns rather than failing the command.
+ */
+async function provisionRoleLabels(ports: CliPorts, root: string): Promise<void> {
+  const raw = ports.fs.read(policyPath(root));
+  if (raw === undefined) return;
+  const config = resolveIssuesConfig(parsePolicyJson(raw));
+  const specs = roleLabelSpecs(config.roleMap);
+  if (specs.length === 0) return;
+  try {
+    await buildIssuesPort(config, effectiveEnv(ports, root)).ensureLabels(specs);
+    ports.out(
+      `Provisioned ${specs.length} workflow labels: ${specs.map((s) => s.name).join(', ')}.`,
+    );
+  } catch (error) {
+    ports.err(
+      `note: could not provision workflow labels now (${
+        error instanceof Error ? error.message : String(error)
+      }); they'll be created on first use.`,
+    );
+  }
 }
 
 async function cmdDoctor(flags: Record<string, string>, ports: CliPorts): Promise<number> {

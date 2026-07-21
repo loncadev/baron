@@ -24,6 +24,10 @@ One-command setup. In order, `init`:
 2. **Introspects** the provider, **proposes** a role/type/gap mapping, and asks you to confirm.
 3. **Writes `.baron/policy.json`**, binding the provider to both `issues` **and** `scm` (when it has
    an scm adapter — both P0 providers do), so the branch/PR flow works without hand-editing.
+4. **Provisions the workflow labels** on providers whose roles ride labels (GitHub): it creates
+   `in-progress` / `in-review` / `done` with deliberate colors, so a transition never depends on the
+   provider auto-creating a grey, description-less label. A no-op on native-state providers (Azure),
+   and best-effort — if it can't reach the provider, it warns and the labels are created on first use.
 
 | Flag | Meaning |
 | --- | --- |
