@@ -1,8 +1,8 @@
 # CLI
 
 The `baron` command has three subcommands. All side effects go through the policy in the current
-directory's `.baron/` (override the root with `--root`). Run from this repo with `pnpm baron …`
-(a `tsx` runner is wired up) until the package is published.
+directory's `.baron/` (override the root with `--root`). Run it via `npx -y @lonca/baron-cli@latest …`,
+or from a clone of this repo with `pnpm baron …` (a `tsx` runner is wired up).
 
 ```
 baron init --provider <id> [--root <dir>] [--force]
@@ -15,17 +15,24 @@ Known provider ids: `azure-devops`, `github`.
 
 ## `baron init`
 
-Introspect the issues provider, propose a role/type/gap mapping, confirm with you, then write
-`.baron/policy.json` and scaffold `.baron/credentials.example` (+ a `.gitignore` entry for
-`.baron/credentials`).
+One-command setup. In order, `init`:
+
+1. **Gathers credentials.** Any key the provider needs that isn't already set (env or an existing
+   `.baron/credentials`) is collected: GitHub `owner`/`repo` are auto-detected from the git `origin`
+   remote, and the rest are prompted — tokens/PATs entered **hidden**. The values are written to
+   `.baron/credentials` and the file is gitignored. A blank required key fails with `CREDENTIALS_MISSING`.
+2. **Introspects** the provider, **proposes** a role/type/gap mapping, and asks you to confirm.
+3. **Writes `.baron/policy.json`**, binding the provider to both `issues` **and** `scm` (when it has
+   an scm adapter — both P0 providers do), so the branch/PR flow works without hand-editing.
 
 | Flag | Meaning |
 | --- | --- |
-| `--provider <id>` | **Required.** Provider to bind to the `issues` port. |
+| `--provider <id>` | **Required.** Provider to bind. |
 | `--root <dir>` | Project root (default `.`). |
 | `--force` | Overwrite an existing `policy.json` without prompting. |
 
-Missing `--provider` exits `2`. Declining the confirmation writes nothing and exits `0`.
+Missing `--provider` exits `2`. Declining the confirmation writes nothing and exits `0`. A mixed
+setup (issues one provider, scm another) is reachable by editing `providers` in the written file.
 
 ## `baron doctor`
 

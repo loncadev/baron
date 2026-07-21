@@ -10,7 +10,23 @@ is for configuring and for recipe runs; the MCP server is for letting Claude dri
 
 ---
 
-## A. Wire the MCP server into Claude Code
+## A. Wire Baron into Claude Code
+
+**Recommended: install the plugin.** It registers the MCP server **and** the workflow skills
+together (so they never drift), and updates in one step:
+
+```
+/plugin marketplace add loncadev/baron
+/plugin install baron@baron
+```
+
+The plugin's server resolves the project root from the working directory, so no `.mcp.json` is
+needed. Pick up releases with `/plugin marketplace update baron` && `/plugin update baron@baron`.
+Do **not** also keep a `baron` server in the project's `.mcp.json` — two servers of the same name
+collide.
+
+<details>
+<summary>Alternative: a manual <code>.mcp.json</code> (no plugin, MCP tools only — no skills)</summary>
 
 Claude Code reads a project's `.mcp.json`. Create **`BeeMaster/.mcp.json`**:
 
@@ -18,10 +34,11 @@ Claude Code reads a project's `.mcp.json`. Create **`BeeMaster/.mcp.json`**:
 {
   "mcpServers": {
     "baron": {
-      // Pre-publish: run the dev server from the baron repo via tsx.
-      "command": "pnpm",
-      "args": ["--dir", "C:/Users/empad/Desktop/Development/baron", "baron:mcp"],
+      "command": "npx",
+      "args": ["-y", "@lonca/baron-mcp-server@latest"],
       // Point the server at THIS project; it reads <root>/.baron/policy.json + credentials.
+      // Omit to use the working directory. The explicit @latest matters: a bare package name makes
+      // npx reuse its cached install without re-checking the registry, pinning you to a stale version.
       "env": { "BARON_ROOT": "C:/Users/empad/Desktop/Development/BeeMaster" }
     }
   }
@@ -30,15 +47,13 @@ Claude Code reads a project's `.mcp.json`. Create **`BeeMaster/.mcp.json`**:
 
 - The server reads `BeeMaster/.baron/policy.json` and overlays `BeeMaster/.baron/credentials` (your
   PAT) onto the environment — so credentials stay in the gitignored file, not in `.mcp.json`.
-- Windows note: if Claude Code can't find `pnpm`, use `"command": "pnpm.cmd"`. Once `@lonca/baron-mcp-server`
-  is published, this becomes `"command": "npx", "args": ["-y", "@lonca/baron-mcp-server@latest"]` with the
-  same `BARON_ROOT`. The explicit `@latest` matters: a bare package name makes `npx` reuse its cached
-  install without ever re-checking the registry, silently pinning you to a stale version.
 - Restart Claude Code (or reload MCP servers) so it picks up the new server.
 
-With BeeMaster's policy (issues bound, knowledge loop always on), Claude will see:
-`baron_issue_create/get/transition/comment/link/query` and `baron_learning_*` / `baron_followup_*`.
-(`baron_scm_*` appears only after you also bind `providers.scm`.)
+</details>
+
+With a policy that binds both ports (what `baron init` writes by default), Claude sees the issues
+tools (`baron_issue_create/get/update/transition/comment/link/assign/query`), the scm tools
+(`baron_scm_*`), and `baron_learning_*` / `baron_followup_*`.
 
 ### Example prompts to Claude
 
@@ -120,4 +135,5 @@ above is what confirms them against the live API for the first time.
 - **`in_review` / `blocked`:** `in_review` → state `Test`; `blocked` is unmapped (transitioning to it
   errors loudly by design — map it if your process has a blocked state).
 - **Reverse type-role** is best-effort when several roles map to one native type.
-- The dev MCP launch via `pnpm`/`tsx` is a pre-publish convenience; publishing will make it `npx @lonca/baron-mcp-server`.
+- Prefer the published plugin (`/plugin install baron@baron`) over a hand-written `.mcp.json`; the
+  `pnpm`/`tsx` launch is only for developing Baron itself from a clone.

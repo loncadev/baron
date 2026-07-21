@@ -4,8 +4,9 @@ A complete, copy-paste walkthrough to wire Baron to an **Azure DevOps** project 
 **Claude Code**, as a first-time user. End state: you ask Claude things like *"list my backlog"* or
 *"start a task and open a PR"* and it does them through Baron's normalized tools.
 
-> Baron is pre-publish, so you run it from the cloned repo (via `pnpm`/`tsx`). Once `@lonca/baron-*` is on
-> npm, the same steps use `npx @lonca/baron-mcp-server` instead — noted where it matters.
+> Baron is on npm: the CLI runs via `npx -y @lonca/baron-cli@latest`, and the MCP server via the
+> Claude Code plugin (`/plugin marketplace add loncadev/baron`) or `npx @lonca/baron-mcp-server@latest`.
+> No clone or build needed. (To develop Baron itself, run from a clone with `pnpm baron …`.)
 
 ---
 
@@ -181,10 +182,11 @@ Claude Code reads a project's `.mcp.json`. Create `<your-project>/.mcp.json`:
 - **Sprints (optional):** iterations are team-scoped. Baron defaults to Azure's `"<project> Team"`;
   if your sprints live under a differently-named team, add `AZURE_DEVOPS_TEAM=<team name>` to
   `.baron/credentials`.
-- **Windows:** if Claude Code can't find `pnpm`, set `"command": "pnpm.cmd"`.
-- **Once published:** replace `command`/`args` with `"command": "npx", "args": ["-y", "@lonca/baron-mcp-server@latest"]`
-  (keep the `BARON_ROOT` env). The explicit `@latest` matters — a bare name makes `npx` reuse its
-  cached install without re-checking the registry, silently pinning you to a stale version.
+- **Prefer the plugin** (`/plugin marketplace add loncadev/baron` && `/plugin install baron@baron`) —
+  it brings the MCP server *and* the skills, and no `.mcp.json` is needed. If you wire the server
+  manually instead, use `"command": "npx", "args": ["-y", "@lonca/baron-mcp-server@latest"]` (keep the
+  `BARON_ROOT` env). The explicit `@latest` matters — a bare name makes `npx` reuse its cached install
+  without re-checking the registry, silently pinning you to a stale version.
 - **Restart Claude Code** (or reload MCP servers) so it picks up the new server. Confirm it started:
   running `pnpm baron:mcp` (with `BARON_ROOT` set) prints `baron mcp-server running on stdio (root: …)`
   to stderr, then waits — Ctrl-C to stop.

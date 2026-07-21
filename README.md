@@ -53,23 +53,29 @@ enforced by Baron's engine, not by the model improvising.
 
 ## Quick start
 
-Baron runs from source today (no build step needed — workspace packages resolve to TypeScript source):
+Published to npm — no clone, no build. From inside your project:
 
 ```bash
-pnpm install
+# 1. Configure — one command. Auto-detects owner/repo from your git remote, prompts for the token
+#    (hidden), writes .baron/credentials (gitignored) + .baron/policy.json (issues + scm bound).
+npx -y @lonca/baron-cli@latest init --provider github      # or: --provider azure-devops
 
-# 1. Configure: introspect a provider and write .baron/policy.json (you confirm the role mapping)
-pnpm baron init --provider azure-devops      # or: --provider github
+# 2. Check the policy against the live provider (drift → exit 1)
+npx -y @lonca/baron-cli@latest doctor
 
-# 2. Add credentials (env or .baron/credentials — never committed). For Azure DevOps:
-#    AZURE_DEVOPS_ORG, AZURE_DEVOPS_PROJECT, AZURE_DEVOPS_REPO, AZURE_DEVOPS_TOKEN
-
-# 3. Check the policy against the live provider
-pnpm baron doctor
-
-# 4. Run a workflow recipe
-pnpm baron run --recipe packages/recipes/recipes/task-start.yaml
+# 3. Run a workflow recipe
+npx -y @lonca/baron-cli@latest run --recipe <path-to>/task-start.yaml
 ```
+
+Or drive it from an agent — install the Claude Code plugin (MCP server + workflow skills in one):
+
+```
+/plugin marketplace add loncadev/baron
+/plugin install baron@baron
+```
+
+See [Getting started](./docs/getting-started.md) for the full walkthrough. Contributing to Baron
+itself? Run from source with `pnpm baron …` — see [CONTRIBUTING](./CONTRIBUTING.md).
 
 Or wire the **MCP server** into your agent and call the tools directly across every port —
 `baron_issue_create`, `baron_scm_pr_create`, `baron_ci_runs`, `baron_deploy_deployments`,
