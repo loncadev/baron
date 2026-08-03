@@ -4,6 +4,13 @@ steps:
   - ask: { as: issueId, type: text, message: "Issue id?" }
   - ask: { as: branch, type: text, message: "Source branch?" }
   - ask: { as: title, type: text, message: "Pull request title?" }
+  # A PR with an empty description makes the reviewer reconstruct the change from the diff. The skill
+  # composes this (what changed + why); optional so a caller that truly has nothing to add can skip.
+  - ask:
+      as: body
+      type: text
+      message: "Pull request description (what changed and why)? Empty to skip."
+      optional: true
   # Idempotency probe: the engine (not the agent) decides create-vs-report (decision #19).
   - do: scm.pr.find
     as: existingPr
@@ -20,6 +27,10 @@ steps:
       # targetBranch omitted — defaults to the repo's default branch, keeping the recipe portable.
       title: ${title}
       sourceBranch: ${branch}
+      body: ${body}
+      # Abstract: the adapter renders the provider's native linking keyword (GitHub `Closes #N`,
+      # Azure `AB#N`), so the tracker really associates PR and item — not just a comment with a URL.
+      linkedIssueKey: ${issueId}
       draft: true
   - do: scm.pr.thread
     when:

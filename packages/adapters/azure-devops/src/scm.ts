@@ -71,6 +71,17 @@ function toAzureStatusFilter(filter: PrStateFilter): AzurePrStatus {
 type GitApi = Awaited<ReturnType<InstanceType<typeof azdev.WebApi>['getGitApi']>>;
 
 /**
+ * Append Azure's native work-item mention (`AB#123`) so the PR is genuinely LINKED to the item —
+ * Azure resolves the mention into a real work-item link on the PR. A comment carrying the PR URL
+ * (which the recipe also posts) is not a link; this is.
+ */
+function withIssueLink(body: string | undefined, issueKey: string | undefined): string | undefined {
+  if (issueKey === undefined || issueKey.length === 0) return body;
+  const link = `AB#${issueKey.replace(/^AB#/i, '')}`;
+  return body === undefined || body.length === 0 ? link : `${body}\n\n${link}`;
+}
+
+/**
  * Live `scm` transport over the Azure DevOps REST API (azure-devops-node-api GitApi). Branches are
  * created with an atomic ref update from the base branch's tip; PRs use full `refs/heads/*` ref
  * names; a PR thread is a native comment thread. The GitApi client is built lazily and cached.
@@ -135,12 +146,13 @@ export function createAzureDevOpsScmTransport(
 
     async createPullRequest(input: NativePullRequestInput): Promise<NativePullRequest> {
       const git = await api();
+      const description = withIssueLink(input.body, input.linkedIssueKey);
       const toCreate: GitPullRequest = {
         sourceRefName: `refs/heads/${input.sourceBranch}`,
         targetRefName: `refs/heads/${input.targetBranch}`,
         title: input.title,
         isDraft: input.draft,
-        ...(input.body !== undefined ? { description: input.body } : {}),
+        ...(description !== undefined ? { description } : {}),
       };
       const pr = await git.createPullRequest(toCreate, repository, project);
       const id = String(pr.pullRequestId ?? '');

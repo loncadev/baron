@@ -302,6 +302,9 @@ async function dispatchOp(ports: RecipePorts, op: RecipeOp, params: Params): Pro
           ? { targetBranch: optStr(params, 'targetBranch', op) }
           : {}),
         ...(optStr(params, 'body', op) !== undefined ? { body: optStr(params, 'body', op) } : {}),
+        ...(optStr(params, 'linkedIssueKey', op) !== undefined
+          ? { linkedIssueKey: optStr(params, 'linkedIssueKey', op) }
+          : {}),
         ...(optBool(params, 'draft', op) !== undefined
           ? { draft: optBool(params, 'draft', op) }
           : {}),

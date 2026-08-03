@@ -68,6 +68,12 @@ export interface PullRequestDraft {
   /** Branch to merge into. Defaults to the repository's default branch when omitted. */
   readonly targetBranch?: string | undefined;
   readonly draft?: boolean | undefined;
+  /**
+   * The work item this PR implements. The adapter renders the provider's NATIVE linking syntax
+   * (GitHub `Closes #12`, Azure `AB#12`) so the tracker actually associates the two — a comment
+   * carrying a URL is not a link. Abstract here on purpose: recipes never spell a vendor's keyword.
+   */
+  readonly linkedIssueKey?: string | undefined;
 }
 
 /** Native PR-create input the transport receives (abstract draft already gap-resolved). */
@@ -77,6 +83,8 @@ export interface NativePullRequestInput {
   readonly sourceBranch: string;
   readonly targetBranch: string;
   readonly draft: boolean;
+  /** Work item to link natively; the transport renders its provider's keyword into the body. */
+  readonly linkedIssueKey?: string | undefined;
 }
 
 export interface NativeBranch {
@@ -246,6 +254,7 @@ export class BaseScmAdapter implements ScmPort {
       sourceBranch: draft.sourceBranch,
       targetBranch,
       draft: draftState,
+      linkedIssueKey: draft.linkedIssueKey,
     });
 
     return {

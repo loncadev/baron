@@ -23,19 +23,33 @@ Idempotent finish: push the branch, check for an existing PR first, and only the
    - **PR exists** (non-null): do NOT create another. Report its URL, and add a
      `baron_scm_pr_thread` note only if there is genuinely new context (new commits since).
    - **null**: continue.
-4. **Run the recipe** — call `baron_recipe_run` exactly once:
+4. **Compose the PR description — never open an empty PR.** A reviewer should not have to
+   reconstruct the change from the diff. Write it from what you actually have: the work item
+   (`baron_issue_get`) plus the real commits/diff on the branch (`git log <base>..HEAD --oneline`,
+   `git diff --stat`). Cover, briefly:
+   - **What changed** — the substance, not a file list.
+   - **Why** — the problem from the item; call out any decision you made along the way.
+   - **How it was verified** — tests/build/manual check, and honestly what was NOT verified.
+
+   Keep it short and specific; skip a section that has nothing real to say.
+
+5. **Run the recipe** — call `baron_recipe_run` exactly once:
 
    ```json
-   { "name": "task-finish", "inputs": { "issueId": "<id>", "branch": "<branch>", "title": "<PR title>" } }
+   { "name": "task-finish", "inputs": { "issueId": "<id>", "branch": "<branch>", "title": "<PR title>", "body": "<the description you composed>" } }
    ```
 
    PR title: the top commit's conventional-commit subject (ask only if it reads poorly). The engine
-   opens a DRAFT PR, adds the opening thread, and posts the PR link on the work item.
-5. **Report**: PR URL + "role unchanged — it moves to in_review when the PR merges" (merge-time is a
-   deliberate rule, not an omission).
+   opens a DRAFT PR **linked to the work item** (the adapter renders the provider's native keyword —
+   GitHub `Closes #N`, Azure `AB#N` — so the tracker really associates them), adds the opening
+   thread, and posts the PR link on the work item.
+6. **Report**: PR URL + "role unchanged — it moves to in_review when the PR merges" (merge-time is a
+   deliberate rule, not an omission). Mention it opened as a **draft**: that is deliberate — you mark
+   it ready for review when you want reviewers, and the item moves on merge.
 
 ## Rules
 
+- **Never open a PR with an empty description.** Compose it (step 4) from the item + the real diff.
 - Call `baron_recipe_run` **once**, and only after the null check in step 3.
 - Do NOT transition the issue here — not manually either. If the user explicitly asks to move it,
   use `baron_issue_transition` and say why (they own the exception).
