@@ -3,6 +3,7 @@ import {
   parsePolicyJson,
   resolveIssuesConfig,
   roleLabelSpecs,
+  typeRoleLabelSpecs,
 } from '@lonca/baron-core';
 import {
   type Env,
@@ -123,7 +124,9 @@ async function provisionRoleLabels(ports: CliPorts, root: string): Promise<void>
   const raw = ports.fs.read(policyPath(root));
   if (raw === undefined) return;
   const config = resolveIssuesConfig(parsePolicyJson(raw));
-  const specs = roleLabelSpecs(config.roleMap);
+  // Role labels + (on flat-type providers) the type-role labels create() writes, so neither kind is
+  // left to the provider's grey auto-create.
+  const specs = [...roleLabelSpecs(config.roleMap), ...typeRoleLabelSpecs(config.typeMap)];
   if (specs.length === 0) return;
   try {
     await buildIssuesPort(config, effectiveEnv(ports, root)).ensureLabels(specs);

@@ -48,11 +48,20 @@ export function runIssuesConformance(target: IssuesConformanceTarget): void {
       if (adapter.manifest.issues.nativeLabels) {
         expect(issue.labels).toContain('conformance-label');
       }
-      // Reverse type-role resolution is best-effort: providers that collapse every type role
-      // onto one native type (GitHub -> 'issue') cannot round-trip the exact role from the native
-      // type alone. Faithful round-trip on such providers needs label emulation (same pattern as
-      // hierarchy) and is tracked as a follow-up; here we only require *a* valid resolved role.
       expect(issue.typeRole).toBeDefined();
+    });
+
+    it('the requested type role round-trips through create + get', async () => {
+      // A provider whose native types are flat (GitHub: everything is an `issue`) cannot recover the
+      // role from the native type — the reverse lookup tie-breaks to story, so a bug used to read
+      // back as a story (and got a feature/ branch prefix). The role now rides a `type:<role>` label
+      // there, exactly as hierarchy rides `parent:<id>`. Either way, what you asked for is what you get.
+      const { adapter } = target.build({});
+      for (const typeRole of ['bug', 'task'] as const) {
+        const created = await adapter.create({ title: `a ${typeRole}`, typeRole });
+        expect(created.typeRole).toBe(typeRole);
+        expect((await adapter.get(created.id)).typeRole).toBe(typeRole);
+      }
     });
 
     it('create preserves the body for a bug (body must not be dropped for any type role)', async () => {

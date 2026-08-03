@@ -9,7 +9,14 @@ import type { Logger } from './logger.js';
 import { silentLogger } from './logger.js';
 import { resolveGap } from './policy.js';
 import { RoleResolver } from './role-resolver.js';
-import type { WorkItemTypeRole, WorkflowRole } from './roles.js';
+import { type WorkItemTypeRole, type WorkflowRole, isWorkItemTypeRole } from './roles.js';
+
+/**
+ * Prefix of the label that carries a work-item TYPE ROLE on providers whose native types are flat
+ * (GitHub: every type role maps onto one `issue`). Without it the role cannot be recovered from the
+ * native type — a bug reads back as a story. Mirrors the `parent:<id>` hierarchy-emulation label.
+ */
+export const TYPE_ROLE_LABEL_PREFIX = 'type:';
 
 /**
  * Deterministic tie-break for reverse type-role resolution when a flat provider maps several type
@@ -187,6 +194,13 @@ export class BaseIssuesAdapter implements IssuesPort {
     }
 
     const labels = [...(draft.labels ?? [])];
+    // On a provider whose native types are flat, the requested role would be lost the moment it is
+    // written (every role becomes the same native type, and the reverse lookup tie-breaks to story).
+    // Carry it on a label so `create({typeRole:'bug'})` still reads back as a bug — which also keeps
+    // the derived branch prefix honest (bug/… not feature/…).
+    if (this.manifest.issues.nativeLabels && this.isAmbiguousNativeType(nativeType)) {
+      labels.push(`${TYPE_ROLE_LABEL_PREFIX}${draft.typeRole}`);
+    }
     let nativeParentId: string | undefined;
 
     if (draft.parentId !== undefined) {
@@ -379,7 +393,7 @@ export class BaseIssuesAdapter implements IssuesPort {
   }
 
   private toIssue(native: NativeIssue): Issue {
-    const typeRole = this.reverseTypeRole(native.nativeType);
+    const typeRole = this.resolveTypeRole(native);
     return {
       id: native.id,
       key: native.key,
@@ -397,6 +411,26 @@ export class BaseIssuesAdapter implements IssuesPort {
       url: native.url,
       provider: this.cfg.provider,
     };
+  }
+
+  /** True when several type roles share one native type, making the reverse lookup ambiguous. */
+  private isAmbiguousNativeType(nativeType: string): boolean {
+    return Object.values(this.cfg.typeMap).filter((name) => name === nativeType).length > 1;
+  }
+
+  /**
+   * The item's type role. An explicit `type:<role>` label wins — it is exact, and it is what create
+   * wrote on a flat provider. Otherwise fall back to reversing the native type (faithful on a
+   * provider with real types; a best-effort tie-break on one without, e.g. items created before
+   * the label existed).
+   */
+  private resolveTypeRole(native: NativeIssue): WorkItemTypeRole | undefined {
+    for (const label of native.labels) {
+      if (!label.startsWith(TYPE_ROLE_LABEL_PREFIX)) continue;
+      const role = label.slice(TYPE_ROLE_LABEL_PREFIX.length);
+      if (isWorkItemTypeRole(role)) return role;
+    }
+    return this.reverseTypeRole(native.nativeType);
   }
 
   private reverseTypeRole(nativeType: string) {

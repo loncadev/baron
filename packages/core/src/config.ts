@@ -51,6 +51,29 @@ const ROLE_LABEL_STYLE: Record<
  * for a provider whose roles ride native states (Azure), so provisioning is a no-op there — this is
  * what makes label provisioning portable rather than a GitHub special case.
  */
+/**
+ * The type-role labels to provision. Only meaningful on a provider whose native types are flat
+ * (several roles share one native type) — there the role rides a `type:<role>` label, so provision
+ * those deliberately instead of letting the provider auto-create them grey. Empty for a provider
+ * with real work-item types (Azure), keeping this portable rather than a GitHub special case.
+ */
+export function typeRoleLabelSpecs(typeMap: TypeMap): LabelSpec[] {
+  const counts = new Map<string, number>();
+  for (const native of Object.values(typeMap)) {
+    if (native !== undefined) counts.set(native, (counts.get(native) ?? 0) + 1);
+  }
+  const specs: LabelSpec[] = [];
+  for (const [role, native] of Object.entries(typeMap)) {
+    if (native === undefined || (counts.get(native) ?? 0) <= 1) continue;
+    specs.push({
+      name: `type:${role}`,
+      color: 'd4c5f9',
+      description: `Baron: work-item type '${role}'`,
+    });
+  }
+  return specs;
+}
+
 export function roleLabelSpecs(roleMap: ProviderRoleMap): LabelSpec[] {
   const seen = new Set<string>();
   const specs: LabelSpec[] = [];
