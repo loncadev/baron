@@ -1,4 +1,5 @@
 import {
+  ASSIGNEE_ME,
   BaseScmAdapter,
   type CheckRollup,
   type GapPolicy,
@@ -21,7 +22,14 @@ import type { GithubTransportOptions } from './transport.js';
 /** GitHub supports draft PRs and PR discussion (PR-level issue comments). */
 export const githubScmManifest: ScmManifest = {
   provider: GITHUB_PROVIDER,
-  scm: { draftPullRequests: true, pullRequestThreads: true },
+  scm: {
+    draftPullRequests: true,
+    pullRequestThreads: true,
+    // A GitHub PR is an issue, so it carries assignees.
+    pullRequestAssignees: true,
+    // "Auto-merge": enabling it is GraphQL-only (REST has no endpoint) and the repo must allow it.
+    autoComplete: true,
+  },
 };
 
 /**
@@ -44,6 +52,15 @@ function withIssueLink(body: string | undefined, issueKey: string | undefined): 
 export function createGithubScmTransport(options: GithubTransportOptions): ScmTransport {
   const { owner, repo, token, baseBranch } = options;
   const octokit = new Octokit({ auth: token });
+
+  // '@me' has no REST equivalent; resolve the token's login once and cache it (same contract as the
+  // issues transport, so a PR and its work item end up assigned to the same person).
+  let myLogin: Promise<string> | undefined;
+  const resolveAssignee = (assignee: string): Promise<string> => {
+    if (assignee !== ASSIGNEE_ME) return Promise.resolve(assignee);
+    myLogin ??= octokit.rest.users.getAuthenticated().then(({ data }) => data.login);
+    return myLogin;
+  };
 
   return {
     async createBranch(name: string, fromBranch: string): Promise<NativeBranch> {
@@ -78,7 +95,35 @@ export function createGithubScmTransport(options: GithubTransportOptions): ScmTr
         base: input.targetBranch,
         draft: input.draft,
       });
+
+      // A PR is an issue here, so assignees go through the issues endpoint. '@me' resolves to the
+      // token owner — the person finishing the task should own the PR without a manual UI step.
+      if (input.assignees !== undefined && input.assignees.length > 0) {
+        const logins = await Promise.all(input.assignees.map((a) => resolveAssignee(a)));
+        await octokit.rest.issues.addAssignees({
+          owner,
+          repo,
+          issue_number: data.number,
+          assignees: logins,
+        });
+      }
+
+      // Auto-merge is GraphQL-only (no REST endpoint) and requires the repo to allow it. A repo with
+      // it disabled rejects the mutation — a provider setting, not a Baron failure — so report the
+      // outcome instead of either failing the created PR or silently pretending it worked.
+      let autoCompleteEnabled: boolean | undefined;
+      if (input.autoComplete === true) {
+        autoCompleteEnabled = await octokit
+          .graphql(
+            'mutation($pr: ID!) { enablePullRequestAutoMerge(input: {pullRequestId: $pr}) { clientMutationId } }',
+            { pr: data.node_id },
+          )
+          .then(() => true)
+          .catch(() => false);
+      }
+
       return {
+        autoCompleteEnabled,
         id: String(data.number),
         number: String(data.number),
         title: data.title,

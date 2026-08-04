@@ -21,6 +21,30 @@ export function runScmConformance(target: ScmConformanceTarget): void {
       expect(typeof adapter.manifest.scm.pullRequestThreads).toBe('boolean');
     });
 
+    it('PR assignees and auto-complete are honored or negotiated, never silently dropped', async () => {
+      // Both exist on one provider and not the other (GitHub has PR assignees, Azure does not; both
+      // have auto-complete). Whatever the manifest says, asking for them must not fail an otherwise
+      // valid PR under a degrade policy — and must not pretend under the strict default.
+      const soft = target.build({
+        pullRequestAssignees: { kind: 'degrade' },
+        autoComplete: { kind: 'degrade' },
+      });
+      const pr = await soft.adapter.createPullRequest({
+        title: 'PR',
+        sourceBranch: 'feature/x',
+        targetBranch: 'main',
+        assignees: ['@me'],
+        autoComplete: true,
+      });
+      expect(pr.id).toBeTruthy();
+
+      const caps = soft.adapter.manifest.scm;
+      if (!caps.pullRequestAssignees || !caps.autoComplete) {
+        // A dropped capability is announced, per invariant #5.
+        expect(soft.logger.entries.some((e) => e.level === 'warn')).toBe(true);
+      }
+    });
+
     it('createBranch returns a normalized branch', async () => {
       const { adapter } = target.build();
       const branch = await adapter.createBranch({ name: 'feature/x', fromBranch: 'main' });

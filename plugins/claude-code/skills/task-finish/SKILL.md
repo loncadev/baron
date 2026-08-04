@@ -33,19 +33,28 @@ Idempotent finish: push the branch, check for an existing PR first, and only the
 
    Keep it short and specific; skip a section that has nothing real to say.
 
-5. **Run the recipe** — call `baron_recipe_run` exactly once:
+5. **Ask about auto-complete** (`AskUserQuestion`, one question): *"Merge automatically once checks
+   pass?"* → **Enable** / **No, I'll merge it myself**. It is the user's call whether a PR lands
+   unattended, so ask rather than assume — but ask ONCE and don't belabor it.
+
+6. **Run the recipe** — call `baron_recipe_run` exactly once:
 
    ```json
-   { "name": "task-finish", "inputs": { "issueId": "<id>", "branch": "<branch>", "title": "<PR title>", "body": "<the description you composed>" } }
+   { "name": "task-finish", "inputs": { "issueId": "<id>", "branch": "<branch>", "title": "<PR title>", "body": "<the description you composed>", "autoComplete": true } }
    ```
+
+   The PR is assigned to you automatically (providers without PR assignees negotiate that gap), so
+   nobody has to add themselves in the UI afterwards.
 
    PR title: the top commit's conventional-commit subject (ask only if it reads poorly). The engine
    opens a DRAFT PR **linked to the work item** (the adapter renders the provider's native keyword —
    GitHub `Closes #N`, Azure `AB#N` — so the tracker really associates them), adds the opening
    thread, and posts the PR link on the work item.
-6. **Report**: PR URL + "role unchanged — it moves to in_review when the PR merges" (merge-time is a
+7. **Report**: PR URL + "role unchanged — it moves to in_review when the PR merges" (merge-time is a
    deliberate rule, not an omission). Mention it opened as a **draft**: that is deliberate — you mark
-   it ready for review when you want reviewers, and the item moves on merge.
+   it ready for review when you want reviewers, and the item moves on merge. If auto-complete was
+   requested, report whether it actually took (`autoCompleteEnabled`) — a repo with auto-merge
+   disabled refuses it, and that is worth saying out loud rather than assuming it is armed.
 
 ## Rules
 

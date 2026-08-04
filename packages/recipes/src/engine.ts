@@ -129,6 +129,23 @@ function optBool(params: Params, key: string, op: string): boolean | undefined {
   return value;
 }
 
+/**
+ * A boolean that may arrive as a real boolean (an agent passing recipe inputs) or as the text a human
+ * typed at an `ask` step ("yes"/"no"). Both paths reach the same step, so accept both rather than
+ * making one of them fail on a type.
+ */
+function optBoolish(params: Params, key: string, op: string): boolean | undefined {
+  const value = params[key];
+  if (value === undefined || value === '') return undefined;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const text = value.trim().toLowerCase();
+    if (['true', 'yes', 'y', '1'].includes(text)) return true;
+    if (['false', 'no', 'n', '0'].includes(text)) return false;
+  }
+  throw new BaronError(`Step '${op}' argument '${key}' must be a boolean (or yes/no).`, ARGS);
+}
+
 function optStrArray(params: Params, key: string, op: string): string[] | undefined {
   const value = params[key];
   if (value === undefined) return undefined;
@@ -304,6 +321,12 @@ async function dispatchOp(ports: RecipePorts, op: RecipeOp, params: Params): Pro
         ...(optStr(params, 'body', op) !== undefined ? { body: optStr(params, 'body', op) } : {}),
         ...(optStr(params, 'linkedIssueKey', op) !== undefined
           ? { linkedIssueKey: optStr(params, 'linkedIssueKey', op) }
+          : {}),
+        ...(optStrArray(params, 'assignees', op) !== undefined
+          ? { assignees: optStrArray(params, 'assignees', op) }
+          : {}),
+        ...(optBoolish(params, 'autoComplete', op) !== undefined
+          ? { autoComplete: optBoolish(params, 'autoComplete', op) }
           : {}),
         ...(optBool(params, 'draft', op) !== undefined
           ? { draft: optBool(params, 'draft', op) }

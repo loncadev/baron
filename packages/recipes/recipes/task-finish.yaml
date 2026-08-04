@@ -11,6 +11,13 @@ steps:
       type: text
       message: "Pull request description (what changed and why)? Empty to skip."
       optional: true
+  # Declared as an ask so it is DISCOVERABLE via baron_recipe_list — a hidden input nobody can find
+  # was a real dogfood failure once. Optional: unanswered means "don't enable it".
+  - ask:
+      as: autoComplete
+      type: text
+      message: "Auto-complete: merge automatically once checks/policies pass? (yes/no)"
+      optional: true
   # Idempotency probe: the engine (not the agent) decides create-vs-report (decision #19).
   - do: scm.pr.find
     as: existingPr
@@ -31,6 +38,10 @@ steps:
       # Abstract: the adapter renders the provider's native linking keyword (GitHub `Closes #N`,
       # Azure `AB#N`), so the tracker really associates PR and item — not just a comment with a URL.
       linkedIssueKey: ${issueId}
+      # The person finishing the task owns the PR. Providers without PR assignees (Azure) negotiate
+      # the gap instead of failing — you never have to add yourself in the UI afterwards.
+      assignees: ["@me"]
+      autoComplete: ${autoComplete}
       draft: true
   - do: scm.pr.thread
     when:

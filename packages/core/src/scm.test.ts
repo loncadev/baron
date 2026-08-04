@@ -49,11 +49,21 @@ const transport: ScmTransport = {
 
 const noDraft: ScmManifest = {
   provider: 'fake',
-  scm: { draftPullRequests: false, pullRequestThreads: true },
+  scm: {
+    draftPullRequests: false,
+    pullRequestThreads: true,
+    pullRequestAssignees: true,
+    autoComplete: true,
+  },
 };
 const withDraft: ScmManifest = {
   provider: 'fake',
-  scm: { draftPullRequests: true, pullRequestThreads: true },
+  scm: {
+    draftPullRequests: true,
+    pullRequestThreads: true,
+    pullRequestAssignees: true,
+    autoComplete: true,
+  },
 };
 
 const prDraft = {
@@ -148,7 +158,12 @@ describe('BaseScmAdapter draft-PR gap', () => {
 
 const noThreads: ScmManifest = {
   provider: 'fake',
-  scm: { draftPullRequests: true, pullRequestThreads: false },
+  scm: {
+    draftPullRequests: true,
+    pullRequestThreads: false,
+    pullRequestAssignees: true,
+    autoComplete: true,
+  },
 };
 
 describe('BaseScmAdapter pull-request-thread gap', () => {

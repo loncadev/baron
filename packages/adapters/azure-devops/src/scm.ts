@@ -41,7 +41,15 @@ export interface AzureDevOpsScmTransportOptions {
 /** Azure Repos supports draft PRs and first-class PR comment threads. */
 export const azureDevOpsScmManifest: ScmManifest = {
   provider: AZURE_DEVOPS_PROVIDER,
-  scm: { draftPullRequests: true, pullRequestThreads: true },
+  scm: {
+    draftPullRequests: true,
+    pullRequestThreads: true,
+    // Azure Repos PRs have REVIEWERS, not assignees — a different role (who approves vs who owns
+    // getting it merged). Rather than pretend, declare the gap and let the policy decide.
+    pullRequestAssignees: false,
+    // Auto-complete: merge once branch policies pass (autoCompleteSetBy + completionOptions).
+    autoComplete: true,
+  },
 };
 
 const ZERO_OBJECT_ID = '0000000000000000000000000000000000000000';
@@ -92,10 +100,23 @@ export function createAzureDevOpsScmTransport(
   const { organization, project, repository, token, baseBranch } = options;
   const orgUrl = `https://dev.azure.com/${organization}`;
 
+  const webApi = new azdev.WebApi(orgUrl, azdev.getPersonalAccessTokenHandler(token));
+
   let gitApi: Promise<GitApi> | undefined;
   const api = (): Promise<GitApi> => {
-    gitApi ??= new azdev.WebApi(orgUrl, azdev.getPersonalAccessTokenHandler(token)).getGitApi();
+    gitApi ??= webApi.getGitApi();
     return gitApi;
+  };
+
+  // Auto-complete is attributed to an identity ("set by"), so it needs the token owner's id — not a
+  // name. Read it from the connection once and cache it.
+  let cachedIdentityId: Promise<string | undefined> | undefined;
+  const currentIdentityId = (): Promise<string | undefined> => {
+    cachedIdentityId ??= webApi
+      .connect()
+      .then((connection) => connection.authenticatedUser?.id)
+      .catch(() => undefined);
+    return cachedIdentityId;
   };
 
   const REFS_HEADS = 'refs/heads/';
@@ -156,7 +177,32 @@ export function createAzureDevOpsScmTransport(
       };
       const pr = await git.createPullRequest(toCreate, repository, project);
       const id = String(pr.pullRequestId ?? '');
+
+      // Auto-complete is a follow-up update: Azure needs the PR to exist, then records WHO enabled it
+      // plus what to do on completion. Report the outcome rather than failing the created PR — an
+      // org that forbids it (or a missing identity) is a provider condition, not a Baron error.
+      let autoCompleteEnabled: boolean | undefined;
+      if (input.autoComplete === true) {
+        const identityId = await currentIdentityId();
+        autoCompleteEnabled =
+          identityId === undefined
+            ? false
+            : await git
+                .updatePullRequest(
+                  {
+                    autoCompleteSetBy: { id: identityId },
+                    completionOptions: { deleteSourceBranch: true, transitionWorkItems: false },
+                  },
+                  repository,
+                  Number(id),
+                  project,
+                )
+                .then(() => true)
+                .catch(() => false);
+      }
+
       return {
+        autoCompleteEnabled,
         id,
         number: id,
         title: pr.title ?? input.title,

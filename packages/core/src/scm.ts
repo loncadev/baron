@@ -11,6 +11,16 @@ export interface ScmCapabilities {
   draftPullRequests: boolean;
   /** First-class PR discussion threads (vs. only a flat PR-level comment). */
   pullRequestThreads: boolean;
+  /**
+   * A pull request can carry ASSIGNEES — who owns getting it merged. GitHub has them (a PR is an
+   * issue); Azure Repos does not (it has reviewers, a different role), so it negotiates the gap.
+   */
+  pullRequestAssignees: boolean;
+  /**
+   * "Merge it for me once the checks/policies pass" — Azure calls it auto-complete, GitHub calls it
+   * auto-merge. Same semantic, so Baron exposes one switch.
+   */
+  autoComplete: boolean;
 }
 
 export type ScmCapabilityName = keyof ScmCapabilities;
@@ -45,6 +55,11 @@ export interface PullRequest {
   readonly draft: boolean;
   /** Lifecycle state; populated by `prForBranch` (a freshly created PR is always `open`). */
   readonly state?: PrState | undefined;
+  /**
+   * Whether auto-complete/auto-merge was actually enabled, when it was requested. False means the
+   * provider refused (e.g. GitHub repos with "Allow auto-merge" off) — reported, never silent.
+   */
+  readonly autoCompleteEnabled?: boolean | undefined;
 }
 
 /** A normalized PR discussion thread reference. */
@@ -74,6 +89,13 @@ export interface PullRequestDraft {
    * carrying a URL is not a link. Abstract here on purpose: recipes never spell a vendor's keyword.
    */
   readonly linkedIssueKey?: string | undefined;
+  /**
+   * Who owns this PR. Accepts the '@me' sentinel like the issues port, so a recipe can say "assign it
+   * to whoever ran this" without knowing a handle. Negotiated where PRs have no assignees (Azure).
+   */
+  readonly assignees?: readonly string[] | undefined;
+  /** Merge automatically once checks/policies pass (Azure auto-complete / GitHub auto-merge). */
+  readonly autoComplete?: boolean | undefined;
 }
 
 /** Native PR-create input the transport receives (abstract draft already gap-resolved). */
@@ -85,6 +107,10 @@ export interface NativePullRequestInput {
   readonly draft: boolean;
   /** Work item to link natively; the transport renders its provider's keyword into the body. */
   readonly linkedIssueKey?: string | undefined;
+  /** Resolved assignees (the port already turned '@me' into a handle); empty when unsupported. */
+  readonly assignees?: readonly string[] | undefined;
+  /** Enable the provider's auto-complete / auto-merge; only set when the manifest declares it. */
+  readonly autoComplete?: boolean | undefined;
 }
 
 export interface NativeBranch {
@@ -105,6 +131,11 @@ export interface NativePullRequest {
   readonly draft: boolean;
   /** Lifecycle state; set by `findPullRequestByBranch` so callers needn't a second status read. */
   readonly state?: PrState | undefined;
+  /**
+   * Whether auto-complete/auto-merge was actually enabled, when it was requested. False means the
+   * provider refused (e.g. GitHub repos with "Allow auto-merge" off) — reported, never silent.
+   */
+  readonly autoCompleteEnabled?: boolean | undefined;
 }
 
 export interface NativeThread {
@@ -247,6 +278,36 @@ export class BaseScmAdapter implements ScmPort {
       draftState = false;
     }
 
+    // Assignees and auto-complete each exist on one provider and not the other, so both are
+    // negotiated rather than silently dropped: 'error' throws, 'degrade'/'emulate' proceed without
+    // the feature after resolveCapabilityGap has logged a warning (invariant #5).
+    let assignees = draft.assignees;
+    if (
+      assignees !== undefined &&
+      assignees.length > 0 &&
+      !this.manifest.scm.pullRequestAssignees
+    ) {
+      resolveCapabilityGap(
+        false,
+        'pullRequestAssignees',
+        this.manifest.provider,
+        this.gapPolicy,
+        this.logger,
+      );
+      assignees = undefined;
+    }
+    let autoComplete = draft.autoComplete;
+    if (autoComplete === true && !this.manifest.scm.autoComplete) {
+      resolveCapabilityGap(
+        false,
+        'autoComplete',
+        this.manifest.provider,
+        this.gapPolicy,
+        this.logger,
+      );
+      autoComplete = undefined;
+    }
+
     const targetBranch = draft.targetBranch ?? (await this.transport.defaultBranch());
     const native = await this.transport.createPullRequest({
       title: draft.title,
@@ -255,6 +316,8 @@ export class BaseScmAdapter implements ScmPort {
       targetBranch,
       draft: draftState,
       linkedIssueKey: draft.linkedIssueKey,
+      assignees,
+      autoComplete,
     });
 
     return {
@@ -267,6 +330,7 @@ export class BaseScmAdapter implements ScmPort {
       draft: native.draft,
       // A freshly created PR is open by definition — surface it uniformly with prForBranch results.
       state: 'open',
+      autoCompleteEnabled: native.autoCompleteEnabled,
     };
   }
 
