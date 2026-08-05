@@ -114,6 +114,11 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
       if (!rec.labels.includes(label)) rec.labels.push(label);
     },
 
+    async removeLabel(id: string, label: string): Promise<void> {
+      const rec = must(id);
+      rec.labels = rec.labels.filter((l) => l !== label);
+    },
+
     async ensureLabels(labels): Promise<void> {
       // Idempotent provisioning: record each name once (a repeat is a no-op), mirroring a real
       // create-if-missing without a network.

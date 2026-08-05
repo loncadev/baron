@@ -130,6 +130,26 @@ export function runIssuesConformance(target: IssuesConformanceTarget): void {
       expect(moved.role).toBe(target.mappedMidRole);
     });
 
+    it('a COLD read reports the role — not just the value a write echoed back', async () => {
+      // A label-keyed provider's plain get carries open/closed as the discriminator, which matches no
+      // label, so the role used to come back undefined on every fresh read (task-list showed blanks).
+      const { adapter } = target.build(emulateStates);
+      const issue = await adapter.create({ title: 'cold read', typeRole: 'task' });
+      await adapter.transition(issue.id, target.mappedMidRole);
+      expect((await adapter.get(issue.id)).role).toBe(target.mappedMidRole);
+    });
+
+    it('a transition leaves exactly ONE role marker — the old one is cleared', async () => {
+      // Where roles ride labels the write only ADDS one, so without cleanup an item ends up tagged
+      // in-progress AND in-review, and whichever matched first won the reverse lookup.
+      const { adapter } = target.build(emulateStates);
+      const issue = await adapter.create({ title: 'two moves', typeRole: 'task' });
+      await adapter.transition(issue.id, target.mappedMidRole);
+      const moved = await adapter.transition(issue.id, target.mappedDoneRole);
+      expect(moved.role).toBe(target.mappedDoneRole);
+      expect((await adapter.get(issue.id)).role).toBe(target.mappedDoneRole);
+    });
+
     it('transition to the done role resolves to done', async () => {
       const { adapter } = target.build({});
       const issue = await adapter.create({ title: 'x', typeRole: 'task' });

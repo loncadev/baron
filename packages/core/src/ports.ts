@@ -108,6 +108,11 @@ export interface IssuesTransport {
   /** Add a label additively WITHOUT touching the role discriminator (used by link emulation). */
   addLabel(id: string, label: string): Promise<void>;
   /**
+   * Remove a label. Only providers whose roles ride labels need it — the base adapter calls it to
+   * clear the PREVIOUS role's label on a transition, so an item never carries two at once.
+   */
+  removeLabel?(id: string, label: string): Promise<void>;
+  /**
    * Create the given labels if they don't already exist (idempotent). Only providers whose roles ride
    * labels (GitHub) implement it; on native-state providers (Azure) it is absent and the base adapter
    * no-ops. Lets Baron provision role labels deliberately instead of relying on grey auto-creation.
@@ -249,7 +254,18 @@ export class BaseIssuesAdapter implements IssuesPort {
       resolveGap('arbitraryStates', this.manifest, this.cfg.gapPolicy, this.logger);
     }
 
-    return this.toIssue(await this.transport.applyTarget(id, target));
+    const applied = await this.transport.applyTarget(id, target);
+    // On a label-keyed provider the write only ADDS the new role's label; without clearing the
+    // others an item ends up tagged in-progress AND in-review (and a stale label outlives a close).
+    const keep = target[this.cfg.roleMap.stateKey];
+    const stale = this.resolver
+      .roleLabels()
+      .filter((label) => label !== keep && applied.labels.includes(label));
+    if (stale.length > 0 && this.transport.removeLabel !== undefined) {
+      for (const label of stale) await this.transport.removeLabel(id, label);
+      return this.toIssue({ ...applied, labels: applied.labels.filter((l) => !stale.includes(l)) });
+    }
+    return this.toIssue(applied);
   }
 
   async comment(id: string, body: string): Promise<IssueComment> {
@@ -401,7 +417,11 @@ export class BaseIssuesAdapter implements IssuesPort {
       body: native.body,
       nativeType: native.nativeType,
       typeRole,
-      role: this.resolver.toRole(native.discriminator),
+      // A label-keyed provider's cold read carries open/closed as the discriminator, which matches no
+      // label — so read the role off the labels first, and fall back to the discriminator (the value
+      // a write echoes back, and the only signal on state-keyed providers like Azure).
+      role:
+        this.resolver.roleFromLabels(native.labels) ?? this.resolver.toRole(native.discriminator),
       nativeState: native.discriminator,
       parentId: native.parentId,
       labels: native.labels,

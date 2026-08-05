@@ -136,6 +136,13 @@ export function createGithubTransport(options: GithubTransportOptions): IssuesTr
       });
     },
 
+    async removeLabel(id: string, label: string): Promise<void> {
+      // 404 when the label isn't on the issue — the goal ("not labelled") is already true.
+      await octokit.rest.issues
+        .removeLabel({ owner, repo, issue_number: Number(id), name: label })
+        .catch(() => undefined);
+    },
+
     async ensureLabels(labels): Promise<void> {
       if (labels.length === 0) return;
       // List once, create only the missing — idempotent, and it never clobbers a color the user
