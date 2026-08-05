@@ -52,6 +52,8 @@ recent PR for a branch (with its `state`) or null: `state:"open"` (default) is t
 (did this branch land while its item stayed in progress?). `pr_status` returns a
 normalized `PullRequestStatus`: `state` (`open|merged|closed|unknown`), `reviewDecision`
 (`approved|changes_requested|review_required|pending|unknown`), `mergeable`, and a `checks` rollup
+(`succeeded|failed|pending|none|unknown` — `none` means asked-and-there-is-no-CI, `unknown` means
+Baron could not look; never read the second as a green light)
 (`succeeded|failed|pending|none`) — reach for it to gate "is this PR ready to merge?".
 
 Ci / pipelines port: `baron_ci_pipelines`, `baron_ci_runs`, `baron_ci_run_get`,

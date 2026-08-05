@@ -200,11 +200,20 @@ export const REVIEW_DECISIONS = [
 ] as const;
 export type ReviewDecision = (typeof REVIEW_DECISIONS)[number];
 
-/** Normalized rollup of a PR's checks (CI/policy validations). */
-export const CHECK_ROLLUPS = ['succeeded', 'failed', 'pending', 'none'] as const;
+/**
+ * Normalized rollup of a PR's checks (CI/policy validations).
+ *
+ * `none` and `unknown` are NOT interchangeable and conflating them is a safety bug: `none` means the
+ * provider was asked and reports no checks at all — nothing can go red, so merging is unblocked.
+ * `unknown` means Baron could not find out (the credential cannot read them, the provider does not
+ * expose them). A caller that treats `unknown` as `none` merges on the assumption that green is
+ * green when nothing was ever looked at.
+ */
+export const CHECK_ROLLUPS = ['succeeded', 'failed', 'pending', 'none', 'unknown'] as const;
 export type CheckRollup = (typeof CHECK_ROLLUPS)[number];
 
 export interface CheckSummary {
+  /** Checks actually counted. Always 0 for `none` and for `unknown` — nothing was readable. */
   readonly total: number;
   readonly succeeded: number;
   readonly failed: number;

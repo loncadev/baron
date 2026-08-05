@@ -3,14 +3,25 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // Stub octokit: the conformance suite runs on the in-memory transport, so it cannot see what the
 // live adapter actually sends. This asserts the part that was broken in real use — a PR opened with
 // no description and no link back to the work item.
-const mocks = vi.hoisted(() => ({ create: vi.fn(), getRef: vi.fn(), createRef: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  create: vi.fn(),
+  getRef: vi.fn(),
+  createRef: vi.fn(),
+  prGet: vi.fn(),
+  listReviews: vi.fn(),
+  checksListForRef: vi.fn(),
+  listWorkflowRuns: vi.fn(),
+  combinedStatus: vi.fn(),
+}));
 
 vi.mock('octokit', () => ({
   Octokit: vi.fn(() => ({
     rest: {
-      pulls: { create: mocks.create },
+      pulls: { create: mocks.create, get: mocks.prGet, listReviews: mocks.listReviews },
       git: { getRef: mocks.getRef, createRef: mocks.createRef },
-      repos: { get: vi.fn() },
+      checks: { listForRef: mocks.checksListForRef },
+      actions: { listWorkflowRunsForRepo: mocks.listWorkflowRuns },
+      repos: { get: vi.fn(), getCombinedStatusForRef: mocks.combinedStatus },
     },
   })),
 }));
@@ -73,5 +84,74 @@ describe('github scm createPullRequest', () => {
       draft: true,
     });
     expect(mocks.create.mock.calls[0]?.[0]?.body).toBeUndefined();
+  });
+});
+
+/** A GitHub permission refusal, as octokit surfaces it. */
+function forbidden(): Error & { status: number } {
+  return Object.assign(new Error('Resource not accessible by personal access token'), {
+    status: 403,
+  });
+}
+
+const OPEN_PR = {
+  data: {
+    number: 7,
+    state: 'open',
+    merged: false,
+    mergeable: true,
+    head: { sha: 'abc123' },
+    html_url: 'https://example.test/pull/7',
+  },
+};
+
+describe('github scm prStatus when the credential cannot read checks', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.prGet.mockResolvedValue(OPEN_PR);
+    mocks.listReviews.mockResolvedValue({ data: [] });
+  });
+
+  it('falls back to Actions + commit statuses, which a fine-grained token CAN be granted', async () => {
+    // "Checks" is not among the permissions a fine-grained PAT can hold at all, so this 403 is the
+    // normal case for a human's token — not an edge case.
+    mocks.checksListForRef.mockRejectedValue(forbidden());
+    mocks.listWorkflowRuns.mockResolvedValue({
+      data: { workflow_runs: [{ status: 'completed', conclusion: 'failure' }] },
+    });
+    mocks.combinedStatus.mockResolvedValue({ data: { statuses: [] } });
+
+    const status = await transport().getPullRequestStatus('7');
+    expect(status.checks.rollup).toBe('failed');
+    expect(status.checks.failed).toBe(1);
+  });
+
+  it("reports 'unknown' — never 'none' — when nothing is readable", async () => {
+    mocks.checksListForRef.mockRejectedValue(forbidden());
+    mocks.listWorkflowRuns.mockRejectedValue(forbidden());
+    mocks.combinedStatus.mockRejectedValue(forbidden());
+
+    const status = await transport().getPullRequestStatus('7');
+    // 'none' would mean "asked, and there is no CI" — a green light to merge. Baron never looked.
+    expect(status.checks.rollup).toBe('unknown');
+    expect(status.checks.total).toBe(0);
+    // One missing permission must not blind the whole call: what the token CAN read still comes back.
+    expect(status.state).toBe('open');
+    expect(status.mergeable).toBe(true);
+  });
+
+  it("reports 'none' when checks ARE readable and there genuinely are none", async () => {
+    mocks.checksListForRef.mockResolvedValue({ data: { check_runs: [] } });
+
+    const status = await transport().getPullRequestStatus('7');
+    expect(status.checks.rollup).toBe('none');
+    expect(mocks.listWorkflowRuns).not.toHaveBeenCalled(); // no needless fallback
+  });
+
+  it('surfaces a non-permission failure instead of swallowing it as unknown', async () => {
+    mocks.checksListForRef.mockRejectedValue(
+      Object.assign(new Error('server error'), { status: 500 }),
+    );
+    await expect(transport().getPullRequestStatus('7')).rejects.toThrow('server error');
   });
 });

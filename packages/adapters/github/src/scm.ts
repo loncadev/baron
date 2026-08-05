@@ -3,6 +3,7 @@ import {
   BaronError,
   BaseScmAdapter,
   type CheckRollup,
+  type CheckSummary,
   type GapPolicy,
   type Logger,
   type MergeOptions,
@@ -72,6 +73,102 @@ export function createGithubScmTransport(options: GithubTransportOptions): ScmTr
     myLogin ??= octokit.rest.users.getAuthenticated().then(({ data }) => data.login);
     return myLogin;
   };
+
+  /**
+   * A PR head's CI state, read through whichever door this credential can actually open.
+   *
+   * Check runs are the complete picture, but a fine-grained PAT can NEVER see them: "Checks" is not
+   * among the repository permissions a fine-grained token can be granted at all — it exists only for
+   * GitHub Apps. So the common case for a human's token is a 403 here, and failing the whole status
+   * call on it would also throw away the review decision and mergeability the token CAN read.
+   *
+   * The fallbacks are the two permissions a fine-grained PAT can hold: `Actions` sees the workflow
+   * runs GitHub Actions produces, and `Commit statuses` sees what third-party CI posts. They cover
+   * different producers, so counting both is not double-counting.
+   */
+  async function checkSummary(sha: string): Promise<CheckSummary> {
+    let succeeded = 0;
+    let failed = 0;
+    let pending = 0;
+    let readAnything = false;
+
+    // A 403 is "this credential may not look", which is a different fact from "there is nothing to
+    // see" — swallow only that, so a real outage still surfaces as an error.
+    const ifPermitted = async (read: () => Promise<void>): Promise<void> => {
+      try {
+        await read();
+        readAnything = true;
+      } catch (error) {
+        if ((error as { status?: number }).status !== 403) throw error;
+      }
+    };
+
+    await ifPermitted(async () => {
+      const { data } = await octokit.rest.checks.listForRef({
+        owner,
+        repo,
+        ref: sha,
+        per_page: 100,
+      });
+      for (const run of data.check_runs) {
+        if (run.status !== 'completed') pending += 1;
+        else if (
+          run.conclusion === 'success' ||
+          run.conclusion === 'neutral' ||
+          run.conclusion === 'skipped'
+        )
+          succeeded += 1;
+        else failed += 1;
+      }
+    });
+
+    if (!readAnything) {
+      await ifPermitted(async () => {
+        const { data } = await octokit.rest.actions.listWorkflowRunsForRepo({
+          owner,
+          repo,
+          head_sha: sha,
+          per_page: 100,
+        });
+        for (const run of data.workflow_runs) {
+          if (run.status !== 'completed') pending += 1;
+          else if (
+            run.conclusion === 'success' ||
+            run.conclusion === 'neutral' ||
+            run.conclusion === 'skipped'
+          )
+            succeeded += 1;
+          else failed += 1;
+        }
+      });
+      await ifPermitted(async () => {
+        const { data } = await octokit.rest.repos.getCombinedStatusForRef({
+          owner,
+          repo,
+          ref: sha,
+        });
+        for (const status of data.statuses) {
+          if (status.state === 'pending') pending += 1;
+          else if (status.state === 'success') succeeded += 1;
+          else failed += 1;
+        }
+      });
+    }
+
+    const total = succeeded + failed + pending;
+    // `unknown` rather than `none`: nothing was readable, so "no checks" would be an invention that
+    // reads as a green light.
+    const rollup: CheckRollup = !readAnything
+      ? 'unknown'
+      : total === 0
+        ? 'none'
+        : failed > 0
+          ? 'failed'
+          : pending > 0
+            ? 'pending'
+            : 'succeeded';
+    return { total, succeeded, failed, pending, rollup };
+  }
 
   return {
     async createBranch(name: string, fromBranch: string): Promise<NativeBranch> {
@@ -291,29 +388,7 @@ export function createGithubScmTransport(options: GithubTransportOptions): ScmTr
             ? 'pending'
             : 'review_required';
 
-      // Check runs on the PR head → a rollup.
-      const { data: checks } = await octokit.rest.checks.listForRef({
-        owner,
-        repo,
-        ref: pr.head.sha,
-        per_page: 100,
-      });
-      let succeeded = 0;
-      let failed = 0;
-      let pending = 0;
-      for (const c of checks.check_runs) {
-        if (c.status !== 'completed') pending += 1;
-        else if (
-          c.conclusion === 'success' ||
-          c.conclusion === 'neutral' ||
-          c.conclusion === 'skipped'
-        )
-          succeeded += 1;
-        else failed += 1;
-      }
-      const total = checks.check_runs.length;
-      const rollup: CheckRollup =
-        total === 0 ? 'none' : failed > 0 ? 'failed' : pending > 0 ? 'pending' : 'succeeded';
+      const { total, succeeded, failed, pending, rollup } = await checkSummary(pr.head.sha);
 
       return {
         id: String(pr.number),

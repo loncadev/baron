@@ -1,4 +1,9 @@
-import type { GapPolicy, RecordingLogger, ScmPort } from '@lonca/baron-core';
+import {
+  CHECK_ROLLUPS,
+  type GapPolicy,
+  type RecordingLogger,
+  type ScmPort,
+} from '@lonca/baron-core';
 import { describe, expect, it } from 'vitest';
 
 export interface ScmConformanceTarget {
@@ -106,7 +111,16 @@ export function runScmConformance(target: ScmConformanceTarget): void {
       expect(['approved', 'changes_requested', 'review_required', 'pending', 'unknown']).toContain(
         status.reviewDecision,
       );
-      expect(['succeeded', 'failed', 'pending', 'none']).toContain(status.checks.rollup);
+      expect(CHECK_ROLLUPS).toContain(status.checks.rollup);
+      // The rollup must agree with the counts it summarizes, and both ways of reporting "no green
+      // to show" must be distinguishable: 'none' means asked-and-there-are-none, 'unknown' means
+      // could-not-look. Neither may carry counted checks, and a caller must never see one as green.
+      const { total, succeeded, failed, pending, rollup } = status.checks;
+      expect(total).toBe(succeeded + failed + pending);
+      if (rollup === 'none' || rollup === 'unknown') expect(total).toBe(0);
+      if (rollup === 'failed') expect(failed).toBeGreaterThan(0);
+      if (rollup === 'pending') expect(failed).toBe(0);
+      if (rollup === 'succeeded') expect(total).toBeGreaterThan(0);
     });
 
     it('prForBranch finds the open PR (default filter) with its state, undefined otherwise', async () => {

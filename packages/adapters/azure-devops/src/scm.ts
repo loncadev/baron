@@ -353,8 +353,10 @@ export function createAzureDevOpsScmTransport(
         state,
         reviewDecision,
         ...(mergeable !== undefined ? { mergeable } : {}),
-        // Azure PR checks are policy evaluations (a separate Policy API) — not surfaced in this slice.
-        checks: { total: 0, succeeded: 0, failed: 0, pending: 0, rollup: 'none' },
+        // Azure PR checks are policy evaluations (a separate Policy API) this slice does not read.
+        // 'unknown', not 'none': claiming "no checks" would tell a caller the merge is unblocked by
+        // CI when Baron simply never looked — the same false green a missing permission produces.
+        checks: { total: 0, succeeded: 0, failed: 0, pending: 0, rollup: 'unknown' },
         url: prWebUrl(id),
       };
     },
