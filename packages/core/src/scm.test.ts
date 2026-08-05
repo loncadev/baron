@@ -36,6 +36,19 @@ const transport: ScmTransport = {
         }
       : undefined;
   },
+  async markPullRequestReady(pullRequestId: string) {
+    return {
+      id: pullRequestId,
+      title: 'ready',
+      sourceBranch: 'feature/x',
+      targetBranch: 'main',
+      draft: false,
+      state: 'open' as const,
+    };
+  },
+  async mergePullRequest(pullRequestId: string) {
+    return { pullRequestId, sha: `merge-${pullRequestId}` };
+  },
   async getPullRequestStatus(pullRequestId: string) {
     return {
       id: pullRequestId,
@@ -101,6 +114,20 @@ describe('BaseScmAdapter prStatus', () => {
     expect(status.state).toBe('open');
     expect(status.reviewDecision).toBe('approved');
     expect(status.checks.rollup).toBe('succeeded');
+  });
+});
+
+describe('BaseScmAdapter landing a PR', () => {
+  it('marks a draft ready and reports it un-drafted', async () => {
+    const adapter = new BaseScmAdapter(withDraft, transport);
+    expect((await adapter.markPrReady('pr1')).draft).toBe(false);
+  });
+
+  it('merges and returns the merge commit', async () => {
+    const adapter = new BaseScmAdapter(withDraft, transport);
+    const result = await adapter.mergePr('pr1', { strategy: 'squash' });
+    expect(result.pullRequestId).toBe('pr1');
+    expect(result.sha).toBeTruthy();
   });
 });
 

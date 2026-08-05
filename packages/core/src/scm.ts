@@ -164,6 +164,32 @@ export function isPrStateFilter(value: string): value is PrStateFilter {
   return (PR_STATE_FILTERS as readonly string[]).includes(value);
 }
 
+/**
+ * How a merge lands. Every provider offers these three; the adapter maps them onto its own names
+ * (Azure's GitPullRequestMergeStrategy enum, GitHub's merge_method).
+ */
+export const MERGE_STRATEGIES = ['merge', 'squash', 'rebase'] as const;
+export type MergeStrategy = (typeof MERGE_STRATEGIES)[number];
+
+export function isMergeStrategy(value: string): value is MergeStrategy {
+  return (MERGE_STRATEGIES as readonly string[]).includes(value);
+}
+
+/** How to land a pull request. */
+export interface MergeOptions {
+  /** Defaults to the provider's own default when omitted. */
+  readonly strategy?: MergeStrategy | undefined;
+  /** Delete the source branch after a successful merge. */
+  readonly deleteSourceBranch?: boolean | undefined;
+}
+
+/** The outcome of landing a PR. */
+export interface MergeResult {
+  readonly pullRequestId: string;
+  /** The merge commit, when the provider reports one. */
+  readonly sha?: string | undefined;
+}
+
 /** Normalized review decision across providers (Azure reviewer votes / GitHub review states). */
 export const REVIEW_DECISIONS = [
   'approved',
@@ -214,6 +240,13 @@ export interface ScmTransport {
   defaultBranch(): Promise<string>;
   /** Normalized PR status (state + review decision + mergeability + checks rollup). */
   getPullRequestStatus(pullRequestId: string): Promise<PullRequestStatus>;
+  /** Take a draft PR out of draft so reviewers are asked / policies start (GitHub "ready for review"). */
+  markPullRequestReady(pullRequestId: string): Promise<NativePullRequest>;
+  /**
+   * Land the PR. A provider that refuses (conflicts, unmet policy, already closed) must throw rather
+   * than report success — a merge that silently didn't happen is the worst possible lie.
+   */
+  mergePullRequest(pullRequestId: string, options: MergeOptions): Promise<MergeResult>;
   /**
    * The most recent PR whose source is `sourceBranch` and whose state matches `stateFilter`, or
    * undefined when none. The transport sets the returned PR's `state`.
@@ -233,6 +266,10 @@ export interface ScmPort {
   addPullRequestThread(pullRequestId: string, body: string): Promise<PullRequestThread>;
   /** Read a PR's normalized status (scm monitoring): state, review decision, mergeability, checks. */
   prStatus(pullRequestId: string): Promise<PullRequestStatus>;
+  /** Take a draft PR out of draft. task-finish opens drafts deliberately; this is how you land-ready it. */
+  markPrReady(pullRequestId: string): Promise<PullRequest>;
+  /** Merge the PR (the last mile of the flow: create → start → PR → land). Throws if refused. */
+  mergePr(pullRequestId: string, options?: MergeOptions): Promise<MergeResult>;
   /**
    * The most recent PR for a source branch matching `stateFilter` (default `open`), with its `state`
    * populated; undefined when none. `open` is the finish-flow idempotency probe (don't duplicate an
@@ -334,10 +371,35 @@ export class BaseScmAdapter implements ScmPort {
     };
   }
 
+  async markPrReady(pullRequestId: string): Promise<PullRequest> {
+    const native = await this.transport.markPullRequestReady(pullRequestId);
+    return this.toPullRequest(native);
+  }
+
+  mergePr(pullRequestId: string, options: MergeOptions = {}): Promise<MergeResult> {
+    // No gap negotiation: every provider can merge. A refusal (conflict, unmet policy) surfaces as
+    // the transport's error, which is exactly what the caller must see.
+    return this.transport.mergePullRequest(pullRequestId, options);
+  }
+
   async prStatus(pullRequestId: string): Promise<PullRequestStatus> {
     // Aggregation is provider-specific (votes/policy vs reviews/checks), so the transport computes
     // the normalized status; the base simply delegates.
     return this.transport.getPullRequestStatus(pullRequestId);
+  }
+
+  private toPullRequest(native: NativePullRequest): PullRequest {
+    return {
+      id: native.id,
+      number: native.number,
+      title: native.title,
+      url: native.url,
+      sourceBranch: native.sourceBranch,
+      targetBranch: native.targetBranch,
+      draft: native.draft,
+      state: native.state,
+      autoCompleteEnabled: native.autoCompleteEnabled,
+    };
   }
 
   async prForBranch(

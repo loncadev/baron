@@ -40,7 +40,12 @@ names (unset for epics/initiatives = don't branch on those) — plus its current
 the provider has sprints.
 
 Scm port: `baron_scm_branch_create`, `baron_scm_pr_create`, `baron_scm_pr_thread`,
-`baron_scm_pr_status`, `baron_scm_pr_for_branch`. `branch_create`/`pr_create` default the base
+`baron_scm_pr_status`, `baron_scm_pr_for_branch`, `baron_scm_pr_ready`, `baron_scm_pr_merge`.
+**Landing a PR is Baron's job too** — don't shell out to `gh`/`az`: `pr_ready` takes a draft out of
+draft (task-finish opens drafts on purpose), and `pr_merge { pullRequestId, strategy?, deleteSourceBranch? }`
+merges it (`strategy`: `merge` | `squash` | `rebase`, defaulting to the provider's own). A refusal —
+conflicts, unmet branch policy, still a draft — comes back as `MERGE_FAILED` rather than a false success;
+`pr_status` tells you beforehand. `branch_create`/`pr_create` default the base
 branch to the repo default when omitted. `pr_for_branch { sourceBranch, state? }` returns the most
 recent PR for a branch (with its `state`) or null: `state:"open"` (default) is the idempotency probe
 — check it BEFORE `pr_create` so a re-run never duplicates a PR; `state:"merged"` is the drift probe

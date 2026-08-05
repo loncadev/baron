@@ -1,9 +1,13 @@
 import {
   ASSIGNEE_ME,
+  BaronError,
   BaseScmAdapter,
   type CheckRollup,
   type GapPolicy,
   type Logger,
+  type MergeOptions,
+  type MergeResult,
+  type MergeStrategy,
   type NativeBranch,
   type NativePullRequest,
   type NativePullRequestInput,
@@ -48,6 +52,13 @@ function withIssueLink(body: string | undefined, issueKey: string | undefined): 
   const link = `Closes #${issueKey.replace(/^#/, '')}`;
   return body === undefined || body.length === 0 ? link : `${body}\n\n${link}`;
 }
+
+/** Baron's abstract strategies -> GitHub's merge_method. */
+const MERGE_METHOD: Record<MergeStrategy, 'merge' | 'squash' | 'rebase'> = {
+  merge: 'merge',
+  squash: 'squash',
+  rebase: 'rebase',
+};
 
 export function createGithubScmTransport(options: GithubTransportOptions): ScmTransport {
   const { owner, repo, token, baseBranch } = options;
@@ -189,6 +200,57 @@ export function createGithubScmTransport(options: GithubTransportOptions): ScmTr
       if (baseBranch !== undefined && baseBranch.length > 0) return baseBranch;
       const { data } = await octokit.rest.repos.get({ owner, repo });
       return data.default_branch;
+    },
+
+    async markPullRequestReady(pullRequestId: string): Promise<NativePullRequest> {
+      // Un-drafting is GraphQL-only on GitHub (no REST route), and the mutation keys on the node id.
+      const { data } = await octokit.rest.pulls.get({
+        owner,
+        repo,
+        pull_number: Number(pullRequestId),
+      });
+      await octokit.graphql(
+        'mutation($pr: ID!) { markPullRequestReadyForReview(input: {pullRequestId: $pr}) { clientMutationId } }',
+        { pr: data.node_id },
+      );
+      return {
+        id: String(data.number),
+        number: String(data.number),
+        title: data.title,
+        url: data.html_url,
+        sourceBranch: data.head.ref,
+        targetBranch: data.base.ref,
+        draft: false,
+        state: 'open',
+      };
+    },
+
+    async mergePullRequest(pullRequestId: string, options: MergeOptions): Promise<MergeResult> {
+      const { data } = await octokit.rest.pulls.merge({
+        owner,
+        repo,
+        pull_number: Number(pullRequestId),
+        ...(options.strategy !== undefined ? { merge_method: MERGE_METHOD[options.strategy] } : {}),
+      });
+      // GitHub answers 405 when it refuses (conflict / unmet protection), which octokit throws —
+      // so reaching here means it really landed. Guard the flag anyway rather than assume.
+      if (data.merged !== true) {
+        throw new BaronError(
+          `GitHub did not merge PR #${pullRequestId}: ${data.message}`,
+          'MERGE_FAILED',
+        );
+      }
+      if (options.deleteSourceBranch === true) {
+        const { data: pr } = await octokit.rest.pulls.get({
+          owner,
+          repo,
+          pull_number: Number(pullRequestId),
+        });
+        await octokit.rest.git
+          .deleteRef({ owner, repo, ref: `heads/${pr.head.ref}` })
+          .catch(() => undefined); // already gone / protected — the merge itself stands
+      }
+      return { pullRequestId, sha: data.sha };
     },
 
     async getPullRequestStatus(pullRequestId: string): Promise<PullRequestStatus> {

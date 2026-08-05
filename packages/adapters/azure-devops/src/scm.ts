@@ -3,6 +3,9 @@ import {
   BaseScmAdapter,
   type GapPolicy,
   type Logger,
+  type MergeOptions,
+  type MergeResult,
+  type MergeStrategy,
   type NativeBranch,
   type NativePullRequest,
   type NativePullRequestInput,
@@ -18,6 +21,7 @@ import * as azdev from 'azure-devops-node-api';
 import {
   PullRequestStatus as AzurePrStatus,
   type GitPullRequest,
+  GitPullRequestMergeStrategy,
   GitRefUpdateStatus,
   PullRequestAsyncStatus,
 } from 'azure-devops-node-api/interfaces/GitInterfaces.js';
@@ -75,6 +79,13 @@ function toAzureStatusFilter(filter: PrStateFilter): AzurePrStatus {
       return AzurePrStatus.Active;
   }
 }
+
+/** Baron's abstract strategies -> Azure's merge-strategy enum. */
+const MERGE_STRATEGY: Record<MergeStrategy, GitPullRequestMergeStrategy> = {
+  merge: GitPullRequestMergeStrategy.NoFastForward,
+  squash: GitPullRequestMergeStrategy.Squash,
+  rebase: GitPullRequestMergeStrategy.Rebase,
+};
 
 type GitApi = Awaited<ReturnType<InstanceType<typeof azdev.WebApi>['getGitApi']>>;
 
@@ -256,6 +267,62 @@ export function createAzureDevOpsScmTransport(
         draft: pr.isDraft ?? false,
         state: toPrState(pr.status),
       };
+    },
+
+    async markPullRequestReady(pullRequestId: string): Promise<NativePullRequest> {
+      const git = await api();
+      const pr = await git.updatePullRequest(
+        { isDraft: false },
+        repository,
+        Number(pullRequestId),
+        project,
+      );
+      const id = String(pr.pullRequestId ?? pullRequestId);
+      const strip = (ref: string | undefined): string =>
+        ref?.startsWith(REFS_HEADS) ? ref.slice(REFS_HEADS.length) : (ref ?? '');
+      return {
+        id,
+        number: id,
+        title: pr.title ?? '',
+        url: prWebUrl(id),
+        sourceBranch: strip(pr.sourceRefName),
+        targetBranch: strip(pr.targetRefName),
+        draft: pr.isDraft ?? false,
+        state: toPrState(pr.status),
+      };
+    },
+
+    async mergePullRequest(pullRequestId: string, options: MergeOptions): Promise<MergeResult> {
+      const git = await api();
+      // Azure completes a PR by PATCHing it to Completed, and it demands the source commit it is
+      // completing — so read the PR first rather than guessing.
+      const current = await git.getPullRequestById(Number(pullRequestId), project);
+      const completed = await git.updatePullRequest(
+        {
+          status: AzurePrStatus.Completed,
+          ...(current.lastMergeSourceCommit !== undefined
+            ? { lastMergeSourceCommit: current.lastMergeSourceCommit }
+            : {}),
+          completionOptions: {
+            ...(options.strategy !== undefined
+              ? { mergeStrategy: MERGE_STRATEGY[options.strategy] }
+              : {}),
+            ...(options.deleteSourceBranch !== undefined
+              ? { deleteSourceBranch: options.deleteSourceBranch }
+              : {}),
+          },
+        },
+        repository,
+        Number(pullRequestId),
+        project,
+      );
+      if (completed.status !== AzurePrStatus.Completed) {
+        throw new BaronError(
+          `Azure did not complete PR ${pullRequestId} (status ${String(completed.status)}); check branch policies and conflicts.`,
+          'MERGE_FAILED',
+        );
+      }
+      return { pullRequestId, sha: completed.lastMergeCommit?.commitId };
     },
 
     async getPullRequestStatus(pullRequestId: string): Promise<PullRequestStatus> {

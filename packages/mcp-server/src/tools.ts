@@ -7,6 +7,7 @@ import {
   type IssueLinkType,
   type IssueQuery,
   type IssuesPort,
+  MERGE_STRATEGIES,
   type NotifyPort,
   PR_STATE_FILTERS,
   type PrStateFilter,
@@ -19,6 +20,7 @@ import {
   type WorkItemTypeRole,
   type WorkflowRole,
   isIssueLinkType,
+  isMergeStrategy,
   isPrStateFilter,
   isRunStatus,
   isWorkItemTypeRole,
@@ -70,6 +72,8 @@ export const SCM_TOOL_NAMES = {
   prThread: 'baron_scm_pr_thread',
   prStatus: 'baron_scm_pr_status',
   prForBranch: 'baron_scm_pr_for_branch',
+  prReady: 'baron_scm_pr_ready',
+  prMerge: 'baron_scm_pr_merge',
 } as const;
 
 export const CI_TOOL_NAMES = {
@@ -384,6 +388,39 @@ export const SCM_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
       properties: {
         pullRequestId: { type: 'string', minLength: 1 },
         body: { type: 'string', minLength: 1 },
+      },
+    },
+  },
+  {
+    name: SCM_TOOL_NAMES.prReady,
+    description:
+      'Take a draft pull request out of draft ("ready for review"). task-finish opens drafts on ' +
+      'purpose; this is how you signal it is ready to land.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['pullRequestId'],
+      properties: { pullRequestId: { type: 'string', minLength: 1 } },
+    },
+  },
+  {
+    name: SCM_TOOL_NAMES.prMerge,
+    description:
+      'Merge (land) a pull request — the last mile of the flow. Fails loudly (MERGE_FAILED) when ' +
+      'the provider refuses: conflicts, unmet branch policies, or a PR that is still a draft. ' +
+      'Check baron_scm_pr_status first if you want to know before trying.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['pullRequestId'],
+      properties: {
+        pullRequestId: { type: 'string', minLength: 1 },
+        strategy: {
+          type: 'string',
+          enum: [...MERGE_STRATEGIES],
+          description: "How to land it; defaults to the provider's own default.",
+        },
+        deleteSourceBranch: { type: 'boolean' },
       },
     },
   },
@@ -932,6 +969,23 @@ export function callScmTool(
           ...(targetBranch !== undefined ? { targetBranch } : {}),
           ...(body !== undefined ? { body } : {}),
           ...(draft !== undefined ? { draft } : {}),
+        });
+      });
+    case SCM_TOOL_NAMES.prReady:
+      return run(() => port.markPrReady(requireString(args, 'pullRequestId')));
+    case SCM_TOOL_NAMES.prMerge:
+      return run(() => {
+        const strategy = optionalString(args, 'strategy');
+        if (strategy !== undefined && !isMergeStrategy(strategy)) {
+          throw new BaronError(
+            `'strategy'='${strategy}' must be one of ${MERGE_STRATEGIES.join(', ')}.`,
+            INVALID_ARGS,
+          );
+        }
+        const deleteSourceBranch = optionalBoolean(args, 'deleteSourceBranch');
+        return port.mergePr(requireString(args, 'pullRequestId'), {
+          ...(strategy !== undefined ? { strategy } : {}),
+          ...(deleteSourceBranch !== undefined ? { deleteSourceBranch } : {}),
         });
       });
     case SCM_TOOL_NAMES.prStatus:

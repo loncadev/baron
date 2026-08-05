@@ -1,4 +1,5 @@
 import type {
+  MergeOptions,
   NativeBranch,
   NativePullRequest,
   NativePullRequestInput,
@@ -73,6 +74,21 @@ export function createMemoryScmTransport(): ScmTransport {
 
     async defaultBranch(): Promise<string> {
       return 'main';
+    },
+
+    async markPullRequestReady(pullRequestId: string) {
+      const pr = prs.find((p) => p.id === pullRequestId);
+      if (pr === undefined) throw new Error(`memory scm: PR '${pullRequestId}' not found`);
+      const ready = { ...pr, draft: false };
+      prs[prs.indexOf(pr)] = ready;
+      return ready;
+    },
+
+    async mergePullRequest(pullRequestId: string, _options: MergeOptions) {
+      const pr = prs.find((p) => p.id === pullRequestId);
+      if (pr === undefined) throw new Error(`memory scm: PR '${pullRequestId}' not found`);
+      prs[prs.indexOf(pr)] = { ...pr, state: 'merged' as const };
+      return { pullRequestId, sha: `sha-merge-${pullRequestId}` };
     },
 
     async getPullRequestStatus(pullRequestId: string) {
