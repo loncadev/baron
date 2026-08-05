@@ -21,6 +21,12 @@ For each in-flight item, correlate it to its branch's PR via the **core-derived 
 
 - **A — merged-but-stuck** (the common one): role is `in_progress` AND its branch has a **merged** PR
   → should be `in_review`. Auto-fixable.
+- **C — closed with a stale role label** (label-keyed providers): the item's role reads `done`
+  (the provider closed it — a PR merging with `Closes #N`) but `labels` still carries another
+  role's label, so boards and label filters keep showing it as in-flight. Auto-fixable: run
+  `baron_issue_transition` to `done`. That is NOT a no-op — the transition is what clears the
+  stale label, which is exactly why nothing cleared it when the provider closed the item itself.
+
 - **B — in-review-without-a-PR** (rare): role is `in_review` AND its branch has **no** PR at all
   → flag for the human; do NOT auto-change (something is off — wrong branch, force-push, manual move).
 

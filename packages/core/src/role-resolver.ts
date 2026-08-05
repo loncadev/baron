@@ -67,4 +67,18 @@ export class RoleResolver {
     }
     return undefined;
   }
+
+  /**
+   * The role a provider's OWN state carries, regardless of which key this map is otherwise driven by.
+   * A label-keyed map can still pin a native state (GitHub `done: { state: 'closed', label: 'done' }`),
+   * and {@link toRole} would miss it because it only reads the map's `stateKey`. That blind spot let
+   * an item the provider closed by itself — a PR merging with `Closes #N` — keep reporting the role
+   * label nobody cleared.
+   */
+  roleFromNativeState(state: string): WorkflowRole | undefined {
+    for (const [role, target] of Object.entries(this.map.states)) {
+      if (target?.state === state) return role as WorkflowRole;
+    }
+    return undefined;
+  }
 }

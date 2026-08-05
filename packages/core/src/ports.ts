@@ -417,11 +417,7 @@ export class BaseIssuesAdapter implements IssuesPort {
       body: native.body,
       nativeType: native.nativeType,
       typeRole,
-      // A label-keyed provider's cold read carries open/closed as the discriminator, which matches no
-      // label — so read the role off the labels first, and fall back to the discriminator (the value
-      // a write echoes back, and the only signal on state-keyed providers like Azure).
-      role:
-        this.resolver.roleFromLabels(native.labels) ?? this.resolver.toRole(native.discriminator),
+      role: this.resolveRole(native),
       nativeState: native.discriminator,
       parentId: native.parentId,
       labels: native.labels,
@@ -431,6 +427,29 @@ export class BaseIssuesAdapter implements IssuesPort {
       url: native.url,
       provider: this.cfg.provider,
     };
+  }
+
+  /**
+   * Read an item's role from what the provider actually reports.
+   *
+   * Role labels EMULATE the roles a provider's own states cannot express, so they are only the
+   * truth while the provider's state is silent. When the native state resolves to a role, the
+   * provider is speaking about the item first-hand and wins — otherwise an item closed by the
+   * provider itself (a PR merging with `Closes #N`, a manual close) keeps reading `in_progress`
+   * off the label Baron never got the chance to clear, because no `transition` ever ran.
+   *
+   * The mirror case: a label whose role pins a native state the item is NOT in is equally stale
+   * (reopen a `done` item and the `done` label outlives the close). Reporting no role is honest
+   * there; claiming the stale one is not.
+   */
+  private resolveRole(native: NativeIssue): WorkflowRole | undefined {
+    const fromState =
+      this.resolver.roleFromNativeState(native.discriminator) ??
+      this.resolver.toRole(native.discriminator);
+    if (fromState !== undefined) return fromState;
+    const fromLabel = this.resolver.roleFromLabels(native.labels);
+    if (fromLabel === undefined) return undefined;
+    return this.resolver.toNative(fromLabel).state === undefined ? fromLabel : undefined;
   }
 
   /** True when several type roles share one native type, making the reverse lookup ambiguous. */
