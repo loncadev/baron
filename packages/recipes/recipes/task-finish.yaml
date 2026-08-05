@@ -55,7 +55,7 @@ steps:
       falsy: "${existingPr}"
     with:
       id: ${issueId}
-      body: "PR opened: ${pr.url} (from ${branch}). Role unchanged — moves to in_review on merge."
-  - message: "Opened PR ${pr.url} for ${issueId}. Role unchanged; transition on merge (task-move)."
+      body: "PR opened: ${pr.url} (from ${branch}). Baron leaves the role as it is; what happens at merge is your provider's — a provider that closes the linked item lands it in done, otherwise move it yourself (task-move) or let task-sync sweep the drift."
+  - message: "Opened PR ${pr.url} for ${issueId}. Role unchanged — the merge outcome is the provider's; task-move or task-sync settles the rest."
     when:
       falsy: "${existingPr}"

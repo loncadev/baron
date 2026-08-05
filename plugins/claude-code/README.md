@@ -19,7 +19,7 @@ plugins/claude-code/
   skills/baron/SKILL.md         # vocabulary + the MCP tool surface (abstract roles)
   skills/task-new/SKILL.md      # /baron:task-new    → CREATE a work item (type + parent)
   skills/task-start/SKILL.md    # /baron:task-start  → start an EXISTING item (canonical branch + in_progress)
-  skills/task-finish/SKILL.md   # /baron:task-finish → push + draft PR (idempotent; role moves on merge)
+  skills/task-finish/SKILL.md   # /baron:task-finish → push + draft PR (idempotent; role unmoved — merge outcome is the provider's)
   skills/task-move/SKILL.md     # /baron:task-move   → move to a role; backward/reopen needs a reason
   skills/task-list/SKILL.md     # /baron:task-list   → read-only listing over baron_issue_query
   skills/task-sync/SKILL.md     # /baron:task-sync   → sweep board↔PR drift (merged-but-stuck) + batch-fix

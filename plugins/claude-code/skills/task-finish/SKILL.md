@@ -50,9 +50,12 @@ Idempotent finish: push the branch, check for an existing PR first, and only the
    opens a DRAFT PR **linked to the work item** (the adapter renders the provider's native keyword —
    GitHub `Closes #N`, Azure `AB#N` — so the tracker really associates them), adds the opening
    thread, and posts the PR link on the work item.
-7. **Report**: PR URL + "role unchanged — it moves to in_review when the PR merges" (merge-time is a
-   deliberate rule, not an omission). Mention it opened as a **draft**: that is deliberate — you mark
-   it ready for review when you want reviewers, and the item moves on merge. If auto-complete was
+7. **Report**: PR URL + the role is **unchanged** — Baron deliberately does not move it here. Say what
+   merge will actually do on THIS provider rather than promising a role: a provider whose `done` is a
+   closed state and whose link uses a closing keyword (GitHub `Closes #N`) will **close the item on
+   merge**, i.e. it lands in `done`; elsewhere (Azure) the item stays put and `task-move` /
+   `task-sync` settles it. Mention it opened as a **draft**: that is deliberate — you mark it ready
+   for review when you want reviewers. If auto-complete was
    requested, report whether it actually took (`autoCompleteEnabled`) — a repo with auto-merge
    disabled refuses it, and that is worth saying out loud rather than assuming it is armed.
 

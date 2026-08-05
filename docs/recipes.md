@@ -160,8 +160,9 @@ isn't configured fails with `PORT_UNBOUND`.
 
 `packages/recipes/recipes/` ships four recipes, all runnable **by name** (`baron_recipe_run`, the
 recipe skills) as well as by path (`baron run --recipe`). They mirror the reference flow Baron was
-abstracted from (ARCHITECTURE #21): creating and starting are separate acts, and review state moves
-on merge, not at PR-open.
+abstracted from (ARCHITECTURE #21): creating and starting are separate acts, and opening a PR does
+NOT move the role — what happens at merge belongs to the provider (a provider that closes the linked
+item on merge lands it in `done`; elsewhere `task-move` / `task-sync` settles it).
 
 - `task-new` — CREATE a work item (title + type role + optional parent).
 - `task-start` — start an EXISTING item: load it, branch on its core-derived canonical
