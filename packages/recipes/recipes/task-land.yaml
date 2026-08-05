@@ -1,0 +1,55 @@
+name: task-land
+description: Land the pull request for a work item — take it out of draft, then merge it. Refuses when there is no open PR, and a provider that declines the merge (conflicts, unmet branch policy) surfaces as MERGE_FAILED rather than a false success.
+steps:
+  - ask:
+      as: issueId
+      type: text
+      message: "Work item id to land?"
+  # Declared as asks so both are DISCOVERABLE via baron_recipe_list; unanswered means
+  # "let the provider decide" (its own default merge behaviour), not a hardcoded choice here.
+  - ask:
+      as: strategy
+      type: text
+      message: "Merge strategy — merge, squash, or rebase? Empty for the provider default."
+      optional: true
+  - ask:
+      as: deleteSourceBranch
+      type: text
+      message: "Delete the source branch after merging? (yes/no)"
+      optional: true
+  - do: issue.get
+    as: issue
+    with:
+      id: ${issueId}
+  - require:
+      truthy: "${issue.branchName}"
+      message: "${issueId} has no branch recorded — run task-start first; there is nothing to land."
+  # The branch is the join key: task-finish opened the PR from it, so the same lookup finds it back
+  # without the caller having to carry a PR id between the two runs.
+  - do: scm.pr.find
+    as: pr
+    with:
+      sourceBranch: ${issue.branchName}
+  - require:
+      truthy: "${pr}"
+      message: "No OPEN pull request on ${issue.branchName} for ${issueId}. Run task-finish to open one — or it may already be landed."
+  # Conditional: markPrReady on an already-ready PR is an error on some providers, so only undraft
+  # what is actually a draft. task-finish opens drafts on purpose, which is why this step exists.
+  - do: scm.pr.ready
+    when:
+      truthy: "${pr.draft}"
+    with:
+      pullRequestId: ${pr.id}
+  - message: "Took ${pr.url} out of draft."
+    when:
+      truthy: "${pr.draft}"
+  - do: scm.pr.merge
+    as: merged
+    with:
+      pullRequestId: ${pr.id}
+      strategy: ${strategy}
+      deleteSourceBranch: ${deleteSourceBranch}
+  # Deliberately no issue.transition here: a PR opened with a native issue link closes its item on
+  # merge on some providers (GitHub) and not on others (Azure). Transitioning unconditionally would
+  # either be a no-op or fight the provider — so report the truth and let task-move handle the rest.
+  - message: "Landed ${issue.key}: ${pr.url} merged (${merged.sha}). If your provider does not close items on merge, run task-move to put ${issue.key} in its final role."

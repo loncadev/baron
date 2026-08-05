@@ -35,7 +35,7 @@ describe('RecipeService', () => {
     const summaries = createRecipeService(ports(), ROOT).list();
     const names = summaries.map((s) => s.name);
     expect(names).toEqual(
-      expect.arrayContaining(['task-new', 'task-start', 'task-finish', 'ship']),
+      expect.arrayContaining(['task-new', 'task-start', 'task-finish', 'task-land', 'ship']),
     );
     const taskNew = summaries.find((s) => s.name === 'task-new');
     expect(taskNew?.inputs.map((i) => i.name)).toContain('title');

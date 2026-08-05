@@ -10,10 +10,10 @@ the caller. Three surfaces, same engine:
 
 - **CLI** — [`baron run --recipe <path>`](./cli.md#baron-run). `ask` steps prompt on stdin.
 - **MCP** — [`baron_recipe_run`](./mcp.md#tools) `{ name, inputs }` runs a recipe by name
-  (built-ins: `task-start`, `task-finish`, `ship`; project recipes live in `.baron/recipes/*.yaml`).
+  (built-ins: `task-start`, `task-finish`, `task-land`, `ship`; project recipes live in `.baron/recipes/*.yaml`).
   Inputs are supplied **up front** in `inputs`; a missing required input fails with
   `RECIPE_INPUT_MISSING` rather than prompting. `baron_recipe_list` reports each recipe's `inputs`.
-- **Claude Code skills** — `/baron:task-start`, `/baron:task-finish`, `/baron:ship`, and
+- **Claude Code skills** — `/baron:task-start`, `/baron:task-finish`, `/baron:task-land`, `/baron:ship`, and
   `/baron:run-recipe` (for any other recipe). Each gathers the inputs and makes the single
   `baron_recipe_run` call; also discoverable by natural language.
 
@@ -169,6 +169,10 @@ item on merge lands it in `done`; elsewhere `task-move` / `task-sync` settles it
   `branchName` (`<prefix>/<id>-<slug>`; fails loudly for epics), move to `in_progress`, note the
   branch on the item.
 - `task-finish` — open a draft PR + post the link on the item. Deliberately does NOT move the role.
+- `task-land` — undraft (only if it is a draft) + merge the item's PR. Refuses when there is no open
+  PR; a provider that declines the merge surfaces as `MERGE_FAILED` instead of a reported success.
+  It does not transition the item either: a native closing link (GitHub `Closes #N`) already closes
+  it on merge, and where it doesn't (Azure), `task-move` settles it.
 - `ship` — a multi-port example: draft PR (`scm`) + `in_review` (`issues`) + CI trigger (`ci`) +
   notify (`notify`) in one run.
 

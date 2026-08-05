@@ -6,6 +6,7 @@ import {
   type IssueLinkType,
   type IssueQuery,
   type IssuesPort,
+  MERGE_STRATEGIES,
   type NotifyPort,
   PR_STATE_FILTERS,
   type PrStateFilter,
@@ -15,6 +16,7 @@ import {
   type WorkItemTypeRole,
   type WorkflowRole,
   isIssueLinkType,
+  isMergeStrategy,
   isPrStateFilter,
   isWorkItemTypeRole,
   isWorkflowRole,
@@ -337,6 +339,22 @@ async function dispatchOp(ports: RecipePorts, op: RecipeOp, params: Params): Pro
         reqStr(params, 'pullRequestId', op),
         reqStr(params, 'body', op),
       );
+    case RECIPE_OPS.scmPrReady:
+      return scm(ports, op).markPrReady(reqStr(params, 'pullRequestId', op));
+    case RECIPE_OPS.scmPrMerge: {
+      const strategy = optStr(params, 'strategy', op);
+      if (strategy !== undefined && !isMergeStrategy(strategy)) {
+        throw new BaronError(
+          `Step '${op}' 'strategy'='${strategy}' must be one of ${MERGE_STRATEGIES.join(', ')}.`,
+          ARGS,
+        );
+      }
+      const deleteSourceBranch = optBoolish(params, 'deleteSourceBranch', op);
+      return scm(ports, op).mergePr(reqStr(params, 'pullRequestId', op), {
+        ...(strategy !== undefined ? { strategy } : {}),
+        ...(deleteSourceBranch !== undefined ? { deleteSourceBranch } : {}),
+      });
+    }
     case RECIPE_OPS.scmPrStatus:
       return scm(ports, op).prStatus(reqStr(params, 'pullRequestId', op));
     case RECIPE_OPS.scmPrFind: {

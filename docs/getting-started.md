@@ -9,7 +9,8 @@ guide takes you from nothing to a working setup in one command, then either driv
 - **Node.js ≥ 20**.
 - A cloned repo you want to track work for, and a provider token:
   - **GitHub** — a fine-grained PAT with **Contents**, **Issues**, and **Pull requests** = Read and
-    write (Metadata read is automatic; add **Checks: Read** for PR-status/ship flows).
+    write, plus **Checks: Read** (Metadata read is automatic). Checks is not optional in practice:
+    without it PR status cannot see CI, so `task-land` and `ship` cannot tell you whether it is safe to merge.
   - **Azure DevOps** — an org + project + repo and a Personal Access Token.
 
 You do **not** clone Baron or run a build — everything is published to npm and runs via `npx`.

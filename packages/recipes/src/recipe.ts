@@ -22,6 +22,8 @@ export const RECIPE_OPS = {
   scmPrThread: 'scm.pr.thread',
   scmPrStatus: 'scm.pr.status',
   scmPrFind: 'scm.pr.find',
+  scmPrReady: 'scm.pr.ready',
+  scmPrMerge: 'scm.pr.merge',
   ciRunTrigger: 'ci.run.trigger',
   ciRunCancel: 'ci.run.cancel',
   deployDeployments: 'deploy.deployments',

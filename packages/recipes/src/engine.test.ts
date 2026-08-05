@@ -344,6 +344,41 @@ steps:
     expect(asker.notes.some((n) => n.includes('already open'))).toBe(true);
   });
 
+  it('lands a draft PR: undrafts only when it is a draft, then merges', async () => {
+    const ports = allPorts();
+    const land = `
+name: land
+steps:
+  - do: scm.pr.find
+    as: pr
+    with: { sourceBranch: "feature/land" }
+  - require:
+      truthy: "\${pr}"
+      message: "no open PR on feature/land"
+  - do: scm.pr.ready
+    when:
+      truthy: "\${pr.draft}"
+    with: { pullRequestId: "\${pr.id}" }
+  - do: scm.pr.merge
+    as: merged
+    with: { pullRequestId: "\${pr.id}", strategy: "squash", deleteSourceBranch: "yes" }
+`;
+    // No PR yet: the guard must STOP rather than merge nothing and report success.
+    await expect(
+      runRecipe(loadRecipe(land), { ports, asker: scriptedAsker() }),
+    ).rejects.toBeInstanceOf(BaronError);
+
+    await ports.scm?.createPullRequest({
+      title: 'Land',
+      sourceBranch: 'feature/land',
+      draft: true,
+    });
+    const { context } = await runRecipe(loadRecipe(land), { ports, asker: scriptedAsker() });
+    expect((context.merged as { sha: string }).sha).toBeTruthy();
+    // The PR is gone from the OPEN set — it really merged, it was not just reported as merged.
+    expect(await ports.scm?.prForBranch('feature/land')).toBeUndefined();
+  });
+
   it('runs ci / notify / deploy / scm-status ops across the new ports', async () => {
     const recipe = loadRecipe(`
 name: single-pane

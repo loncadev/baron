@@ -48,7 +48,7 @@ enforced by Baron's engine, not by the model improvising.
 - **Capability gaps are never silent.** When a provider lacks something (say, native issue hierarchy),
   Baron either emulates it (e.g. labels), degrades with a warning, or errors loudly — decided by
   policy, never swallowed.
-- **Workflows are deterministic recipes.** Multi-step flows (`task-start`, `task-finish`, `ship`) are
+- **Workflows are deterministic recipes.** Multi-step flows (`task-start`, `task-finish`, `task-land`, `ship`) are
   declarative YAML run as one rule-enforced call — the engine enforces step order, the agent doesn't.
 
 ## Quick start

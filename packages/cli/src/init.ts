@@ -278,7 +278,8 @@ providers behind one contract, so speak its abstract vocabulary, never a vendor'
   \`baron_scm_*\` (branch / PR), \`baron_recipe_run\`, and \`baron_learning_*\` / \`baron_followup_*\` for
   durable decisions and follow-ups.
 - **Daily loop — prefer the skills:** \`/baron:task-new\` (create), \`/baron:task-start <id>\` (cut the
-  canonical branch, move to in_progress, assign you), \`/baron:task-finish\` (draft PR), \`/baron:task-move\`,
+  canonical branch, move to in_progress, assign you), \`/baron:task-finish\` (draft PR),
+  \`/baron:task-land\` (undraft + merge — never \`gh\`/\`az\`), \`/baron:task-move\`,
   \`/baron:task-list\`, \`/baron:task-sync\`. Each item's canonical branch is Baron-derived — use it
   verbatim, never invent one.
 - Reading/exploring a provider natively is fine, but make every work-item **change** through Baron so the
