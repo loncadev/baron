@@ -123,6 +123,22 @@ export function runIssuesConformance(target: IssuesConformanceTarget): void {
       });
     });
 
+    it('reconcile never invents a role, and is safe to call on any item', async () => {
+      // Widening the port contract, so the suite covers it: reconcile only ever aligns emulation
+      // with what the provider already reports, so on a freshly created item it must change
+      // nothing — and running it twice must land in the same place.
+      const { adapter } = target.build(emulateStates);
+      const issue = await adapter.create({ title: 'reconcile me', typeRole: 'task' });
+
+      const once = await adapter.reconcile(issue.id);
+      expect(once.id).toBe(issue.id);
+      expect(once.role).toBe(issue.role);
+
+      const twice = await adapter.reconcile(issue.id);
+      expect(twice.role).toBe(once.role);
+      expect([...twice.labels].sort()).toEqual([...once.labels].sort());
+    });
+
     it('transition to a mapped role resolves that role back', async () => {
       const { adapter } = target.build(emulateStates);
       const issue = await adapter.create({ title: 'x', typeRole: 'task' });

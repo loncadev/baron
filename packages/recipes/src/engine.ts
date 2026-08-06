@@ -339,6 +339,8 @@ async function dispatchOp(ports: RecipePorts, op: RecipeOp, params: Params): Pro
         reqStr(params, 'pullRequestId', op),
         reqStr(params, 'body', op),
       );
+    case RECIPE_OPS.issueReconcile:
+      return issues(ports, op).reconcile(reqStr(params, 'id', op));
     case RECIPE_OPS.scmPrReady:
       return scm(ports, op).markPrReady(reqStr(params, 'pullRequestId', op));
     case RECIPE_OPS.scmPrMerge: {

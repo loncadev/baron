@@ -42,8 +42,10 @@ const cfg: IssuesProviderConfig = {
   gapPolicy: {},
 };
 
-/** Read back an item the provider reports in the given state/label combination. */
-function readIssue(discriminator: string, labels: readonly string[]) {
+/** Build an adapter over a provider reporting the given state/label combination, recording writes. */
+function adapterFor(discriminator: string, labels: readonly string[]) {
+  const removed: string[] = [];
+  const added: string[] = [];
   const native: NativeIssue = {
     id: '12',
     key: '#12',
@@ -86,7 +88,21 @@ function readIssue(discriminator: string, labels: readonly string[]) {
       return [];
     },
   };
-  return new BaseIssuesAdapter(manifest, cfg, transport).get(native.id);
+  const recording: IssuesTransport = {
+    ...transport,
+    async addLabel(_id: string, label: string) {
+      added.push(label);
+    },
+    async removeLabel(_id: string, label: string) {
+      removed.push(label);
+    },
+  };
+  return { adapter: new BaseIssuesAdapter(manifest, cfg, recording), added, removed };
+}
+
+/** Read back an item the provider reports in the given state/label combination. */
+function readIssue(discriminator: string, labels: readonly string[]) {
+  return adapterFor(discriminator, labels).adapter.get('12');
 }
 
 describe('role read when the provider changed the item behind Baron', () => {
@@ -111,5 +127,37 @@ describe('role read when the provider changed the item behind Baron', () => {
     // twice over; claiming in-flight would invent a role nothing supports.
     const issue = await readIssue('open', ['done']);
     expect(issue.role).toBeUndefined();
+  });
+});
+
+describe('reconcile: emulated labels must not outlive the state that contradicts them', () => {
+  it('clears the stale in-progress label a merge left behind, and adds the one the state implies', async () => {
+    // Reported three landings in a row: GitHub closes the item via `Closes #N`, no transition ever
+    // runs, so the label task-start wrote survives and the board keeps showing finished work as
+    // in-flight. The label is Baron's own emulation — Baron has to clear it.
+    const { adapter, added, removed } = adapterFor('closed', ['in-progress', 'type:task']);
+    const issue = await adapter.reconcile('12');
+
+    expect(removed).toEqual(['in-progress']);
+    expect(added).toEqual(['done']);
+    expect(issue.role).toBe('done');
+    expect(issue.labels).not.toContain('in-progress');
+    // A label that carries no role is none of reconcile's business.
+    expect(issue.labels).toContain('type:task');
+  });
+
+  it('is idempotent — a second run writes nothing', async () => {
+    const { adapter, added, removed } = adapterFor('closed', ['done', 'type:task']);
+    await adapter.reconcile('12');
+    expect(removed).toEqual([]);
+    expect(added).toEqual([]);
+  });
+
+  it('leaves an in-flight item alone: the state implies no role, so the label is the only truth', async () => {
+    const { adapter, added, removed } = adapterFor('open', ['in-progress']);
+    const issue = await adapter.reconcile('12');
+    expect(removed).toEqual([]);
+    expect(added).toEqual([]);
+    expect(issue.role).toBe('in_progress');
   });
 });

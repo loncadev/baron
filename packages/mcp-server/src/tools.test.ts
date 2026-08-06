@@ -311,6 +311,7 @@ describe('TOOL_DEFINITIONS', () => {
       MCP_TOOL_NAMES.get,
       MCP_TOOL_NAMES.update,
       MCP_TOOL_NAMES.transition,
+      MCP_TOOL_NAMES.reconcile,
       MCP_TOOL_NAMES.comment,
       MCP_TOOL_NAMES.link,
       MCP_TOOL_NAMES.assign,

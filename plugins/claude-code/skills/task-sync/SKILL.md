@@ -24,8 +24,11 @@ For each in-flight item, correlate it to its branch's PR via the **core-derived 
 - **C — closed with a stale role label** (label-keyed providers): the item's role reads `done`
   (the provider closed it — a PR merging with `Closes #N`) but `labels` still carries another
   role's label, so boards and label filters keep showing it as in-flight. Auto-fixable: run
-  `baron_issue_transition` to `done`. That is NOT a no-op — the transition is what clears the
-  stale label, which is exactly why nothing cleared it when the provider closed the item itself.
+  `baron_issue_reconcile`. It commands no role — it clears the label the provider's own state
+  contradicts. Prefer it over `baron_issue_transition` here: transitioning would work on GitHub
+  and be wrong on a provider where a close does not mean `done`. Since task-land reconciles after
+  every merge, this class should now only appear for items landed before that, or where the
+  provider had not closed the item yet when the run finished.
 
 - **B — in-review-without-a-PR** (rare): role is `in_review` AND its branch has **no** PR at all
   → flag for the human; do NOT auto-change (something is off — wrong branch, force-push, manual move).

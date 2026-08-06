@@ -39,6 +39,11 @@ canonical `<prefix>/<id>-<slug>` branch derived by the core; use it verbatim, ne
 names (unset for epics/initiatives = don't branch on those) — plus its current `iteration` path when
 the provider has sprints.
 
+Issues also has `baron_issue_reconcile`: it makes an item's emulated role labels agree with the
+state the provider itself reports. It commands no role, so it is safe after anything that changed an
+item outside Baron — a merge that closes its issue leaves the old role label behind, and this is what
+clears it. `task-land` already calls it; reach for it directly when cleaning up drift.
+
 Scm port: `baron_scm_branch_create`, `baron_scm_pr_create`, `baron_scm_pr_thread`,
 `baron_scm_pr_status`, `baron_scm_pr_for_branch`, `baron_scm_pr_ready`, `baron_scm_pr_merge`.
 **Landing a PR is Baron's job too** — don't shell out to `gh`/`az`: `pr_ready` takes a draft out of

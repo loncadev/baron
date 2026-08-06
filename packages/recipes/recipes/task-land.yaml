@@ -49,7 +49,14 @@ steps:
       pullRequestId: ${pr.id}
       strategy: ${strategy}
       deleteSourceBranch: ${deleteSourceBranch}
-  # Deliberately no issue.transition here: a PR opened with a native issue link closes its item on
-  # merge on some providers (GitHub) and not on others (Azure). Transitioning unconditionally would
-  # either be a no-op or fight the provider — so report the truth and let task-move handle the rest.
-  - message: "Landed ${issue.key}: ${pr.url} merged (${merged.sha}). If your provider does not close items on merge, run task-move to put ${issue.key} in its final role."
+  # Still no issue.transition — a PR with a native closing link closes its item on merge on some
+  # providers (GitHub) and not on others (Azure), so commanding a role would either be a no-op or
+  # fight the provider. Reconcile is the other thing: it commands nothing and only clears the role
+  # LABEL Baron itself wrote, once the provider's own state contradicts it. Without this the
+  # in-progress label survives every landing and the board keeps showing finished work as in-flight.
+  # Race note: if the provider has not closed the item yet, this no-ops and task-sync catches it.
+  - do: issue.reconcile
+    as: reconciled
+    with:
+      id: ${issueId}
+  - message: "Landed ${issue.key}: ${pr.url} merged (${merged.sha}). Item now reads '${reconciled.role}' (${reconciled.nativeState}). If your provider does not close items on merge, run task-move to put ${issue.key} in its final role."

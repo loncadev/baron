@@ -151,6 +151,12 @@ export interface IssuesPort {
   /** The caller's own handle (what `@me` resolves to) — lets a recipe ask "is this item mine?". */
   whoAmI(): Promise<string>;
   transition(id: string, role: WorkflowRole): Promise<Issue>;
+  /**
+   * Bring emulated role labels back in line with the state the provider reports. Commands no role —
+   * it only clears an emulation the provider's own state contradicts, so it is safe to call after
+   * any operation that may have changed an item outside Baron (a merge that closes its issue).
+   */
+  reconcile(id: string): Promise<Issue>;
   comment(id: string, body: string): Promise<IssueComment>;
   link(fromId: string, toId: string, type: IssueLinkType): Promise<void>;
   query(filter: IssueQuery): Promise<readonly Issue[]>;
@@ -266,6 +272,53 @@ export class BaseIssuesAdapter implements IssuesPort {
       return this.toIssue({ ...applied, labels: applied.labels.filter((l) => !stale.includes(l)) });
     }
     return this.toIssue(applied);
+  }
+
+  /**
+   * Make the emulated role labels agree with the state the provider itself reports.
+   *
+   * Role labels are Baron's OWN artifact — it writes them to express roles a provider's states
+   * cannot. So when the provider changes an item behind Baron's back (a PR merging with
+   * `Closes #N`), nobody clears the label Baron wrote, and it outlives the close. Since v0.29.1
+   * the READ is right (a closed item reads `done`), but the label is still physically there,
+   * showing up in the provider's UI and in every label filter.
+   *
+   * This is deliberately NOT a transition: it commands no role. It reads the role the provider's
+   * own state already implies and removes the emulation that contradicts it. On a state-keyed
+   * provider (Azure) there are no role labels, so it is a no-op — which is why landing a PR can
+   * call it unconditionally without forcing a GitHub-shaped "merge means done" onto anyone else.
+   */
+  async reconcile(id: string): Promise<Issue> {
+    const native = await this.transport.getIssue(id);
+    const fromState = this.resolver.roleFromNativeState(native.discriminator);
+    // The provider's state carries no role, so the labels are the only signal there is; removing
+    // them would destroy information rather than correct it.
+    if (fromState === undefined) return this.toIssue(native);
+
+    const keep = this.resolver.toNative(fromState).label;
+    const stale = this.resolver
+      .roleLabels()
+      .filter((label) => label !== keep && native.labels.includes(label));
+    const missing = keep !== undefined && !native.labels.includes(keep) ? keep : undefined;
+    if (stale.length === 0 && missing === undefined) return this.toIssue(native);
+
+    if (stale.length > 0 && this.transport.removeLabel !== undefined) {
+      for (const label of stale) await this.transport.removeLabel(id, label);
+    }
+    if (missing !== undefined) await this.transport.addLabel(id, missing);
+
+    this.logger.info(
+      `Reconciled '${id}' to role '${fromState}' from native state '${native.discriminator}'` +
+        `${stale.length > 0 ? ` (cleared stale: ${stale.join(', ')})` : ''}` +
+        `${missing !== undefined ? ` (added: ${missing})` : ''}`,
+    );
+    return this.toIssue({
+      ...native,
+      labels: [
+        ...native.labels.filter((label) => !stale.includes(label)),
+        ...(missing !== undefined ? [missing] : []),
+      ],
+    });
   }
 
   async comment(id: string, body: string): Promise<IssueComment> {

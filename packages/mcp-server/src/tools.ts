@@ -58,6 +58,7 @@ export const MCP_TOOL_NAMES = {
   get: 'baron_issue_get',
   update: 'baron_issue_update',
   transition: 'baron_issue_transition',
+  reconcile: 'baron_issue_reconcile',
   comment: 'baron_issue_comment',
   link: 'baron_issue_link',
   assign: 'baron_issue_assign',
@@ -221,6 +222,19 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
           description: 'Target workflow role. Translated to the provider-native target.',
         },
       },
+    },
+  },
+  {
+    name: MCP_TOOL_NAMES.reconcile,
+    description:
+      "Make an item's emulated role labels agree with the state the provider itself reports. " +
+      "Commands no role — it only clears a role label the provider's own state contradicts, which " +
+      'is what a merge that closes an issue leaves behind. A no-op where roles ride native states.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['id'],
+      properties: { id: { type: 'string', minLength: 1 } },
     },
   },
   {
@@ -904,6 +918,8 @@ export function callTool(
     }
     case MCP_TOOL_NAMES.transition:
       return run(() => port.transition(requireString(args, 'id'), requireRole(args)));
+    case MCP_TOOL_NAMES.reconcile:
+      return run(() => port.reconcile(requireString(args, 'id')));
     case MCP_TOOL_NAMES.comment:
       return run(() => port.comment(requireString(args, 'id'), requireString(args, 'body')));
     case MCP_TOOL_NAMES.link:

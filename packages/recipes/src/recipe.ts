@@ -10,6 +10,7 @@ export const RECIPE_OPS = {
   issueGet: 'issue.get',
   issueUpdate: 'issue.update',
   issueTransition: 'issue.transition',
+  issueReconcile: 'issue.reconcile',
   issueComment: 'issue.comment',
   issueLink: 'issue.link',
   issueAssign: 'issue.assign',

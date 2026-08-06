@@ -47,8 +47,12 @@ is the answer — report it, don't route around it.
    - The merge commit and the PR URL.
    - **What happened to the item.** A PR opened with a native closing link (GitHub `Closes #N`)
      closes its item on merge — it is already in `done`, nothing more to do. Where the link does not
-     close (Azure `AB#N`), the item **stays where it was**; offer `task-move` to settle it. Read the
-     item back with `baron_issue_get` rather than guessing which case you're in.
+     close (Azure `AB#N`), the item **stays where it was**; offer `task-move` to settle it. The
+     recipe reports the role and native state it read back, so quote those rather than guessing.
+     It also **reconciles** after the merge: on a label-keyed provider the role label Baron wrote at
+     task-start would otherwise survive the close and keep the board showing finished work as
+     in-flight. If the provider had not closed the item yet when the run finished, reconcile no-ops
+     and `task-sync` picks it up — say so instead of claiming the board is clean.
    - Then `git checkout <default-branch> && git pull` locally so the user isn't left on a merged
      branch.
 
