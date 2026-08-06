@@ -213,12 +213,19 @@ export const CHECK_ROLLUPS = ['succeeded', 'failed', 'pending', 'none', 'unknown
 export type CheckRollup = (typeof CHECK_ROLLUPS)[number];
 
 export interface CheckSummary {
-  /** Checks actually counted. Always 0 for `none` and for `unknown` — nothing was readable. */
+  /** Checks actually counted. Always 0 for `none`; may be partial when the view was incomplete. */
   readonly total: number;
   readonly succeeded: number;
   readonly failed: number;
   readonly pending: number;
   readonly rollup: CheckRollup;
+  /**
+   * Sources that did not contribute — refused by the credential, or not read by this adapter.
+   * Present whenever the view was incomplete, so a caller can tell "this token may not look" from
+   * "the integration is broken". Without it an unexplained `unknown` reads as a Baron bug, which
+   * cost a real investigation before this field existed.
+   */
+  readonly unreadable?: readonly string[] | undefined;
 }
 
 /**

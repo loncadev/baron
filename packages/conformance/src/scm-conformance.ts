@@ -117,7 +117,9 @@ export function runScmConformance(target: ScmConformanceTarget): void {
       // could-not-look. Neither may carry counted checks, and a caller must never see one as green.
       const { total, succeeded, failed, pending, rollup } = status.checks;
       expect(total).toBe(succeeded + failed + pending);
-      if (rollup === 'none' || rollup === 'unknown') expect(total).toBe(0);
+      // 'none' claims there is nothing to run, so it must have counted nothing. 'unknown' may carry
+      // a partial tally — it means the view was incomplete, not that it was empty.
+      if (rollup === 'none') expect(total).toBe(0);
       if (rollup === 'failed') expect(failed).toBeGreaterThan(0);
       if (rollup === 'pending') expect(failed).toBe(0);
       if (rollup === 'succeeded') expect(total).toBeGreaterThan(0);

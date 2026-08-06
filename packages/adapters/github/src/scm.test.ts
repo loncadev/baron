@@ -148,6 +148,43 @@ describe('github scm prStatus when the credential cannot read checks', () => {
     expect(mocks.listWorkflowRuns).not.toHaveBeenCalled(); // no needless fallback
   });
 
+  it("a readable-but-empty commit-status view must NOT be read as 'none'", async () => {
+    // The false green this whole path exists to prevent. GitHub Actions never writes legacy commit
+    // statuses, so reading that API successfully and finding it empty proves nothing about whether a
+    // workflow is red. A token holding Commit statuses but not Actions used to land here and get
+    // 'none' — "no CI, safe to merge" — while a workflow was failing.
+    mocks.checksListForRef.mockRejectedValue(forbidden());
+    mocks.listWorkflowRuns.mockRejectedValue(forbidden());
+    mocks.combinedStatus.mockResolvedValue({ data: { statuses: [] } });
+
+    const status = await transport().getPullRequestStatus('7');
+    expect(status.checks.rollup).toBe('unknown');
+    expect(status.checks.rollup).not.toBe('none');
+    // And it names WHY, so an unexplained 'unknown' is not mistaken for a broken integration.
+    expect(status.checks.unreadable).toEqual(['check-runs', 'actions-runs']);
+  });
+
+  it('a definite failure stays definite even when the view is partial', async () => {
+    mocks.checksListForRef.mockRejectedValue(forbidden());
+    mocks.listWorkflowRuns.mockRejectedValue(forbidden());
+    mocks.combinedStatus.mockResolvedValue({ data: { statuses: [{ state: 'failure' }] } });
+
+    const status = await transport().getPullRequestStatus('7');
+    expect(status.checks.rollup).toBe('failed');
+  });
+
+  it('reports a green check run as succeeded when check-runs IS readable', async () => {
+    // Guards the happy path: a credential that can read check runs must see them, not fall through.
+    mocks.checksListForRef.mockResolvedValue({
+      data: { check_runs: [{ status: 'completed', conclusion: 'success' }] },
+    });
+
+    const status = await transport().getPullRequestStatus('7');
+    expect(status.checks.rollup).toBe('succeeded');
+    expect(status.checks.total).toBe(1);
+    expect(status.checks.unreadable).toBeUndefined();
+  });
+
   it('surfaces a non-permission failure instead of swallowing it as unknown', async () => {
     mocks.checksListForRef.mockRejectedValue(
       Object.assign(new Error('server error'), { status: 500 }),

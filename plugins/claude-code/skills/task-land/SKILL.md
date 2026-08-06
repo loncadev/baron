@@ -23,10 +23,17 @@ is the answer — report it, don't route around it.
 2. **Check before you merge** — call `baron_scm_pr_for_branch`, then `baron_scm_pr_status` on the
    PR it returns. Read three things and say them out loud:
    - **checks** (`rollup`) — `failed` or `pending` means STOP and ask, rather than merging red or
-     unfinished. `unknown` means Baron could not read CI at all (a fine-grained GitHub token cannot
-     be granted the Checks permission, and without `Actions: Read` + `Commit statuses: Read` there is
-     no way in; Azure PR policies are not read either). Report `unknown` as unknown and let the user
-     decide — it is NOT `none`, which means the provider was asked and there is genuinely no CI.
+     unfinished. `unknown` means the view was incomplete, and `checks.unreadable` names exactly
+     which sources did not contribute — quote it. `['check-runs', 'actions-runs']` means the
+     credential lacks **Actions: Read** (a fine-grained GitHub token can never hold the Checks
+     permission, so Actions is the way in); `['policy-evaluations']` is Azure, which Baron does not
+     read yet. This matters: an unexplained `unknown` looks like a broken integration, and someone
+     will go hunting. It is NOT `none` — that one means the provider was asked and there is
+     genuinely no CI.
+     
+     Do not conclude Baron is broken by comparing against `gh`: the GitHub CLI authenticates with a
+     different, broader credential than Baron's token, so it routinely sees checks Baron's token
+     may not. Compare permissions, not tools.
    - **reviewDecision** — `changes_requested` means STOP. `review_required` is the user's call.
    - **mergeable** — false usually means conflicts; the fix is a local rebase, not a retry.
 

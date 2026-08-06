@@ -90,20 +90,29 @@ export function createGithubScmTransport(options: GithubTransportOptions): ScmTr
     let succeeded = 0;
     let failed = 0;
     let pending = 0;
-    let readAnything = false;
+    const unreadable: string[] = [];
+    /**
+     * Only a source that would surface GitHub Actions can justify concluding "there is no CI here".
+     * The combined-status API is NOT one: Actions never writes legacy commit statuses, so reading it
+     * successfully and finding it empty proves nothing about whether a workflow is red. Letting that
+     * read alone count as "I saw the picture" turned a blind spot into `none` — a green light.
+     */
+    let sawActionsCapableSource = false;
 
     // A 403 is "this credential may not look", which is a different fact from "there is nothing to
     // see" — swallow only that, so a real outage still surfaces as an error.
-    const ifPermitted = async (read: () => Promise<void>): Promise<void> => {
+    const ifPermitted = async (source: string, read: () => Promise<void>): Promise<boolean> => {
       try {
         await read();
-        readAnything = true;
+        return true;
       } catch (error) {
         if ((error as { status?: number }).status !== 403) throw error;
+        unreadable.push(source);
+        return false;
       }
     };
 
-    await ifPermitted(async () => {
+    sawActionsCapableSource = await ifPermitted('check-runs', async () => {
       const { data } = await octokit.rest.checks.listForRef({
         owner,
         repo,
@@ -122,8 +131,8 @@ export function createGithubScmTransport(options: GithubTransportOptions): ScmTr
       }
     });
 
-    if (!readAnything) {
-      await ifPermitted(async () => {
+    if (!sawActionsCapableSource) {
+      sawActionsCapableSource = await ifPermitted('actions-runs', async () => {
         const { data } = await octokit.rest.actions.listWorkflowRunsForRepo({
           owner,
           repo,
@@ -141,7 +150,9 @@ export function createGithubScmTransport(options: GithubTransportOptions): ScmTr
           else failed += 1;
         }
       });
-      await ifPermitted(async () => {
+      // Counted, but deliberately does NOT set sawActionsCapableSource: third-party CI that posts
+      // legacy statuses is real signal, yet its absence says nothing about a workflow.
+      await ifPermitted('commit-statuses', async () => {
         const { data } = await octokit.rest.repos.getCombinedStatusForRef({
           owner,
           repo,
@@ -156,18 +167,27 @@ export function createGithubScmTransport(options: GithubTransportOptions): ScmTr
     }
 
     const total = succeeded + failed + pending;
-    // `unknown` rather than `none`: nothing was readable, so "no checks" would be an invention that
-    // reads as a green light.
-    const rollup: CheckRollup = !readAnything
-      ? 'unknown'
-      : total === 0
-        ? 'none'
-        : failed > 0
-          ? 'failed'
-          : pending > 0
-            ? 'pending'
-            : 'succeeded';
-    return { total, succeeded, failed, pending, rollup };
+    // A failure or a run still going is DEFINITE — it stays definite even when the view is partial.
+    // Only the reassuring conclusions ("all green", "nothing to run") need to have seen everything,
+    // because those are the ones a caller merges on.
+    const rollup: CheckRollup =
+      failed > 0
+        ? 'failed'
+        : pending > 0
+          ? 'pending'
+          : !sawActionsCapableSource
+            ? 'unknown'
+            : total === 0
+              ? 'none'
+              : 'succeeded';
+    return {
+      total,
+      succeeded,
+      failed,
+      pending,
+      rollup,
+      ...(unreadable.length > 0 ? { unreadable } : {}),
+    };
   }
 
   return {
@@ -388,14 +408,14 @@ export function createGithubScmTransport(options: GithubTransportOptions): ScmTr
             ? 'pending'
             : 'review_required';
 
-      const { total, succeeded, failed, pending, rollup } = await checkSummary(pr.head.sha);
+      const checks = await checkSummary(pr.head.sha);
 
       return {
         id: String(pr.number),
         state,
         reviewDecision,
         ...(pr.mergeable != null ? { mergeable: pr.mergeable } : {}),
-        checks: { total, succeeded, failed, pending, rollup },
+        checks,
         url: pr.html_url,
       };
     },
