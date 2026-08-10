@@ -1,0 +1,23 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.loncadev/baron",
+  "title": "Baron",
+  "description": "Let your coding agent write to your work tracker: issues, branches, PRs and CI, one contract.",
+  "repository": {
+    "url": "https://github.com/loncadev/baron",
+    "source": "github",
+    "subfolder": "packages/mcp-server"
+  },
+  "version": "0.31.1",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@lonca/baron-mcp-server",
+      "version": "0.31.1",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}
