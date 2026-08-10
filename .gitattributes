@@ -1,0 +1,19 @@
+# Normalize line endings so the working tree is deterministic regardless of core.autocrlf.
+#
+# Without this, a Windows checkout rewrites LF to CRLF on disk while the repository stores LF, and
+# Biome — which reads the working tree, not the index — fails on the CR characters. That surfaced as
+# a recurring "11 lint errors in package.json" with an empty `git diff`, which is a confusing state
+# to debug and, worse, a red baseline that hides real regressions.
+* text=auto eol=lf
+
+# Binary assets must never be touched by EOL conversion.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+
+# Lockfiles are generated; keep them byte-stable across platforms.
+pnpm-lock.yaml -text
