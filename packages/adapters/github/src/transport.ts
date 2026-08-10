@@ -33,10 +33,24 @@ const GH_STATE = { OPEN: 'open', CLOSED: 'closed' } as const;
  */
 const TARGET = { STATE: 'state', LABEL: 'label' } as const;
 
-/** GitHub has one native type; every type role maps onto it (matches the example type map). */
-const GH_NATIVE_TYPE = 'issue';
+/**
+ * The type of an issue carrying no Issue Type — the only kind GitHub had before the feature, and
+ * still what you get on any repo that has not adopted it. `introspector.ts` always offers this
+ * alongside whatever `GET /issue-types` reports, so a policy written by `baron init` can map it.
+ */
+const GH_UNTYPED = 'issue';
 
 type IssueResponse = Awaited<ReturnType<Octokit['rest']['issues']['get']>>['data'];
+
+/**
+ * Issue Types are newer than the octokit types we build against, so `type` is not on IssueResponse.
+ * Read it defensively rather than widening the response type: absent field, absent object and empty
+ * name all collapse to {@link GH_UNTYPED}, which is what an unadopted repo returns for every issue.
+ */
+function nativeTypeOf(data: IssueResponse): string {
+  const name = (data as { type?: { name?: string } | null }).type?.name;
+  return name !== undefined && name.length > 0 ? name : GH_UNTYPED;
+}
 
 function labelNames(labels: IssueResponse['labels']): string[] {
   return labels
@@ -70,7 +84,7 @@ export function createGithubTransport(options: GithubTransportOptions): IssuesTr
     key: `#${data.number}`,
     title: data.title,
     body: data.body ?? undefined,
-    nativeType: GH_NATIVE_TYPE,
+    nativeType: nativeTypeOf(data),
     discriminator: discriminator ?? data.state ?? GH_STATE.OPEN,
     parentId: undefined,
     labels: labelNames(data.labels),

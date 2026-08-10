@@ -16,7 +16,12 @@ export function createGithubIntrospector(options: GithubTransportOptions): Intro
 
   return {
     async introspect(): Promise<ProviderIntrospection> {
-      let workItemTypes: { name: string }[] = [{ name: 'issue' }];
+      // 'issue' is not a fallback that richer types replace — it is the type of every issue with no
+      // Issue Type set, which stays possible even where the feature is enabled. Dropping it once
+      // `GET /issue-types` answers is what broke this repo: the org had Task/Bug/Feature defined but
+      // assigned to none of its 12 issues, so `baron init` proposed a map in which nothing an issue
+      // actually reports could be found, and every task-start failed on a missing branch name.
+      const workItemTypes: { name: string }[] = [{ name: 'issue' }];
       try {
         // issue-types is a newer, optional route; call it loosely so an absent feature just falls
         // back rather than failing introspection.
@@ -25,13 +30,16 @@ export function createGithubIntrospector(options: GithubTransportOptions): Intro
           params: Record<string, unknown>,
         ) => Promise<{ data: unknown }>;
         const { data } = await request('GET /repos/{owner}/{repo}/issue-types', { owner, repo });
-        if (Array.isArray(data) && data.length > 0) {
-          workItemTypes = data.map((entry) => ({
-            name: String((entry as { name?: string }).name ?? 'issue'),
-          }));
+        if (Array.isArray(data)) {
+          for (const entry of data) {
+            const name = String((entry as { name?: string }).name ?? '');
+            if (name.length > 0 && !workItemTypes.some((t) => t.name === name)) {
+              workItemTypes.push({ name });
+            }
+          }
         }
       } catch {
-        // Issue Types disabled / not available -> keep the single-type fallback.
+        // Issue Types disabled / not available -> 'issue' alone still describes this repo.
       }
 
       return {
