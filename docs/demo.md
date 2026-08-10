@@ -64,7 +64,7 @@ Show the agent using Baron's MCP tools / skills. Type these prompts; let the too
    Baron runs the `ship` recipe: opens a draft PR (`scm`), moves the issue to `in_review` (`issues`),
    triggers the CI pipeline (`ci`), notifies the team (`notify`) — **four providers, one recipe.**
 
-4. **Close on the tagline caption:** *"Same prompts, any stack. Roles, not vendor states."*
+4. **Close on the tagline caption:** *"Roles, not vendor states — the same flow on the next tracker."*
 
 ## Variant B — CLI only (no agent, fully deterministic)
 
@@ -72,7 +72,8 @@ For a provider-agnostic recording that needs no MCP client:
 
 ```bash
 pnpm baron doctor                                                   # prove the live policy is healthy
-pnpm baron run --recipe packages/recipes/recipes/task-start.yaml    # create + branch + in_progress
+pnpm baron run --recipe packages/recipes/recipes/task-new.yaml      # create the work item
+pnpm baron run --recipe packages/recipes/recipes/task-start.yaml    # branch + in_progress + assign
 pnpm baron run --recipe packages/recipes/recipes/ship.yaml          # PR + in_review + CI + notify
 ```
 

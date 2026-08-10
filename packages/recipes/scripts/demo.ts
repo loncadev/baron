@@ -69,20 +69,34 @@ function scriptedAsker(answers: string[]): RecipeAsker {
 
 const p = ports();
 
+// task-new CREATES; task-start starts an EXISTING item (ARCHITECTURE #21). Feeding a title to
+// task-start — as this script used to — fails with "issue not found", because the first thing the
+// recipe does is `issue.get` on whatever it was given.
+write('$ pnpm baron run --recipe packages/recipes/recipes/task-new.yaml');
+const created = await runRecipe(loadRecipe(read('task-new.yaml')), {
+  ports: p,
+  asker: scriptedAsker(['Add rate limiting to the login endpoint', 'task', '', '']),
+});
+write('Recipe packages/recipes/recipes/task-new.yaml finished.');
+write('');
+
+const issue = created.context.issue as { id: string; key?: string };
+
 write('$ pnpm baron run --recipe packages/recipes/recipes/task-start.yaml');
 const started = await runRecipe(loadRecipe(read('task-start.yaml')), {
   ports: p,
-  asker: scriptedAsker(['Add rate limiting to the login endpoint']),
+  asker: scriptedAsker([issue.id]),
 });
 write('Recipe packages/recipes/recipes/task-start.yaml finished.');
 write('');
 
-const issue = started.context.issue as { id: string; key?: string };
-const branch = `feature/${issue.id}`;
+// The branch name is Baron's, derived from the item's type role — never assembled here. That is the
+// property the demo is meant to show, so inventing `feature/<id>` would undercut the point.
+const branch = (started.context.branch as { name: string }).name;
 
 write('$ pnpm baron run --recipe packages/recipes/recipes/task-finish.yaml');
 await runRecipe(loadRecipe(read('task-finish.yaml')), {
   ports: p,
-  asker: scriptedAsker([issue.id, branch, 'Rate limit the login endpoint']),
+  asker: scriptedAsker([issue.id, branch, 'Rate limit the login endpoint', '', 'no']),
 });
 write('Recipe packages/recipes/recipes/task-finish.yaml finished.');

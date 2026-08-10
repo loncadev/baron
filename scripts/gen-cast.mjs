@@ -27,49 +27,65 @@ const nl = (dt = 0.15, s = '') => at(dt, `${s}\r\n`);
 const prompt = () => at(0.5, `${GREEN}$${RESET} `);
 
 // Intro
-nl(0.3, `${CYAN}Baron — one pane of glass from backlog to deploy${RESET}`);
+nl(0.3, `${CYAN}Baron — your agent writes to your work tracker${RESET}`);
 nl(0.5, '');
 
-// Recipe 1: start a task from one prompt
+// Recipe 1: create the work item. task-new CREATES; task-start starts an EXISTING item (#21).
+prompt();
+type('baron run --recipe task-new.yaml');
+nl(0.3, '');
+at(0.5, 'Work item title? ');
+type('Add rate limiting to the login endpoint');
+nl(0.3, '');
+at(0.4, 'Type role? ');
+type('task');
+nl(0.35, '');
+nl(0.35, 'Created #1 (issue): Add rate limiting to the login endpoint');
+nl(0.6, '');
+
+// Recipe 2: start it — branch, role, assignee, in one call.
 prompt();
 type('baron run --recipe task-start.yaml');
 nl(0.3, '');
-at(0.5, 'Task title? ');
-type('Add rate limiting to the login endpoint');
+at(0.5, 'Work item id? ');
+type('mem-1');
 nl(0.35, '');
-nl(0.35, 'Task #142 is in progress on feature/142.');
-nl(0.15, 'Recipe task-start.yaml finished.');
+nl(
+  0.35,
+  '#1 is in progress on task/mem-1-add-rate-limiting-to-the-login-endpoint, assigned to you.',
+);
 nl(0.6, '');
 nl(
   0.15,
-  `${GRAY}# "in_progress" is a role — Baron maps it to each provider's native state:${RESET}`,
+  `${GRAY}# The branch name is Baron's, derived from the item's type role — never invented.${RESET}`,
 );
 nl(
   0.15,
-  `${GRAY}#   GitHub -> "in-progress" label   Azure DevOps -> "Active".  Same prompt, any stack.${RESET}`,
+  `${GRAY}# "in_progress" is a role: GitHub -> "in-progress" label, Azure DevOps -> "Active".${RESET}`,
 );
 nl(1.1, '');
 
-// Recipe 2: finish it — open the PR and move to review
+// Recipe 3: finish it — open the PR. Deliberately does NOT move the role (#21).
 prompt();
 type('baron run --recipe task-finish.yaml');
 nl(0.3, '');
 at(0.5, 'Issue id? ');
-type('142');
+type('mem-1');
 nl(0.3, '');
 at(0.4, 'Source branch? ');
-type('feature/142');
+type('task/mem-1-add-rate-limiting-to-the-login-endpoint');
 nl(0.3, '');
 at(0.4, 'Pull request title? ');
 type('Rate limit the login endpoint');
 nl(0.35, '');
-nl(0.35, 'Opened PR https://github.com/acme/store/pull/23; moved 142 to review.');
-nl(0.15, 'Recipe task-finish.yaml finished.');
+nl(0.35, 'Opened PR mem://pr/1 for mem-1. Role unchanged — the merge outcome is the');
+nl(0.15, "provider's; task-move or task-sync settles the rest.");
 nl(0.6, '');
 nl(
   0.15,
-  `${GRAY}# One recipe, the right ports in order — the engine enforces it, not the agent.${RESET}`,
+  `${GRAY}# Baron does not pretend the merge already happened. What closing means is the${RESET}`,
 );
+nl(0.15, `${GRAY}# provider's rule, so Baron reports rather than guesses.${RESET}`);
 nl(2.0, '');
 
 const header = { version: 2, width: 92, height: 20, env: { TERM: 'xterm-256color' } };
