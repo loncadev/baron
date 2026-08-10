@@ -85,10 +85,21 @@ This preserves Baron's ability to sustain the project through a commercial tier 
 track down every contributor for consent later. It does **not** take away your rights: your
 contribution remains available to you and to everyone else under Apache-2.0.
 
+### How you agree
+
+Opening your first pull request starts a bot that asks you to post one line as a comment:
+
+```
+I have read the contribution terms and I hereby sign them
+```
+
+Your signature is recorded in [`.github/cla-signatures.json`](./.github/cla-signatures.json) with a
+timestamp and covers every contribution you make afterwards — you are asked once. Until it is
+recorded, the pull request is blocked.
+
 > **Note (pending formal review).** These terms are a lightweight, good-faith starting point so the
 > project's licensing model stays intact from the first contribution. They are **not legal advice**
 > and are expected to be replaced by a formally reviewed Contributor License Agreement (CLA) before
-> the project accepts contributions at scale. If you contribute in the meantime, opening a PR is taken
-> as agreement to the terms above as written.
+> the project accepts contributions at scale.
 
 Questions about these terms? Open a discussion or issue before contributing.

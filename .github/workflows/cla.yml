@@ -1,0 +1,43 @@
+name: CLA
+
+# Records an explicit signature against the contribution terms in CONTRIBUTING.md before an
+# external contribution can merge. Apache-2.0 grants no relicensing right, so once an outside
+# contribution lands without recorded consent, the open-core option (ARCHITECTURE #20) can no
+# longer be exercised without tracking that person down. Assumed agreement is not consent.
+on:
+  issue_comment:
+    types: [created]
+  pull_request_target:
+    types: [opened, closed, synchronize]
+
+permissions:
+  actions: write
+  contents: write # signatures are committed to this repo, so no PAT is needed
+  pull-requests: write
+  statuses: write
+
+jobs:
+  cla:
+    # Only react to the signature phrase, never to arbitrary comment traffic.
+    if: >-
+      github.event_name == 'pull_request_target' ||
+      github.event.comment.body == 'I have read the contribution terms and I hereby sign them'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: contributor-assistant/github-action@v2.6.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          path-to-signatures: .github/cla-signatures.json
+          path-to-document: https://github.com/loncadev/baron/blob/main/CONTRIBUTING.md#contribution-terms
+          branch: main
+          custom-notsigned-prcomment: >-
+            Thanks for the contribution. Before it can be merged, please read the
+            [contribution terms](https://github.com/loncadev/baron/blob/main/CONTRIBUTING.md#contribution-terms)
+            — Apache-2.0 licensing plus a relicensing grant that keeps Baron's open-core model viable —
+            and post the line below as a comment on this pull request. It is recorded once and covers
+            your future contributions.
+          custom-pr-sign-comment: I have read the contribution terms and I hereby sign them
+          custom-allsigned-prcomment: Signature recorded — thanks. This pull request is clear to merge.
+          # The maintainer holds the copyright; bots cannot agree to anything.
+          allowlist: keparlak,bot*,dependabot[bot],renovate[bot]
