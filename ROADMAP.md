@@ -74,9 +74,10 @@ Scope discipline is a feature. These are decided, not pending:
 - **A wider port set for its own sake.** Cost tracking, incident management, and velocity reporting
   are not planned. New ports must earn their place against the contract debt above.
 
-The `docs` port is declared in ARCHITECTURE.md but not implemented, so binding it errors. Rather
-than leave a promise outstanding, the declaration is being withdrawn until there is a reason to
-build it.
+The `docs` port (Notion, Confluence) is declared in ARCHITECTURE.md and remains unimplemented.
+Binding it fails with an explicit, actionable error rather than degrading quietly, which is the
+behaviour the capability-gap rule asks for — so it stays declared and stays unbuilt. It is not on
+this roadmap and will not be until something depends on it.
 
 ## How to influence this
 
