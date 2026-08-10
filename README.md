@@ -1,8 +1,8 @@
 # Baron
 
-> **One pane of glass from backlog to deploy — for AI coding agents.**
-> Drive issues, branches, PRs, CI, deployments, and notifications across any stack through a single
-> normalized contract, instead of hardwiring one vendor's API into your prompts.
+> **Let your coding agent write to your work tracker — and keep the same flow when you change trackers.**
+> Baron is an open-source layer that turns issues, branches, PRs, CI runs, and deployments into one
+> normalized contract, so your agent never learns a vendor's API, states, or column names.
 
 ![Baron running the task-start then task-finish recipes through its normalized ports](docs/demo/baron-demo.gif)
 
@@ -15,28 +15,38 @@ vendor-specific tools. You've hardcoded vendor lock-in into the way you work.
 
 ## What Baron does
 
-Baron puts a **normalized contract** between the agent and your providers. The agent speaks one
-abstract vocabulary — work items, branches, PRs, CI runs, deployments, notifications, in terms of
-**roles** (`backlog → ready → in_progress → in_review → done`, plus `blocked`) — and Baron translates
-to each provider's real API, states, and quirks. Mix providers freely (Linear issues + GitHub PRs +
-Slack notifications). **Same prompt, any stack.**
+Plenty of tools let an agent *read* your tracker. Baron is about the other direction: **writing** —
+creating work items, moving them, cutting branches, opening and merging PRs — which is where an agent
+does damage when it guesses a vendor's state machine wrong.
+
+The agent speaks one abstract vocabulary in terms of **roles** (`backlog → ready → in_progress →
+in_review → done`, plus `blocked`), and Baron translates to each provider's real API, states, and
+quirks. You confirm that mapping once, at `baron init`, and it is committed to your repo as
+configuration — not re-guessed by the model on every call.
+
+Each port binds to a provider independently, so `issues` on Azure DevOps, `scm` on GitHub, and
+`notify` on Slack is a normal setup rather than a special case.
 
 ## What it looks like
 
 ```
-You:  Start a task: add rate limiting to the login endpoint.
+You:  Start work on STORE-142.
 
-Baron  ▸ runs the task-start recipe as ONE deterministic call:
-  ✓ Created STORE-142 "Add rate limiting to the login endpoint"  (type role: task)
+Baron  ▸ runs the task-start recipe as a single call:
+  ✓ Loaded STORE-142 "Add rate limiting to the login endpoint"  (type role: task)
+  ✓ Checked it: not done, has a canonical branch, not assigned to someone else
   ✓ Branched feature/STORE-142 from the repo's default branch
-  ✓ Moved STORE-142 → in_progress
-  ✓ Commented: "Started on branch feature/STORE-142."
+  ✓ Moved STORE-142 → in_progress, assigned to you
+  ✓ Commented on the item: "Started work — on branch feature/STORE-142."
 ```
 
 That same prompt on **Azure DevOps** sets the work item state to `Active`; on **GitHub** it applies an
-`in-progress` label — because `in_progress` is a *role*, not a vendor state. You confirmed that mapping
-once, at `baron init`. The agent never learns a vendor's column names, and the workflow's order is
-enforced by Baron's engine, not by the model improvising.
+`in-progress` label — because `in_progress` is a *role*, not a vendor state.
+
+The checks matter as much as the actions: if the item is already done, belongs to someone else, or is
+a container that should never be branched, the run stops **before** anything is created. The branch
+name is derived by Baron from the item's type role, so every agent and every recipe derives the same
+name for the same item instead of inventing one.
 
 ## Why it's different
 
@@ -48,8 +58,9 @@ enforced by Baron's engine, not by the model improvising.
 - **Capability gaps are never silent.** When a provider lacks something (say, native issue hierarchy),
   Baron either emulates it (e.g. labels), degrades with a warning, or errors loudly — decided by
   policy, never swallowed.
-- **Workflows are deterministic recipes.** Multi-step flows (`task-start`, `task-finish`, `task-land`, `ship`) are
-  declarative YAML run as one rule-enforced call — the engine enforces step order, the agent doesn't.
+- **Workflows are recipes, not prompts.** Multi-step flows (`task-start`, `task-finish`, `task-land`,
+  `ship`) are declarative YAML executed as a single call, with guards that stop a run *before* it
+  mutates anything. The order lives in the recipe rather than being improvised per run.
 
 ## Quick start
 
@@ -93,8 +104,8 @@ scratch (PAT scopes, `init → doctor → MCP`, troubleshooting).
 | **GitHub** | `issues` · `scm` · `ci` · `deploy` |
 | **Slack** | `notify` |
 
-More adapters (Jira, Linear, GitLab, Notion) are on the roadmap — the whole point is that adding one
-never changes how the agent talks to Baron.
+GitLab, Jira, and Linear are on the [roadmap](./ROADMAP.md) — adding one never changes how the agent
+talks to Baron, which is the whole point. Until they land, those names describe intent, not support.
 
 ## Documentation
 
@@ -109,7 +120,7 @@ never changes how the agent talks to Baron.
 | [MCP server & plugin](./docs/mcp.md) | The MCP tools and the Claude Code plugin. |
 | [Trying it with Claude Code](./docs/trying-with-claude-code.md) | Hands-on: wire the MCP server to a real project + a verification checklist. |
 | [Providers](./docs/providers.md) | Which provider supports which port and capability. |
-| [Demo script](./docs/demo.md) | Ready-to-record 60-second "single pane" demo (Claude Code or CLI). |
+| [Demo script](./docs/demo.md) | Ready-to-record 60-second demo (Claude Code or CLI). |
 
 The full design decision record is in [ARCHITECTURE.md](./ARCHITECTURE.md); the contributor working
 contract is [CLAUDE.md](./CLAUDE.md), contribution terms are in [CONTRIBUTING.md](./CONTRIBUTING.md),
@@ -121,7 +132,13 @@ v1 is built end-to-end: the `issues`, `scm`, `ci`, and `deploy` ports across **A
 **GitHub** plus `notify` via **Slack**, the config engine (`baron init` / `doctor`), a multi-port MCP
 server, the YAML recipe engine + `baron run`, the knowledge loop, and a Claude Code plugin. Every
 adapter passes a network-free **conformance suite**; the Azure DevOps ports are additionally
-**live-validated** against a real project. GitHub/Slack live validation is next.
+**live-validated** against a real project.
+
+Baron now also runs this repository — its issues, branches, and pull requests move through its own
+GitHub adapter. That is a working proof, not adoption: Baron is young and has not yet been put
+through a stack it did not grow up on. If you run it against yours, the resulting bug report is the
+most useful thing you could send. What is planned next, and what is deliberately out of scope, is in
+[ROADMAP.md](./ROADMAP.md).
 
 ## License
 

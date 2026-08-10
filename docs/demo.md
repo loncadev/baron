@@ -1,4 +1,4 @@
-# Demo script — the 60-second "single pane" moment
+# Demo script — the 60-second moment
 
 The one artifact that sells Baron fastest is a short recording of an agent driving a real workflow
 through Baron's normalized tools. This is a ready-to-record script: run it top to bottom, keep it
