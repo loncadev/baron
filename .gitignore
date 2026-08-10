@@ -4,6 +4,10 @@ coverage/
 *.tsbuildinfo
 .DS_Store
 
+# Editor/tooling caches. Biome reads .gitignore (vcs.useIgnoreFile), so ignoring these here also
+# keeps machine-local scratch files out of the lint baseline.
+.impeccable/
+
 # Baron credentials are NEVER committed - policy is, secrets are not.
 .baron/credentials
 .baron/credentials.*

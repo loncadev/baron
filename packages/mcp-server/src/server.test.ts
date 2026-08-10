@@ -10,7 +10,7 @@ import type { IssuesPort, ScmPort } from '@lonca/baron-core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { describe, expect, it } from 'vitest';
-import { createMcpServer } from './server.js';
+import { SERVER_INSTRUCTIONS, createMcpServer } from './server.js';
 import { MCP_TOOL_NAMES, type McpPorts, SCM_TOOL_NAMES } from './tools.js';
 
 function githubPort(): IssuesPort {
@@ -140,5 +140,27 @@ describe('createMcpServer (end-to-end over the MCP protocol)', () => {
     const result = await call(client, MCP_TOOL_NAMES.transition, { id, role: 'blocked' });
     expect(result.isError).toBe(true);
     expect(result.structuredContent?.code).toBe('ROLE_MAPPING');
+  });
+});
+
+describe('server instructions', () => {
+  it('reaches the client on initialize', async () => {
+    const client = await connectClient({ issues: githubPort() });
+    expect(client.getInstructions()).toBe(SERVER_INSTRUCTIONS);
+  });
+
+  it('stays within the ~2KB budget clients truncate at', () => {
+    // Claude Code truncates server instructions together with tool descriptions, so exceeding this
+    // silently costs the guidance rather than failing loudly. Assert it instead of hoping.
+    expect(SERVER_INSTRUCTIONS.length).toBeLessThan(2048);
+  });
+
+  it('teaches the role vocabulary and prefers recipes over primitives', () => {
+    // When tool definitions are deferred (tool search on by default), this text is the only thing
+    // the model sees up front — losing either of these turns Baron back into a bag of endpoints.
+    for (const role of ['backlog', 'ready', 'in_progress', 'in_review', 'done', 'blocked']) {
+      expect(SERVER_INSTRUCTIONS).toContain(role);
+    }
+    expect(SERVER_INSTRUCTIONS).toContain('baron_recipe_run');
   });
 });
