@@ -1,5 +1,7 @@
 import {
+  BLOCKED_LABEL_SPEC,
   BaronError,
+  ROLE_LABEL_KEY,
   parsePolicyJson,
   resolveIssuesConfig,
   roleLabelSpecs,
@@ -126,7 +128,13 @@ async function provisionRoleLabels(ports: CliPorts, root: string): Promise<void>
   const config = resolveIssuesConfig(parsePolicyJson(raw));
   // Role labels + (on flat-type providers) the type-role labels create() writes, so neither kind is
   // left to the provider's grey auto-create.
-  const specs = [...roleLabelSpecs(config.roleMap), ...typeRoleLabelSpecs(config.typeMap)];
+  // Role labels, the type-role labels create() writes, and the orthogonal blocked flag — so none of
+  // them is left to the provider's grey auto-create.
+  const specs = [
+    ...roleLabelSpecs(config.roleMap),
+    ...typeRoleLabelSpecs(config.typeMap),
+    ...(config.roleMap.stateKey === ROLE_LABEL_KEY ? [BLOCKED_LABEL_SPEC] : []),
+  ];
   if (specs.length === 0) return;
   try {
     await buildIssuesPort(config, effectiveEnv(ports, root)).ensureLabels(specs);
@@ -166,6 +174,15 @@ async function cmdDoctor(flags: Record<string, string>, ports: CliPorts): Promis
       }
       ports.err('  Grant these, then re-run `baron doctor` before starting work.');
     }
+  }
+
+  // A policy that had to be migrated to load is not broken, but the file on disk still says the old
+  // thing — so this prints until `baron init` rewrites it.
+  if (report.migrations.length > 0) {
+    ports.err(
+      `Policy migrated on load (${report.migrations.length}) — the file still says otherwise:`,
+    );
+    for (const item of report.migrations) ports.err(`  - ${item}`);
   }
 
   // Coverage gaps are not drift and do not fail the report, but they are exactly the kind of thing

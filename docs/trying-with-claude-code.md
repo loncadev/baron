@@ -88,7 +88,7 @@ tools (`baron_issue_create/get/update/transition/comment/link/assign/query`), th
 - [ ] `baron_issue_transition { id, role: in_progress }` → the item's State becomes **Active** in Azure.
 - [ ] `… role: in_review` → State becomes **Test**; `… role: done` → State becomes **Closed**.
 - [ ] `baron_issue_comment { id, body: "via Baron" }` adds the comment.
-- [ ] A capability gap is loud, not silent: e.g. `baron_issue_transition { role: blocked }` returns an `isError` result with code `ROLE_MAPPING` (blocked is unmapped in the policy).
+- [ ] A capability gap is loud, not silent: e.g. `baron_issue_transition { role: ready }` returns an `isError` result with code `ROLE_MAPPING` (ready is unmapped in the policy).
 
 ### Phase 3 — After (confirm + clean up)
 
@@ -132,8 +132,9 @@ above is what confirms them against the live API for the first time.
   and set `AZURE_DEVOPS_REPO` to test branches/PRs (writes to the repo).
 - **Board columns** were intentionally left out of the policy — Baron sets `System.State` and lets
   Azure derive the board column. (Explicit board-column moves are provider-quirky; see the providers doc.)
-- **`in_review` / `blocked`:** `in_review` → state `Test`; `blocked` is unmapped (transitioning to it
-  errors loudly by design — map it if your process has a blocked state).
+- **`in_review` / `ready`:** `in_review` → state `Test`; `ready` is unmapped (transitioning to it
+  errors loudly by design — map it if your process has a matching state). Blocking is orthogonal and
+  needs no mapping.
 - **Reverse type-role** is best-effort when several roles map to one native type.
 - Prefer the published plugin (`/plugin install baron@baron`) over a hand-written `.mcp.json`; the
   `pnpm`/`tsx` launch is only for developing Baron itself from a clone.

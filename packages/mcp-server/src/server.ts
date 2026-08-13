@@ -16,7 +16,7 @@ export const SERVER_INFO = { name: 'baron', version: OWN_PACKAGE.version } as co
  */
 export const SERVER_INSTRUCTIONS = `Baron normalizes work tracking and delivery across providers (Azure DevOps, GitHub, Slack) behind one contract, so the same calls work whatever the stack.
 
-Speak in ROLES, never a vendor's native states: backlog, ready, in_progress, in_review, done, plus blocked. Item types are roles too: initiative, epic, story, task, bug, subtask. Baron maps a role to the provider's real state, column or label using a mapping the human confirmed at \`baron init\` — do not guess native state names, and do not try to set them directly.
+Speak in ROLES, never a vendor's native states: backlog, ready, in_progress, in_review, done. Blocking is ORTHOGONAL, not a role: use baron_issue_block (id + a required reason) and baron_issue_unblock — a blocked item keeps the role it is blocked in, so unblocking returns it to where the work actually was. Item types are roles too: initiative, epic, story, task, bug, subtask. Baron maps a role to the provider's real state, column or label using a mapping the human confirmed at \`baron init\` — do not guess native state names, and do not try to set them directly.
 
 Prefer \`baron_recipe_run\` over hand-composing primitives. Recipes (task-new, task-start, task-finish, task-land, ship) run a whole workflow in one call with guards that stop before mutating anything, so the order and rules are enforced rather than improvised. Reach for individual primitives only when no recipe covers the task.
 

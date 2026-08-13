@@ -55,7 +55,8 @@ runIssuesConformance({
   },
   mappedMidRole: 'in_review',
   mappedDoneRole: 'done',
-  unmappedRole: 'blocked',
+  // 'ready' is the role neither example map binds — 'blocked' stopped being a role at all.
+  unmappedRole: 'ready',
 });
 
 runIntrospectionConformance({

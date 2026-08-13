@@ -67,9 +67,13 @@ open/closed issues). Instead, Baron defines a small set of abstract **workflow r
 
 ```
 backlog -> ready -> in_progress -> in_review -> done
-                         |
-                       blocked (orthogonal)
 ```
+
+Blocking is **not** one of them. It answers "can this move?", not "where is it?", and modelling it as
+a role made the two mutually exclusive: transitioning to `blocked` overwrote the role, so nothing
+recorded whether the item had been `in_progress` or `in_review` and unblocking had nowhere to return
+to. It is an orthogonal flag (`issue.block` / `issue.unblock`) carried alongside the role. Jira,
+Linear and GitLab all keep the two separate for the same reason.
 
 `baron init` introspects each provider's *actual* states/types and proposes a role mapping; a
 human confirms it. Recipes and primitives speak roles ("transition to `in_review`"); the

@@ -29,7 +29,7 @@ describe('RoleResolver.toNative', () => {
 
   it('throws RoleMappingError for an unmapped role', () => {
     const r = new RoleResolver(azureMap, 'azure-devops');
-    expect(() => r.toNative('blocked')).toThrow(RoleMappingError);
+    expect(() => r.toNative('ready')).toThrow(RoleMappingError);
   });
 });
 
@@ -58,6 +58,6 @@ describe('RoleResolver.has', () => {
   it('reports mapping presence without throwing', () => {
     const r = new RoleResolver(azureMap, 'azure-devops');
     expect(r.has('in_progress')).toBe(true);
-    expect(r.has('blocked')).toBe(false);
+    expect(r.has('ready')).toBe(false);
   });
 });

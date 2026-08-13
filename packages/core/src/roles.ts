@@ -1,19 +1,25 @@
 /**
- * Abstract workflow roles. Providers map their native states/columns/labels onto these so that
- * recipes and primitives can speak one language regardless of the backing provider.
+ * Abstract workflow roles: where a work item is in its lifecycle. Providers map their native
+ * states/columns/labels onto these so that recipes and primitives can speak one language regardless
+ * of the backing provider.
  *
  *   backlog -> ready -> in_progress -> in_review -> done
- *                            |
- *                          blocked  (orthogonal)
+ *
+ * `blocked` is deliberately NOT here. It answers a different question — "can this move?" rather than
+ * "where is it?" — and modelling it as a role made the two mutually exclusive: transitioning to
+ * blocked overwrote the role, so nothing recorded whether the item had been in_progress or in_review,
+ * and unblocking had nowhere to return to. Jira, Linear and GitLab all keep it separate. It lives on
+ * the item as an orthogonal flag ({@link BLOCKED_LABEL}) that coexists with whatever role the item
+ * holds.
  */
-export const WORKFLOW_ROLES = [
-  'backlog',
-  'ready',
-  'in_progress',
-  'in_review',
-  'blocked',
-  'done',
-] as const;
+export const WORKFLOW_ROLES = ['backlog', 'ready', 'in_progress', 'in_review', 'done'] as const;
+
+/**
+ * The label carrying the orthogonal blocked flag. A Baron-managed constant rather than policy, like
+ * the `type:<role>` and `parent:<id>` emulation labels — it names a fact about the item, not a
+ * mapping onto anything the provider already has.
+ */
+export const BLOCKED_LABEL = 'blocked';
 
 export type WorkflowRole = (typeof WORKFLOW_ROLES)[number];
 

@@ -1,7 +1,7 @@
 import type { IssuesProviderConfig, NativeTarget, ProviderRoleMap, TypeMap } from './config.js';
 import { BaronError } from './errors.js';
 import { parseGapPolicy } from './policy.js';
-import { isWorkItemTypeRole, isWorkflowRole } from './roles.js';
+import { BLOCKED_LABEL, WORKFLOW_ROLES, isWorkItemTypeRole, isWorkflowRole } from './roles.js';
 
 /**
  * Capability ports a policy can bind to a provider. Each binds independently — a real install
@@ -30,6 +30,15 @@ export interface BaronPolicyFile {
   /** provider id -> capability name -> on-disk gap behavior string ('error' | 'degrade' | 'emulate:<s>'). */
   readonly gapPolicy?: Record<string, Record<string, string>>;
   readonly language?: { readonly interaction?: string; readonly artifacts?: string };
+  /**
+   * What loading this file had to change to make it valid under the current contract. Empty for a
+   * policy already in the current shape. Carried on the parsed value rather than logged, so `doctor`
+   * can report it and the file on disk is left exactly as the user wrote it until `baron init`
+   * rewrites it — a loader that silently corrects and says nothing is how drift becomes permanent.
+   *
+   * Parse metadata, not policy: {@link serializePolicy} strips it, so it never reaches the file.
+   */
+  readonly migrations?: readonly string[];
 }
 
 const PARSE_CODE = 'POLICY_PARSE';
@@ -62,7 +71,13 @@ function parseNativeTarget(value: unknown, path: string): NativeTarget {
   return out;
 }
 
-function parseRoleMapEntry(value: unknown, provider: string): PolicyRoleMapEntry {
+/** What `blocked` was called when it was still a workflow role, so an old policy can be recognised. */
+const LEGACY_BLOCKED_ROLE = 'blocked';
+
+function parseRoleMapEntry(
+  value: unknown,
+  provider: string,
+): { entry: PolicyRoleMapEntry; migrations: string[] } {
   const record = requireRecord(value, `roleMap.${provider}`);
   const { stateKey, states } = record;
   if (typeof stateKey !== 'string' || stateKey.length === 0) {
@@ -70,16 +85,32 @@ function parseRoleMapEntry(value: unknown, provider: string): PolicyRoleMapEntry
   }
   const statesRecord = requireRecord(states, `roleMap.${provider}.states`);
   const out: Record<string, NativeTarget> = {};
+  const migrations: string[] = [];
   for (const [role, target] of Object.entries(statesRecord)) {
+    // `blocked` stopped being a workflow role: it is orthogonal, and mapping it as a state is what
+    // made blocking destroy the role it was blocking. A policy written before that is migrated
+    // rather than rejected — the entry is dropped and the fact is reported, so a working install
+    // keeps working and its owner still finds out.
+    if (role === LEGACY_BLOCKED_ROLE) {
+      const parsed = parseNativeTarget(target, `roleMap.${provider}.states.${role}`);
+      const was = Object.values(parsed).join('/');
+      migrations.push(
+        `roleMap.${provider}.states.blocked (was '${was}') was dropped: blocked is no longer a ` +
+          `workflow role but an orthogonal flag on a '${BLOCKED_LABEL}' label. Re-run \`baron init\` ` +
+          'to make this permanent, and retire the old value in your provider if nothing else uses it.',
+      );
+      continue;
+    }
     if (!isWorkflowRole(role)) {
       fail(
         `policy.roleMap.${provider}.states has unknown workflow role '${role}'. ` +
-          'Roles are: backlog, ready, in_progress, in_review, blocked, done.',
+          `Roles are: ${WORKFLOW_ROLES.join(', ')}. (blocked is not a role — it is an orthogonal ` +
+          'flag; see issue.block / issue.unblock.)',
       );
     }
     out[role] = parseNativeTarget(target, `roleMap.${provider}.states.${role}`);
   }
-  return { stateKey, states: out };
+  return { entry: { stateKey, states: out }, migrations };
 }
 
 function parseTypeMapEntry(value: unknown, provider: string): TypeMap {
@@ -126,8 +157,11 @@ export function parsePolicy(raw: unknown): BaronPolicyFile {
 
   const roleMapRecord = requireRecord(root.roleMap, 'roleMap');
   const roleMap: Record<string, PolicyRoleMapEntry> = {};
+  const migrations: string[] = [];
   for (const [provider, entry] of Object.entries(roleMapRecord)) {
-    roleMap[provider] = parseRoleMapEntry(entry, provider);
+    const parsed = parseRoleMapEntry(entry, provider);
+    roleMap[provider] = parsed.entry;
+    migrations.push(...parsed.migrations);
   }
 
   const typeMapRecord = requireRecord(root.typeMap, 'typeMap');
@@ -176,6 +210,8 @@ export function parsePolicy(raw: unknown): BaronPolicyFile {
     typeMap,
     ...(gapPolicy !== undefined ? { gapPolicy } : {}),
     ...(language !== undefined ? { language } : {}),
+    // Present only when something actually changed, so a current policy round-trips unchanged.
+    ...(migrations.length > 0 ? { migrations } : {}),
   };
 }
 
@@ -199,7 +235,10 @@ export function parsePolicyJson(raw: string): BaronPolicyFile {
 
 /** Serialize a policy to the canonical on-disk form (2-space indent, trailing newline). */
 export function serializePolicy(policy: BaronPolicyFile): string {
-  return `${JSON.stringify(policy, null, 2)}\n`;
+  // `migrations` describes what LOADING had to fix, not what the install is. Writing it back would
+  // make a one-off note permanent, and re-loading would then report a migration that already happened.
+  const { migrations: _parseOnly, ...onDisk } = policy;
+  return `${JSON.stringify(onDisk, null, 2)}\n`;
 }
 
 /**

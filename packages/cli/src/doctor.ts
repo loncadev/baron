@@ -52,6 +52,12 @@ export interface DoctorReport {
    * issue in this repository.
    */
   readonly unreachableNativeTypes: readonly string[];
+  /**
+   * What loading the policy had to change to make it valid under the current contract. The file on
+   * disk is untouched until `baron init` rewrites it, so this is the only place a silent correction
+   * becomes visible — and a loader that corrects without saying so is how drift becomes permanent.
+   */
+  readonly migrations: readonly string[];
 }
 
 /**
@@ -197,5 +203,6 @@ export async function runDoctor(options: DoctorOptions): Promise<DoctorReport> {
     credentials,
     unmappedTypeRoles,
     unreachableNativeTypes,
+    migrations: policy.migrations ?? [],
   };
 }

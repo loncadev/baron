@@ -143,3 +143,50 @@ describe('resolveIssuesConfig', () => {
     );
   });
 });
+
+// `blocked` stopped being a workflow role. A policy written when it was one must keep loading — the
+// alternative is bricking a working install over a vocabulary change — but the correction has to be
+// visible, or the file on disk silently disagrees with what Baron is doing forever.
+describe('legacy blocked role migration', () => {
+  const legacy = {
+    version: 1,
+    providers: { issues: 'github' },
+    roleMap: {
+      github: {
+        stateKey: 'label',
+        states: {
+          in_progress: { label: 'in-progress' },
+          blocked: { label: 'is-blocked' },
+          done: { state: 'closed', label: 'done' },
+        },
+      },
+    },
+    typeMap: { github: { task: 'issue' } },
+  };
+
+  it('drops the blocked entry instead of rejecting the policy', () => {
+    const parsed = parsePolicy(legacy);
+    expect(parsed.roleMap.github?.states).not.toHaveProperty('blocked');
+    expect(parsed.roleMap.github?.states.in_progress).toEqual({ label: 'in-progress' });
+  });
+
+  it('reports what it migrated, naming the value it dropped', () => {
+    const parsed = parsePolicy(legacy);
+    expect(parsed.migrations?.length).toBe(1);
+    expect(parsed.migrations?.[0]).toContain('is-blocked');
+    expect(parsed.migrations?.[0]).toContain('orthogonal');
+  });
+
+  it('never writes the migration note back to disk', () => {
+    const parsed = parsePolicy(legacy);
+    expect(serializePolicy(parsed)).not.toContain('migrations');
+    // and re-parsing what was written reports nothing left to migrate
+    expect(parsePolicy(JSON.parse(serializePolicy(parsed))).migrations).toBeUndefined();
+  });
+
+  it('still rejects a role that is not merely legacy', () => {
+    expect(() =>
+      parsePolicy({ ...legacy, roleMap: { github: { stateKey: 'label', states: { nope: {} } } } }),
+    ).toThrow(/unknown workflow role/);
+  });
+});

@@ -1,6 +1,6 @@
 import type { IssueLinkType } from './links.js';
 import type { GapPolicy } from './policy.js';
-import type { WorkItemTypeRole, WorkflowRole } from './roles.js';
+import { BLOCKED_LABEL, type WorkItemTypeRole, type WorkflowRole } from './roles.js';
 
 /**
  * A provider-native target a role maps onto. Intentionally an open record because the shape is
@@ -42,7 +42,6 @@ const ROLE_LABEL_STYLE: Record<
   ready: { color: 'c5def5', description: 'Baron: ready to start' },
   in_progress: { color: 'fbca04', description: 'Baron: in progress' },
   in_review: { color: '1d76db', description: 'Baron: in review' },
-  blocked: { color: 'd93f0b', description: 'Baron: blocked' },
   done: { color: '0e8a16', description: 'Baron: done' },
 };
 
@@ -73,6 +72,16 @@ export function typeRoleLabelSpecs(typeMap: TypeMap): LabelSpec[] {
   }
   return specs;
 }
+
+/**
+ * The orthogonal blocked flag's label, provisioned deliberately like every other Baron label so it
+ * is not left grey and description-less the first time something is blocked.
+ */
+export const BLOCKED_LABEL_SPEC: LabelSpec = {
+  name: BLOCKED_LABEL,
+  color: 'd93f0b',
+  description: 'Baron: blocked (orthogonal to the workflow role)',
+};
 
 export function roleLabelSpecs(roleMap: ProviderRoleMap): LabelSpec[] {
   const seen = new Set<string>();

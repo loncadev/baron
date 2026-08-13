@@ -312,6 +312,8 @@ describe('TOOL_DEFINITIONS', () => {
       MCP_TOOL_NAMES.update,
       MCP_TOOL_NAMES.transition,
       MCP_TOOL_NAMES.reconcile,
+      MCP_TOOL_NAMES.block,
+      MCP_TOOL_NAMES.unblock,
       MCP_TOOL_NAMES.comment,
       MCP_TOOL_NAMES.link,
       MCP_TOOL_NAMES.assign,
@@ -368,7 +370,7 @@ describe('callTool', () => {
   });
 
   it('maps a BaronError to an isError result carrying the code', async () => {
-    // 'blocked' is unmapped in the example GitHub role map -> RoleMappingError (code ROLE_MAPPING).
+    // 'ready' is unmapped in the example GitHub role map -> RoleMappingError (code ROLE_MAPPING).
     const port = githubPort();
     const created = parse(
       await callTool(port, MCP_TOOL_NAMES.create, {
@@ -378,7 +380,7 @@ describe('callTool', () => {
     );
     const result = await callTool(port, MCP_TOOL_NAMES.transition, {
       id: created.id,
-      role: 'blocked',
+      role: 'ready',
     });
     expect(result.isError).toBe(true);
     expect(result.structuredContent?.code).toBe('ROLE_MAPPING');
