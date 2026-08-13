@@ -39,6 +39,16 @@ export interface MemoryTransportOptions {
   readonly stateKey: string;
   /** The discriminator a freshly created issue carries (Azure 'New', GitHub 'open'). */
   readonly defaultDiscriminator: string;
+  /**
+   * For a provider that cannot be told a work-item type: the type every created item reports back
+   * instead, whatever the type map asked for (GitHub 'issue'). Leave unset for a provider that
+   * stores the type it is given.
+   *
+   * This exists because echoing the requested type back is a fidelity the live GitHub transport
+   * does not have, and modelling it made the suite prove a round-trip GitHub would fail — which is
+   * exactly how a dropped type-role label reached a real repository.
+   */
+  readonly untypedNativeType?: string | undefined;
 }
 
 /**
@@ -82,7 +92,7 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
         key: `#${seq}`,
         title: input.title,
         body: input.body,
-        nativeType: input.nativeType,
+        nativeType: opts.untypedNativeType ?? input.nativeType,
         typeRole: input.typeRole,
         discriminator: opts.defaultDiscriminator,
         parentId: input.parentId,

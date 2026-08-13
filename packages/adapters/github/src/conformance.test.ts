@@ -24,18 +24,31 @@ import {
 
 runIssuesConformance({
   label: 'github',
-  build(gapPolicy) {
+  build(gapPolicy, typeMap = exampleGithubTypeMap) {
     const logger = new RecordingLogger();
     const transport = createMemoryTransport({
       stateKey: exampleGithubRoleMap.stateKey,
       defaultDiscriminator: 'open',
+      // `POST /issues` accepts no type, so a real GitHub issue reads back untyped no matter what
+      // the map asked for. Echoing the requested type here would prove a fidelity this adapter
+      // does not have — and did, right up until a bug started branching feature/.
+      untypedNativeType: 'issue',
     });
     const adapter = defineGithubIssuesAdapter(
-      { roleMap: exampleGithubRoleMap, typeMap: exampleGithubTypeMap, gapPolicy },
+      { roleMap: exampleGithubRoleMap, typeMap, gapPolicy },
       transport,
       logger,
     );
     return { adapter, logger };
+  },
+  // The org's real Issue Types, the way `baron init` now proposes them for a repo that has them.
+  distinctTypeMap: {
+    initiative: 'issue',
+    epic: 'Feature',
+    story: 'issue',
+    task: 'Task',
+    bug: 'Bug',
+    subtask: 'issue',
   },
   mappedMidRole: 'in_review',
   mappedDoneRole: 'done',

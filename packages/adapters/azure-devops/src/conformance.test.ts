@@ -24,18 +24,29 @@ import {
 
 runIssuesConformance({
   label: 'azure-devops',
-  build(gapPolicy) {
+  build(gapPolicy, typeMap = exampleAzureDevOpsTypeMap) {
     const logger = new RecordingLogger();
+    // No untypedNativeType: Azure is told the type at create and reports it back verbatim.
     const transport = createMemoryTransport({
       stateKey: exampleAzureDevOpsRoleMap.stateKey,
       defaultDiscriminator: 'New',
     });
     const adapter = defineAzureDevOpsIssuesAdapter(
-      { roleMap: exampleAzureDevOpsRoleMap, typeMap: exampleAzureDevOpsTypeMap, gapPolicy },
+      { roleMap: exampleAzureDevOpsRoleMap, typeMap, gapPolicy },
       transport,
       logger,
     );
     return { adapter, logger };
+  },
+  // Azure's own vocabulary: bug and task each get a type nobody else uses. subtask still shares
+  // Task because the process has no Sub-task type — which is exactly what the map should say.
+  distinctTypeMap: {
+    initiative: 'Epic',
+    epic: 'Feature',
+    story: 'Product Backlog Item',
+    task: 'Task',
+    bug: 'Bug',
+    subtask: 'Task',
   },
   mappedMidRole: 'in_review',
   mappedDoneRole: 'done',

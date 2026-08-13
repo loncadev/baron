@@ -205,11 +205,15 @@ export class BaseIssuesAdapter implements IssuesPort {
     }
 
     const labels = [...(draft.labels ?? [])];
-    // On a provider whose native types are flat, the requested role would be lost the moment it is
-    // written (every role becomes the same native type, and the reverse lookup tie-breaks to story).
-    // Carry it on a label so `create({typeRole:'bug'})` still reads back as a bug — which also keeps
-    // the derived branch prefix honest (bug/… not feature/…).
-    if (this.manifest.issues.nativeLabels && this.isAmbiguousNativeType(nativeType)) {
+    // Carry the role on a label unless the native type can carry it back on its own — which needs
+    // BOTH that the provider stores a type at all and that this one names a single role. GitHub
+    // fails the first (`issues.create` takes no type, so everything reads back untyped) and the
+    // label is the only thing keeping `create({typeRole:'bug'})` readable as a bug, and its branch
+    // prefix honest (bug/… not feature/…). Asking only the second question silently dropped the
+    // label the moment a type map stopped collapsing every role onto one native type.
+    const nativeTypeCarriesRole =
+      this.manifest.issues.nativeTypes && !this.isAmbiguousNativeType(nativeType);
+    if (this.manifest.issues.nativeLabels && !nativeTypeCarriesRole) {
       labels.push(`${TYPE_ROLE_LABEL_PREFIX}${draft.typeRole}`);
     }
     let nativeParentId: string | undefined;
