@@ -5,8 +5,11 @@ Track work through **Baron**, not raw provider writes: it normalizes issues and 
 providers behind one contract, so speak its abstract vocabulary, never a vendor's native states.
 
 - **Roles, not native states.** Move work by role: `backlog → ready → in_progress → in_review → done`,
-  plus `blocked`. Types are roles too: `initiative`, `epic`, `story`, `task`, `bug`, `subtask`.
-  Say "move it to in_progress", never "set the state to Active" — Baron maps the role to the provider.
+  plus `blocked`. Say "move it to in_progress", never "set the state to Active" — Baron maps the
+  role to the provider.
+- **Type roles this policy maps:** `initiative`, `epic`, `story`, `task`, `bug`, `subtask`.
+  Asking for one it does not map is an error, not a degrade — that list is what `issue.create`
+  accepts here.
 - **Tools:** `baron_issue_*` (create / get / update / transition / comment / assign / link / query),
   `baron_scm_*` (branch / PR), `baron_recipe_run`, and `baron_learning_*` / `baron_followup_*` for
   durable decisions and follow-ups.

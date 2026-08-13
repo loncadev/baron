@@ -21,7 +21,9 @@ export function createGithubIntrospector(options: GithubTransportOptions): Intro
       // `GET /issue-types` answers is what broke this repo: the org had Task/Bug/Feature defined but
       // assigned to none of its 12 issues, so `baron init` proposed a map in which nothing an issue
       // actually reports could be found, and every task-start failed on a missing branch name.
-      const workItemTypes: { name: string }[] = [{ name: 'issue' }];
+      const workItemTypes: { name: string; isDefault?: boolean }[] = [
+        { name: 'issue', isDefault: true },
+      ];
       try {
         // issue-types is a newer, optional route; call it loosely so an absent feature just falls
         // back rather than failing introspection.

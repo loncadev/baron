@@ -3,6 +3,7 @@ import {
   type CredentialFinding,
   type CredentialProbe,
   type Introspector,
+  WORK_ITEM_TYPE_ROLES,
   parsePolicyJson,
   requiredCredentialCapabilities,
   resolveIssuesConfig,
@@ -39,6 +40,18 @@ export interface DoctorReport {
    * the difference between a policy that matches the provider and an installation that works.
    */
   readonly credentials: readonly DoctorCredentialFinding[];
+  /**
+   * Abstract type roles the policy maps onto nothing. Not drift — the policy is internally valid —
+   * but `issue.create` refuses each of them, so a silent omission here surfaces as a failed run
+   * much later. Reported, never fatal: on some providers a role genuinely has no native equivalent.
+   */
+  readonly unmappedTypeRoles: readonly string[];
+  /**
+   * Native types no type role maps back FROM. Every item reporting one of these resolves to no type
+   * role, and therefore to no canonical branch — the failure that made `task-start` refuse every
+   * issue in this repository.
+   */
+  readonly unreachableNativeTypes: readonly string[];
 }
 
 /**
@@ -159,6 +172,15 @@ export async function runDoctor(options: DoctorOptions): Promise<DoctorReport> {
     }
   }
 
+  // Coverage, both directions. Drift asks whether what IS mapped still exists; this asks whether
+  // anything is missing from the map at all — the question that goes unasked until a run fails.
+  const mappedRoles = new Set(Object.keys(config.typeMap));
+  const unmappedTypeRoles = WORK_ITEM_TYPE_ROLES.filter((role) => !mappedRoles.has(role));
+  const mappedNativeTypes = new Set(Object.values(config.typeMap));
+  const unreachableNativeTypes = introspection.workItemTypes
+    .map((t) => t.name)
+    .filter((name) => !mappedNativeTypes.has(name));
+
   const env = options.env ?? {};
   const probeFor =
     options.probeFor ??
@@ -166,5 +188,14 @@ export async function runDoctor(options: DoctorOptions): Promise<DoctorReport> {
   const credentials = await checkCredentials(policy, probeFor);
 
   const ok = drift.length === 0 && !credentials.some((f) => f.status === 'denied');
-  return { ok, policyPath: path, provider: config.provider, drift, checks, credentials };
+  return {
+    ok,
+    policyPath: path,
+    provider: config.provider,
+    drift,
+    checks,
+    credentials,
+    unmappedTypeRoles,
+    unreachableNativeTypes,
+  };
 }

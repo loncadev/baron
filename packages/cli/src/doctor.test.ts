@@ -204,6 +204,62 @@ describe('runDoctor', () => {
     expect(report.credentials[0]?.detail).toContain('network down');
   });
 
+  // Coverage is the question drift never asks: not "does what is mapped still exist?" but "is
+  // anything missing from the map?" — which only announces itself when a run fails.
+  it('reports a type role the policy maps to nothing', async () => {
+    const fs = await seededFs('github', githubIntrospectionFixture);
+    const policy = JSON.parse(fs.read(`${ROOT}/.baron/policy.json`) as string);
+    const { story: _unmapped, ...withoutStory } = policy.typeMap.github;
+    policy.typeMap.github = withoutStory;
+    fs.write(`${ROOT}/.baron/policy.json`, JSON.stringify(policy));
+
+    const report = await runDoctor({
+      root: ROOT,
+      fs,
+      introspector: createMemoryIntrospector(githubIntrospectionFixture),
+      probeFor: NO_PROBE,
+    });
+    expect(report.unmappedTypeRoles).toEqual(['story']);
+    // Not drift: the policy is internally valid, and on some providers a role has no native
+    // equivalent. Reported, never fatal.
+    expect(report.drift).toEqual([]);
+    expect(report.ok).toBe(true);
+  });
+
+  // The direction that costs an item its branch, and the exact shape of the regression that made
+  // task-start refuse every issue in this repository.
+  it('reports a native type that no type role maps back from', async () => {
+    const fs = await seededFs('github', githubIntrospectionFixture);
+    const policy = JSON.parse(fs.read(`${ROOT}/.baron/policy.json`) as string);
+    for (const role of Object.keys(policy.typeMap.github)) {
+      policy.typeMap.github[role] = 'Task';
+    }
+    fs.write(`${ROOT}/.baron/policy.json`, JSON.stringify(policy));
+
+    const report = await runDoctor({
+      root: ROOT,
+      fs,
+      introspector: createMemoryIntrospector({
+        ...githubIntrospectionFixture,
+        workItemTypes: [{ name: 'issue', isDefault: true }, { name: 'Task' }],
+      }),
+      probeFor: NO_PROBE,
+    });
+    expect(report.unreachableNativeTypes).toEqual(['issue']);
+  });
+
+  it('reports full coverage on a freshly proposed policy', async () => {
+    const fs = await seededFs('github', githubIntrospectionFixture);
+    const report = await runDoctor({
+      root: ROOT,
+      fs,
+      introspector: createMemoryIntrospector(githubIntrospectionFixture),
+      probeFor: NO_PROBE,
+    });
+    expect(report.unmappedTypeRoles).toEqual([]);
+    expect(report.unreachableNativeTypes).toEqual([]);
+  });
+
   it('throws an actionable error when no policy exists', async () => {
     const fs = memoryFileSystem();
     await expect(

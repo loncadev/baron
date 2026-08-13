@@ -23,11 +23,12 @@
   },
   "typeMap": {
     "github": {
-      "epic": "issue",
+      "epic": "Feature",
+      "task": "Task",
+      "bug": "Bug",
+      "initiative": "issue",
       "story": "issue",
-      "task": "issue",
-      "subtask": "issue",
-      "bug": "issue"
+      "subtask": "issue"
     }
   },
   "gapPolicy": {

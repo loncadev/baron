@@ -1,6 +1,7 @@
 import {
   type CapabilityManifest,
   type Introspector,
+  WORK_ITEM_TYPE_ROLES,
   parsePolicy,
   proposePolicy,
   resolveIssuesConfig,
@@ -80,6 +81,27 @@ export function runIntrospectionConformance(target: IntrospectionConformanceTarg
       const introspection = await target.build().introspect();
       const proposal = proposePolicy(introspection, target.manifest);
       expect(Array.isArray(proposal.notes)).toBe(true);
+    });
+
+    // Coverage is a contract, not a nicety. A role mapped to nothing makes `issue.create` refuse it
+    // while the steering block still advertises it; both halves of that were real.
+    it('maps every abstract type role onto some native type', async () => {
+      const introspection = await target.build().introspect();
+      const { typeMap } = proposePolicy(introspection, target.manifest);
+      for (const role of WORK_ITEM_TYPE_ROLES) {
+        expect(typeMap[role], `type role '${role}' is unmapped for ${target.label}`).toBeDefined();
+      }
+    });
+
+    // The other direction, and the one that costs an item its branch: a native type nothing maps
+    // back FROM resolves to no type role, so `deriveBranchName` returns undefined and task-start
+    // refuses the item. A provider that declares a default type must have it reachable.
+    it("maps some type role back from the provider's default native type", async () => {
+      const introspection = await target.build().introspect();
+      const defaultType = introspection.workItemTypes.find((t) => t.isDefault === true);
+      if (defaultType === undefined) return;
+      const { typeMap } = proposePolicy(introspection, target.manifest);
+      expect(Object.values(typeMap)).toContain(defaultType.name);
     });
   });
 }

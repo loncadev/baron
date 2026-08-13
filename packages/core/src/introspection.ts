@@ -37,6 +37,14 @@ export interface IntrospectedType {
   readonly name: string;
   /** Depth in the provider's hierarchy if it exposes one (Epic shallower than Task). */
   readonly hierarchyLevel?: number | undefined;
+  /**
+   * True for the type an item reports when nobody chose one. GitHub has exactly this: an org can
+   * define Task/Bug/Feature and assign them to nothing, leaving every issue reporting 'issue'.
+   * A proposal that maps no role onto this type leaves those items with no type role — and so no
+   * canonical branch — which is how `task-start` came to refuse every issue in this repository.
+   * Providers that require a type on every item (Azure) mark none.
+   */
+  readonly isDefault?: boolean | undefined;
 }
 
 /**

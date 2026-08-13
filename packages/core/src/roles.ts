@@ -39,3 +39,24 @@ export type WorkItemTypeRole = (typeof WORK_ITEM_TYPE_ROLES)[number];
 export function isWorkItemTypeRole(value: string): value is WorkItemTypeRole {
   return (WORK_ITEM_TYPE_ROLES as readonly string[]).includes(value);
 }
+
+/**
+ * When a provider has no native type for a role, whose native type it borrows — in preference
+ * order, nearest neighbour first. Abstract knowledge about the roles themselves, so it lives here
+ * rather than in any adapter or in the proposal's provider-facing keyword table.
+ *
+ * The point is coverage. A role left unmapped is not a harmless omission: `issue.create` refuses it,
+ * and an item whose native type maps to no role reports no type role at all, which costs it its
+ * canonical branch. Collapsing is lossy and always noted; leaving a hole is lossy AND silent until
+ * something fails.
+ */
+export const TYPE_ROLE_COLLAPSE_ORDER: Readonly<
+  Record<WorkItemTypeRole, readonly WorkItemTypeRole[]>
+> = {
+  initiative: ['epic', 'story', 'task'],
+  epic: ['initiative', 'story', 'task'],
+  story: ['task', 'epic', 'bug'],
+  task: ['story', 'subtask', 'bug'],
+  bug: ['task', 'story'],
+  subtask: ['task', 'story'],
+};

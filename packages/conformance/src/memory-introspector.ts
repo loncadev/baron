@@ -39,7 +39,8 @@ export const azureIntrospectionFixture: ProviderIntrospection = {
 export const githubIntrospectionFixture: ProviderIntrospection = {
   provider: 'github',
   stateKey: 'label',
-  workItemTypes: [{ name: 'issue' }],
+  // 'issue' is what a GitHub item reports when no Issue Type is set — the default, not a fallback.
+  workItemTypes: [{ name: 'issue', isDefault: true }],
   states: [
     { name: 'open', category: 'proposed' },
     { name: 'closed', category: 'completed' },

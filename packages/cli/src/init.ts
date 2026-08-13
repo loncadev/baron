@@ -3,6 +3,7 @@ import {
   type BaronPolicyFile,
   type Introspector,
   type ProviderProposal,
+  WORK_ITEM_TYPE_ROLES,
   parsePolicy,
   proposePolicy,
   serializePolicy,
@@ -249,6 +250,12 @@ interface SteeringContext {
   readonly rolesRideLabels: boolean;
   readonly sprints: boolean;
   readonly hierarchy: boolean;
+  /**
+   * The type roles this policy actually maps. Steering used to list the full abstract vocabulary
+   * unconditionally, so an agent following its own instructions could ask for a role the policy
+   * mapped to nothing and get an error for doing exactly what it was told.
+   */
+  readonly typeRoles: readonly string[];
 }
 
 /**
@@ -266,14 +273,21 @@ function steeringBlock(ctx: SteeringContext): string {
     ? 'available (`baron_issue_iterations`, filter by `@current`)'
     : 'NOT available — sprint queries degrade to empty. That empty is expected here, not a bug';
   const hierarchy = ctx.hierarchy ? 'native parent/child' : 'emulated via a `parent:<id>` label';
+  const typeRoles =
+    ctx.typeRoles.length > 0
+      ? ctx.typeRoles.map((role) => `\`${role}\``).join(', ')
+      : 'none — this policy maps no work-item type, so `issue.create` cannot set one';
   const body = `## Work tracking — route through Baron
 
 Track work through **Baron**, not raw provider writes: it normalizes issues and source control across
 providers behind one contract, so speak its abstract vocabulary, never a vendor's native states.
 
 - **Roles, not native states.** Move work by role: \`backlog → ready → in_progress → in_review → done\`,
-  plus \`blocked\`. Types are roles too: \`initiative\`, \`epic\`, \`story\`, \`task\`, \`bug\`, \`subtask\`.
-  Say "move it to in_progress", never "set the state to Active" — Baron maps the role to the provider.
+  plus \`blocked\`. Say "move it to in_progress", never "set the state to Active" — Baron maps the
+  role to the provider.
+- **Type roles this policy maps:** ${typeRoles}.
+  Asking for one it does not map is an error, not a degrade — that list is what \`issue.create\`
+  accepts here.
 - **Tools:** \`baron_issue_*\` (create / get / update / transition / comment / assign / link / query),
   \`baron_scm_*\` (branch / PR), \`baron_recipe_run\`, and \`baron_learning_*\` / \`baron_followup_*\` for
   durable decisions and follow-ups.
@@ -443,6 +457,9 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
       rolesRideLabels: proposal.roleMap.stateKey === 'label',
       sprints: manifest.issues.sprints,
       hierarchy: manifest.issues.hierarchy,
+      // Canonical order (broadest to narrowest), not the map's insertion order — the steering block
+      // is read by a human as often as by an agent.
+      typeRoles: WORK_ITEM_TYPE_ROLES.filter((role) => proposal.typeMap[role] !== undefined),
     },
   );
 

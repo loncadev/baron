@@ -168,6 +168,21 @@ async function cmdDoctor(flags: Record<string, string>, ports: CliPorts): Promis
     }
   }
 
+  // Coverage gaps are not drift and do not fail the report, but they are exactly the kind of thing
+  // that only announces itself when a run fails, so they print on a green doctor too.
+  if (report.unmappedTypeRoles.length > 0) {
+    ports.err(`Type roles mapped to nothing (${report.unmappedTypeRoles.length}):`);
+    ports.err(`  - ${report.unmappedTypeRoles.join(', ')}`);
+    ports.err('  `issue.create` refuses these. Add them to policy.typeMap or re-run `baron init`.');
+  }
+  if (report.unreachableNativeTypes.length > 0) {
+    ports.err(
+      `Native types no type role maps back from (${report.unreachableNativeTypes.length}):`,
+    );
+    ports.err(`  - ${report.unreachableNativeTypes.join(', ')}`);
+    ports.err('  Items reporting these get no type role, and so no canonical branch.');
+  }
+
   // Never let 'we could not check' pass as 'it works'. Printed on a green run too, because that is
   // precisely when an unverified assumption is about to be acted on.
   if (unknown.length > 0) {

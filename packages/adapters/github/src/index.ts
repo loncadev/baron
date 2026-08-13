@@ -44,8 +44,13 @@ export const exampleGithubRoleMap: ProviderRoleMap = {
   },
 };
 
-/** GitHub has one issue type; every type role maps onto a plain issue. */
+/**
+ * GitHub has one issue type; every type role maps onto a plain issue. Every role — a hole here is
+ * not "that role is unavailable", it is `issue.create` refusing a role the steering block still
+ * advertises.
+ */
 export const exampleGithubTypeMap: TypeMap = {
+  initiative: 'issue',
   epic: 'issue',
   story: 'issue',
   task: 'issue',
