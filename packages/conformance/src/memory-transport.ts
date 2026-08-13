@@ -56,6 +56,13 @@ export interface MemoryTransportOptions {
    * handed back as if it were filtered.
    */
   readonly filtersByType?: boolean | undefined;
+  /**
+   * Set false to model a transport that implements `addLabel` but not `removeLabel` — the shape the
+   * contract permits and the Azure adapter actually had, which made the blocked flag a one-way door
+   * there. Implementing it here unconditionally is a third case of the suite proving a fidelity a
+   * real adapter lacked.
+   */
+  readonly canRemoveLabels?: boolean | undefined;
 }
 
 /**
@@ -131,10 +138,14 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
       if (!rec.labels.includes(label)) rec.labels.push(label);
     },
 
-    async removeLabel(id: string, label: string): Promise<void> {
-      const rec = must(id);
-      rec.labels = rec.labels.filter((l) => l !== label);
-    },
+    ...(opts.canRemoveLabels === false
+      ? {}
+      : {
+          async removeLabel(id: string, label: string): Promise<void> {
+            const rec = must(id);
+            rec.labels = rec.labels.filter((l) => l !== label);
+          },
+        }),
 
     async ensureLabels(labels): Promise<void> {
       // Idempotent provisioning: record each name once (a repeat is a no-op), mirroring a real

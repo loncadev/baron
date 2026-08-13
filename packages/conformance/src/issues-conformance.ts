@@ -19,7 +19,12 @@ export interface IssuesConformanceTarget {
    * optional type map overrides the target's default — the contract has to hold for any valid map,
    * and a map that collapses every role onto one native type hides half of it.
    */
-  build(gapPolicy: GapPolicy, typeMap?: TypeMap): { adapter: IssuesPort; logger: RecordingLogger };
+  build(
+    gapPolicy: GapPolicy,
+    typeMap?: TypeMap,
+    /** Transport fidelity overrides, for asserting what happens when a provider cannot do a thing. */
+    transport?: { readonly canRemoveLabels?: boolean },
+  ): { adapter: IssuesPort; logger: RecordingLogger };
   /**
    * A type map in which `bug` and `task` each name a native type no other role uses. Not every
    * provider can make all six distinct (Azure has no Sub-task type, so subtask shares Task), so the
@@ -105,6 +110,17 @@ export function runIssuesConformance(target: IssuesConformanceTarget): void {
       const unblocked = await adapter.unblock(issue.id);
       expect(unblocked.blocked).toBe(false);
       expect(unblocked.role, 'unblocking must return it to where the work was').toBe(working.role);
+    });
+
+    // `removeLabel` is optional on the transport contract, so a provider can implement `addLabel`
+    // and not its inverse — which turns the blocked flag into a one-way door. It must say so rather
+    // than appear to work: an item that cannot be unblocked through Baron is worse than one that
+    // could never be blocked.
+    it('refuses to unblock rather than pretend, when the transport cannot clear a label', async () => {
+      const { adapter } = target.build({}, undefined, { canRemoveLabels: false });
+      const issue = await adapter.create({ title: 'stuck', typeRole: 'task' });
+      await adapter.block(issue.id, 'waiting');
+      await expect(adapter.unblock(issue.id)).rejects.toMatchObject({ code: 'NOT_SUPPORTED' });
     });
 
     it('refuses to block without a reason', async () => {

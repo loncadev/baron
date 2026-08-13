@@ -12,8 +12,10 @@ import {
   runScmConformance,
 } from '@lonca/baron-conformance';
 import { RecordingLogger } from '@lonca/baron-core';
+import { describe, expect, it } from 'vitest';
 import {
   azureDevOpsManifest,
+  createAzureDevOpsTransport,
   defineAzureDevOpsCiAdapter,
   defineAzureDevOpsDeployAdapter,
   defineAzureDevOpsIssuesAdapter,
@@ -24,12 +26,13 @@ import {
 
 runIssuesConformance({
   label: 'azure-devops',
-  build(gapPolicy, typeMap = exampleAzureDevOpsTypeMap) {
+  build(gapPolicy, typeMap = exampleAzureDevOpsTypeMap, fidelity = {}) {
     const logger = new RecordingLogger();
     // No untypedNativeType: Azure is told the type at create and reports it back verbatim.
     const transport = createMemoryTransport({
       stateKey: exampleAzureDevOpsRoleMap.stateKey,
       defaultDiscriminator: 'New',
+      ...fidelity,
     });
     const adapter = defineAzureDevOpsIssuesAdapter(
       { roleMap: exampleAzureDevOpsRoleMap, typeMap, gapPolicy },
@@ -89,4 +92,21 @@ runDeployConformance({
     );
     return { adapter, logger };
   },
+});
+
+// The blocked flag rides a label, so a provider that declares nativeLabels must be able to CLEAR
+// one. `removeLabel` is optional on the transport contract — an exemption meant for providers whose
+// roles do not ride labels — and Azure took it while still declaring nativeLabels, which made
+// blocking a one-way door: block wrote the tag, unblock refused, and the only way out was the UI.
+// The conformance suite cannot see this: it runs on the memory transport, which implements it.
+describe('azure-devops transport label contract', () => {
+  it('implements removeLabel, because its manifest declares nativeLabels', () => {
+    const transport = createAzureDevOpsTransport({
+      organization: 'o',
+      project: 'p',
+      token: 't',
+    });
+    expect(azureDevOpsManifest.issues.nativeLabels).toBe(true);
+    expect(typeof transport.removeLabel).toBe('function');
+  });
 });
