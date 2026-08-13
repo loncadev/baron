@@ -19,6 +19,15 @@ export interface IssuesCapabilities {
   arbitraryStates: boolean;
   /** First-class labels/tags. */
   nativeLabels: boolean;
+  /**
+   * The provider persists a work-item type chosen at create time and reports it back. Azure: yes.
+   * GitHub: no — `issues.create` accepts no type, so every item reads back as the untyped default
+   * however the type map is written, and the abstract type role has to ride a `type:<role>` label
+   * instead. This is what the label gate must ask; "do several roles share this native type?" is a
+   * different question, and answering that one instead dropped the label from every GitHub bug the
+   * moment the type map stopped collapsing.
+   */
+  nativeTypes: boolean;
   /** Comments/discussion on a work item. */
   comments: boolean;
   /**

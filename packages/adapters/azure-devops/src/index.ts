@@ -25,6 +25,8 @@ export const azureDevOpsManifest: CapabilityManifest = {
     sprints: true,
     arbitraryStates: true,
     nativeLabels: true,
+    // A work item's type is chosen at create time and reported back verbatim.
+    nativeTypes: true,
     comments: true,
     issueLinks: true,
     assignment: true,

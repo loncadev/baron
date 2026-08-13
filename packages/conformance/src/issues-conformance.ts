@@ -7,14 +7,29 @@ import {
   type IssuesPort,
   type RecordingLogger,
   RoleMappingError,
+  type TypeMap,
   type WorkflowRole,
 } from '@lonca/baron-core';
 import { describe, expect, it } from 'vitest';
 
 export interface IssuesConformanceTarget {
   readonly label: string;
-  /** Build a fresh adapter (in-memory transport) with the given gap policy, plus its logger. */
-  build(gapPolicy: GapPolicy): { adapter: IssuesPort; logger: RecordingLogger };
+  /**
+   * Build a fresh adapter (in-memory transport) with the given gap policy, plus its logger. The
+   * optional type map overrides the target's default — the contract has to hold for any valid map,
+   * and a map that collapses every role onto one native type hides half of it.
+   */
+  build(gapPolicy: GapPolicy, typeMap?: TypeMap): { adapter: IssuesPort; logger: RecordingLogger };
+  /**
+   * A type map in which `bug` and `task` each name a native type no other role uses. Not every
+   * provider can make all six distinct (Azure has no Sub-task type, so subtask shares Task), so the
+   * contract is stated over the two roles the suite asserts on.
+   *
+   * This shape exposed a real bug: the `type:<role>` label was written only when the map collapsed,
+   * so the moment an install described its provider's actual types, every created item lost the one
+   * thing carrying its role.
+   */
+  readonly distinctTypeMap: TypeMap;
   /** A mid-workflow role that IS mapped for this provider (e.g. 'in_review'). */
   readonly mappedMidRole: WorkflowRole;
   /** The terminal role (e.g. 'done'). */
@@ -61,6 +76,22 @@ export function runIssuesConformance(target: IssuesConformanceTarget): void {
         const created = await adapter.create({ title: `a ${typeRole}`, typeRole });
         expect(created.typeRole).toBe(typeRole);
         expect((await adapter.get(created.id)).typeRole).toBe(typeRole);
+      }
+    });
+
+    // The same contract under a type map that does NOT collapse. It has to be stated separately,
+    // because the collapsing map above makes the label unconditional and so proves nothing about
+    // the gate: an install that described its provider's real types lost the label on every item,
+    // and every bug started branching feature/ again. The map is install config — the round-trip
+    // must not depend on which one an install happens to write.
+    it('the type role round-trips under a type map that does not collapse it', async () => {
+      const { adapter } = target.build({}, target.distinctTypeMap);
+      for (const typeRole of ['bug', 'task'] as const) {
+        const created = await adapter.create({ title: `a ${typeRole}`, typeRole });
+        expect(created.typeRole, `create() lost typeRole '${typeRole}'`).toBe(typeRole);
+        expect((await adapter.get(created.id)).typeRole, `get() lost typeRole '${typeRole}'`).toBe(
+          typeRole,
+        );
       }
     });
 

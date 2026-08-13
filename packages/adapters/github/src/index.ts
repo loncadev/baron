@@ -28,6 +28,9 @@ export const githubManifest: CapabilityManifest = {
     sprints: false,
     arbitraryStates: false,
     nativeLabels: true,
+    // `POST /repos/{owner}/{repo}/issues` accepts no type: an org's Issue Types can only be set
+    // after the fact, so anything Baron creates reads back untyped and the role rides a label.
+    nativeTypes: false,
     comments: true,
     issueLinks: false,
     assignment: true,

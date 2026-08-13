@@ -20,6 +20,7 @@ const manifest: CapabilityManifest = {
     sprints: false,
     arbitraryStates: false,
     nativeLabels: true,
+    nativeTypes: false,
     comments: true,
     issueLinks: false,
     assignment: true,
