@@ -34,7 +34,7 @@ export interface IssuesConformanceTarget {
   readonly mappedMidRole: WorkflowRole;
   /** The terminal role (e.g. 'done'). */
   readonly mappedDoneRole: WorkflowRole;
-  /** A role deliberately left out of the role map (e.g. 'blocked'). */
+  /** A role deliberately left out of the role map (e.g. 'ready'). */
   readonly unmappedRole: WorkflowRole;
 }
 
@@ -86,6 +86,43 @@ export function runIssuesConformance(target: IssuesConformanceTarget): void {
         expect(created.typeRole).toBe(typeRole);
         expect((await adapter.get(created.id)).typeRole).toBe(typeRole);
       }
+    });
+
+    // The whole point of taking blocked out of WORKFLOW_ROLES: as a role it OVERWROTE the role it was
+    // blocking, so nothing recorded whether the item had been in_progress or in_review, and
+    // unblocking had nowhere to return to.
+    it('blocking leaves the workflow role exactly where it was', async () => {
+      const { adapter } = target.build(emulateStates);
+      const issue = await adapter.create({ title: 'stuck', typeRole: 'task' });
+      const working = await adapter.transition(issue.id, target.mappedMidRole);
+      expect(working.blocked).toBe(false);
+
+      const blocked = await adapter.block(issue.id, 'waiting on the vendor');
+      expect(blocked.blocked).toBe(true);
+      expect(blocked.role, 'blocking must not move the item').toBe(working.role);
+      expect((await adapter.get(issue.id)).role).toBe(working.role);
+
+      const unblocked = await adapter.unblock(issue.id);
+      expect(unblocked.blocked).toBe(false);
+      expect(unblocked.role, 'unblocking must return it to where the work was').toBe(working.role);
+    });
+
+    it('refuses to block without a reason', async () => {
+      const { adapter } = target.build({});
+      const issue = await adapter.create({ title: 'stuck', typeRole: 'task' });
+      await expect(adapter.block(issue.id, '   ')).rejects.toMatchObject({
+        code: 'BLOCK_REASON_REQUIRED',
+      });
+    });
+
+    it('blocking and unblocking are idempotent', async () => {
+      const { adapter } = target.build({});
+      const issue = await adapter.create({ title: 'stuck', typeRole: 'task' });
+      await adapter.block(issue.id, 'once');
+      const twice = await adapter.block(issue.id, 'again');
+      expect(twice.blocked).toBe(true);
+      await adapter.unblock(issue.id);
+      expect((await adapter.unblock(issue.id)).blocked).toBe(false);
     });
 
     // With no policy for it, a provider that cannot filter by type must REFUSE rather than hand back

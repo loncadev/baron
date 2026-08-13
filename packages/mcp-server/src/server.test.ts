@@ -72,6 +72,8 @@ describe('createMcpServer (end-to-end over the MCP protocol)', () => {
         MCP_TOOL_NAMES.update,
         MCP_TOOL_NAMES.transition,
         MCP_TOOL_NAMES.reconcile,
+        MCP_TOOL_NAMES.block,
+        MCP_TOOL_NAMES.unblock,
         MCP_TOOL_NAMES.comment,
         MCP_TOOL_NAMES.link,
         MCP_TOOL_NAMES.assign,
@@ -137,7 +139,7 @@ describe('createMcpServer (end-to-end over the MCP protocol)', () => {
     const client = await connectClient({ issues: githubPort() });
     const created = await call(client, MCP_TOOL_NAMES.create, { title: 'x', typeRole: 'task' });
     const id = JSON.parse(textOf(created)).id as string;
-    const result = await call(client, MCP_TOOL_NAMES.transition, { id, role: 'blocked' });
+    const result = await call(client, MCP_TOOL_NAMES.transition, { id, role: 'ready' });
     expect(result.isError).toBe(true);
     expect(result.structuredContent?.code).toBe('ROLE_MAPPING');
   });
@@ -158,7 +160,7 @@ describe('server instructions', () => {
   it('teaches the role vocabulary and prefers recipes over primitives', () => {
     // When tool definitions are deferred (tool search on by default), this text is the only thing
     // the model sees up front — losing either of these turns Baron back into a bag of endpoints.
-    for (const role of ['backlog', 'ready', 'in_progress', 'in_review', 'done', 'blocked']) {
+    for (const role of ['backlog', 'ready', 'in_progress', 'in_review', 'done']) {
       expect(SERVER_INSTRUCTIONS).toContain(role);
     }
     expect(SERVER_INSTRUCTIONS).toContain('baron_recipe_run');

@@ -12,6 +12,12 @@ export interface Issue {
   readonly typeRole?: WorkItemTypeRole | undefined;
   /** Resolved workflow role, or undefined if the native state is unmapped. */
   readonly role?: WorkflowRole | undefined;
+  /**
+   * Whether the item is blocked. Orthogonal to {@link role} on purpose: a blocked item is still
+   * in_progress or in_review, and losing that was the defect that made blocked a role in the first
+   * place — there was nowhere to return to on unblock.
+   */
+  readonly blocked: boolean;
   /** The raw provider discriminator the role was resolved from. */
   readonly nativeState: string;
   readonly parentId?: string | undefined;

@@ -25,7 +25,7 @@ confirms.
 Providers model status too differently for a universal schema, so Baron never speaks native states.
 It speaks **abstract roles**, and a per-provider map translates them:
 
-- **Workflow roles:** `backlog → ready → in_progress → in_review → done`, plus `blocked` (orthogonal).
+- **Workflow roles:** `backlog → ready → in_progress → in_review → done`. Blocking is NOT one of them: it is an orthogonal flag (`issue.block` / `issue.unblock`) that coexists with whatever role an item holds, so unblocking returns it to where the work actually was.
 - **Type roles:** `initiative`, `epic`, `story`, `task`, `subtask`.
 - **Link types:** `relates`, `blocks`, `blocked_by`, `duplicates`.
 

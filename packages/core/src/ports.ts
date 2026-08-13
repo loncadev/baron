@@ -7,9 +7,14 @@ import { ITERATION_CURRENT, type Iteration } from './iteration.js';
 import type { IssueLinkType } from './links.js';
 import type { Logger } from './logger.js';
 import { silentLogger } from './logger.js';
-import { resolveGap } from './policy.js';
+import { resolveCapabilityGap, resolveGap } from './policy.js';
 import { RoleResolver } from './role-resolver.js';
-import { type WorkItemTypeRole, type WorkflowRole, isWorkItemTypeRole } from './roles.js';
+import {
+  BLOCKED_LABEL,
+  type WorkItemTypeRole,
+  type WorkflowRole,
+  isWorkItemTypeRole,
+} from './roles.js';
 
 /**
  * Prefix of the label that carries a work-item TYPE ROLE on providers whose native types are flat
@@ -152,6 +157,14 @@ export interface IssuesPort {
   whoAmI(): Promise<string>;
   transition(id: string, role: WorkflowRole): Promise<Issue>;
   /**
+   * Set the orthogonal blocked flag with a reason, leaving the workflow role alone. Separate from
+   * `transition` on purpose: "can it move?" and "where is it?" are different questions, and folding
+   * them together is what made unblocking have nowhere to return to.
+   */
+  block(id: string, reason: string): Promise<Issue>;
+  /** Clear the blocked flag, optionally recording why. The role is untouched. */
+  unblock(id: string, reason?: string): Promise<Issue>;
+  /**
    * Bring emulated role labels back in line with the state the provider reports. Commands no role —
    * it only clears an emulation the provider's own state contradicts, so it is safe to call after
    * any operation that may have changed an item outside Baron (a merge that closes its issue).
@@ -253,6 +266,59 @@ export class BaseIssuesAdapter implements IssuesPort {
 
   async get(id: string): Promise<Issue> {
     return this.toIssue(await this.transport.getIssue(id));
+  }
+
+  /**
+   * Mark the item blocked, leaving its workflow role exactly where it is. The reason is posted as a
+   * comment first, so the record of WHY survives on the item rather than in whoever ran it — and it
+   * lands before the flag, so an item is never seen blocked with no explanation. Idempotent.
+   */
+  async block(id: string, reason: string): Promise<Issue> {
+    if (reason.trim().length === 0) {
+      throw new BaronError(
+        'Blocking needs a reason — an item blocked for no recorded reason is one nobody can unblock.',
+        'BLOCK_REASON_REQUIRED',
+      );
+    }
+    this.requireBlockedFlag();
+    const before = await this.transport.getIssue(id);
+    if (before.labels.includes(BLOCKED_LABEL)) return this.toIssue(before);
+    await this.transport.addComment(id, `⛔ Blocked: ${reason}`);
+    await this.transport.addLabel(id, BLOCKED_LABEL);
+    return this.get(id);
+  }
+
+  /** Clear the blocked flag. The role is untouched, so work resumes where it actually was. */
+  async unblock(id: string, reason?: string): Promise<Issue> {
+    this.requireBlockedFlag();
+    const before = await this.transport.getIssue(id);
+    if (!before.labels.includes(BLOCKED_LABEL)) return this.toIssue(before);
+    if (reason !== undefined && reason.trim().length > 0) {
+      await this.transport.addComment(id, `▶ Unblocked: ${reason}`);
+    }
+    if (this.transport.removeLabel === undefined) {
+      throw new BaronError(
+        `Provider '${this.cfg.provider}' cannot remove a label, so the blocked flag cannot be ` +
+          'cleared. Clear it in the provider.',
+        'NOT_SUPPORTED',
+      );
+    }
+    await this.transport.removeLabel(id, BLOCKED_LABEL);
+    return this.get(id);
+  }
+
+  /**
+   * The flag rides a label, so a provider without labels cannot carry it. Negotiated rather than
+   * assumed — a silently-unblocked item is exactly the kind of gap invariant #5 forbids.
+   */
+  private requireBlockedFlag(): void {
+    resolveCapabilityGap(
+      this.manifest.issues.nativeLabels,
+      'blockedFlag',
+      this.cfg.provider,
+      this.cfg.gapPolicy,
+      this.logger,
+    );
   }
 
   async transition(id: string, role: WorkflowRole): Promise<Issue> {
@@ -508,6 +574,9 @@ export class BaseIssuesAdapter implements IssuesPort {
       nativeType: native.nativeType,
       typeRole,
       role: this.resolveRole(native),
+      // Read independently of the role, which is the entire point: a blocked item still reports the
+      // role it is blocked IN.
+      blocked: native.labels.includes(BLOCKED_LABEL),
       nativeState: native.discriminator,
       parentId: native.parentId,
       labels: native.labels,

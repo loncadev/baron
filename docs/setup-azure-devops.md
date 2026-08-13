@@ -115,8 +115,8 @@ Baron's design depends on. Common things to check:
   or is it `Resolved` / `Code Review`?)
 - Did `story` map to your story-level type (Scrum: **Product Backlog Item**; Agile: **User Story**) and
   not to `Feature`?
-- Is `blocked` unmapped? That's fine — transitioning to an unmapped role errors loudly (by design);
-  map it later if your process has a blocked state.
+- Blocking is not a role, so there is nothing to map: `issue.block` / `issue.unblock` set an orthogonal
+  flag and leave the workflow role alone.
 
 Confirm to write `<your-project>/.baron/policy.json`. init also scaffolds `.baron/credentials.example`
 and adds `.baron/credentials` to your `.gitignore`.
@@ -225,7 +225,7 @@ azure-devops MCP only for research Baron doesn't cover."*
 | --- | --- |
 | `POLICY_NOT_FOUND` | No `.baron/policy.json` at the root — run `baron init` (step 4), or check `BARON_ROOT`. |
 | `401` / `403` from Azure | PAT missing or lacking a scope (step 2). For PRs you need Code R&W; for trigger/cancel, Build R&E. |
-| `ROLE_MAPPING` on a transition | The target role (e.g. `blocked`) isn't mapped in `policy.json` — add it or pick a mapped role. Loud-by-design. |
+| `ROLE_MAPPING` on a transition | The target role (e.g. `ready`) isn't mapped in `policy.json` — add it or pick a mapped role. Loud-by-design. |
 | `doctor` reports drift | A state/type/column in `policy.json` no longer exists in the project — update the map. |
 | Claude doesn't see `baron_*` tools | `.mcp.json` not picked up — restart Claude Code; on Windows try `pnpm.cmd`; confirm the server starts (step 7). |
 | `baron_deploy_*` returns nothing | Your project uses pipeline stages, not Azure **Environments** — that's correct-empty, not an error. |

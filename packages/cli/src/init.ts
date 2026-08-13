@@ -282,9 +282,12 @@ function steeringBlock(ctx: SteeringContext): string {
 Track work through **Baron**, not raw provider writes: it normalizes issues and source control across
 providers behind one contract, so speak its abstract vocabulary, never a vendor's native states.
 
-- **Roles, not native states.** Move work by role: \`backlog → ready → in_progress → in_review → done\`,
-  plus \`blocked\`. Say "move it to in_progress", never "set the state to Active" — Baron maps the
-  role to the provider.
+- **Roles, not native states.** Move work by role: \`backlog → ready → in_progress → in_review → done\`.
+  Say "move it to in_progress", never "set the state to Active" — Baron maps the role to the provider.
+- **Blocking is orthogonal, not a role.** \`baron_issue_block { id, reason }\` and
+  \`baron_issue_unblock\` set and clear a flag; the item keeps the role it is blocked in, so
+  unblocking returns it to where the work actually was. A reason is required — an item blocked for no
+  recorded reason is one nobody can unblock.
 - **Type roles this policy maps:** ${typeRoles}.
   Asking for one it does not map is an error, not a degrade — that list is what \`issue.create\`
   accepts here.

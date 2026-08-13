@@ -59,6 +59,8 @@ export const MCP_TOOL_NAMES = {
   update: 'baron_issue_update',
   transition: 'baron_issue_transition',
   reconcile: 'baron_issue_reconcile',
+  block: 'baron_issue_block',
+  unblock: 'baron_issue_unblock',
   comment: 'baron_issue_comment',
   link: 'baron_issue_link',
   assign: 'baron_issue_assign',
@@ -235,6 +237,46 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
       additionalProperties: false,
       required: ['id'],
       properties: { id: { type: 'string', minLength: 1 } },
+    },
+  },
+  {
+    name: MCP_TOOL_NAMES.block,
+    description:
+      'Mark an item blocked, WITHOUT changing its workflow role — blocking answers "can this move?", ' +
+      'not "where is it?". The item keeps the role it is blocked in, so unblocking returns it to ' +
+      'where the work actually was. The reason is required and is posted on the item before the flag ' +
+      'is set. Idempotent.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['id', 'reason'],
+      properties: {
+        id: { type: 'string', minLength: 1 },
+        reason: {
+          type: 'string',
+          minLength: 1,
+          description:
+            'Why it is blocked. Recorded on the item — an unexplained block is unactionable.',
+        },
+      },
+    },
+  },
+  {
+    name: MCP_TOOL_NAMES.unblock,
+    description:
+      "Clear an item's blocked flag. The workflow role is untouched. Optionally records why it was " +
+      'unblocked. Idempotent.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['id'],
+      properties: {
+        id: { type: 'string', minLength: 1 },
+        reason: {
+          type: 'string',
+          description: 'Optional note recorded before the flag is cleared.',
+        },
+      },
     },
   },
   {
@@ -951,6 +993,16 @@ export function callTool(
       return run(() => port.transition(requireString(args, 'id'), requireRole(args)));
     case MCP_TOOL_NAMES.reconcile:
       return run(() => port.reconcile(requireString(args, 'id')));
+    case MCP_TOOL_NAMES.block:
+      return run(() => port.block(requireString(args, 'id'), requireString(args, 'reason')));
+    case MCP_TOOL_NAMES.unblock: {
+      const reason = optionalString(args, 'reason');
+      return run(() =>
+        reason === undefined
+          ? port.unblock(requireString(args, 'id'))
+          : port.unblock(requireString(args, 'id'), reason),
+      );
+    }
     case MCP_TOOL_NAMES.comment:
       return run(() => port.comment(requireString(args, 'id'), requireString(args, 'body')));
     case MCP_TOOL_NAMES.link:
