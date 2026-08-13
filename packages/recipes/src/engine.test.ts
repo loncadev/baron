@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import {
   defineGithubIssuesAdapter,
   defineGithubScmAdapter,
@@ -17,6 +19,7 @@ import {
   BaseCiAdapter,
   BaseDeployAdapter,
   BaseNotifyAdapter,
+  type CheckSummary,
   type IssuesPort,
   type ScmPort,
 } from '@lonca/baron-core';
@@ -485,6 +488,74 @@ steps:
     const { context } = await runRecipe(recipe, { ports: allPorts(), asker: scriptedAsker() });
     expect((context.note as { id: string }).id).toBeTruthy();
     expect((context.found as unknown[]).length).toBe(1);
+  });
+
+  // The guard that exists because this recipe once merged a PR whose checks were failing and turned
+  // main red. These run the SHIPPED task-land.yaml, not a copy of it — a gate that only holds in a
+  // test fixture is the thing being guarded against.
+  describe('task-land checks gate', () => {
+    const taskLand = loadRecipe(
+      readFileSync(fileURLToPath(new URL('../recipes/task-land.yaml', import.meta.url)), 'utf8'),
+    );
+
+    async function landable(checks?: CheckSummary) {
+      const issues = issuesPort();
+      const scm = defineGithubScmAdapter(
+        createMemoryScmTransport(checks === undefined ? {} : { checks }),
+      );
+      const issue = await issues.create({ title: 'boom', typeRole: 'bug' });
+      const branch = issue.branchName as string;
+      await scm.createBranch({ name: branch, fromBranch: 'main' });
+      const pr = await scm.createPullRequest({ title: 'fix', sourceBranch: branch, draft: true });
+      return { ports: { issues, scm } as RecipePorts, scm, issue, pr };
+    }
+
+    const summary = (over: Partial<CheckSummary>): CheckSummary => ({
+      total: 1,
+      succeeded: 0,
+      failed: 0,
+      pending: 0,
+      rollup: 'succeeded',
+      ...over,
+    });
+
+    it('refuses to land a pull request whose checks failed', async () => {
+      const { ports, scm, issue, pr } = await landable(summary({ failed: 1, rollup: 'failed' }));
+      await expect(
+        runRecipe(taskLand, { ports, asker: scriptedAsker([issue.id]) }),
+      ).rejects.toThrow(/failing checks/);
+      // And it stops BEFORE any mutation: still a draft, still open.
+      const after = await scm.prStatus(pr.id);
+      expect(after.state).toBe('open');
+      expect((await scm.prForBranch(issue.branchName as string))?.draft).toBe(true);
+    });
+
+    it('refuses to land while checks are still running', async () => {
+      const { ports, issue, scm } = await landable(summary({ pending: 1, rollup: 'pending' }));
+      await expect(
+        runRecipe(taskLand, { ports, asker: scriptedAsker([issue.id]) }),
+      ).rejects.toThrow(/still has checks running/);
+      expect((await scm.prForBranch(issue.branchName as string))?.state).toBe('open');
+    });
+
+    // A fine-grained token cannot be granted the Checks permission at all, so refusing here would
+    // make task-land unusable for the very token `baron init` recommends. Loud, not fatal.
+    it('lands on an unreadable rollup but says so', async () => {
+      const { ports, issue } = await landable(
+        summary({ total: 0, rollup: 'unknown', unreadable: ['checks'] }),
+      );
+      const asker = scriptedAsker([issue.id]);
+      await runRecipe(taskLand, { ports, asker });
+      expect(asker.notes.some((n) => n.includes('WARNING') && n.includes('unknown'))).toBe(true);
+    });
+
+    it('lands quietly when every check passed', async () => {
+      const { ports, issue, scm } = await landable();
+      const asker = scriptedAsker([issue.id]);
+      await runRecipe(taskLand, { ports, asker });
+      expect(asker.notes.some((n) => n.includes('WARNING'))).toBe(false);
+      expect((await scm.prForBranch(issue.branchName as string, 'merged'))?.state).toBe('merged');
+    });
   });
 
   it('throws PORT_UNBOUND when a recipe needs an unconfigured port', async () => {
