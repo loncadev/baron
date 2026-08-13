@@ -58,6 +58,16 @@ export interface RunRecipeOptions {
 export interface RunRecipeResult {
   /** Final run context: seeded inputs + each `ask`/`do` step's bound variable. */
   readonly context: RecipeContext;
+  /**
+   * Every `message` step the run emitted, in order.
+   *
+   * Collected here rather than left to the asker because the asker a caller supplies decides
+   * whether anyone hears it, and the non-interactive one used by the MCP service discards notes
+   * entirely — which silently threw away task-land's warning that it could not verify the checks,
+   * on the one path every skill actually uses. A recipe's own words about what it just did belong
+   * in its result.
+   */
+  readonly notes: readonly string[];
 }
 
 type Params = Record<string, unknown>;
@@ -487,6 +497,7 @@ export async function runRecipe(
   options: RunRecipeOptions,
 ): Promise<RunRecipeResult> {
   const context: RecipeContext = { ...options.inputs };
+  const notes: string[] = [];
 
   for (const step of recipe.steps) {
     if (isAskStep(step)) {
@@ -516,7 +527,9 @@ export async function runRecipe(
 
     if (isMessageStep(step)) {
       if (step.when !== undefined && !evalCondition(step.when, context)) continue;
-      options.asker.note(String(interpolate(step.message, context)));
+      const note = String(interpolate(step.message, context));
+      notes.push(note);
+      options.asker.note(note);
       continue;
     }
 
@@ -528,5 +541,5 @@ export async function runRecipe(
     }
   }
 
-  return { context };
+  return { context, notes };
 }

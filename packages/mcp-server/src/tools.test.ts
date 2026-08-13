@@ -663,6 +663,23 @@ describe('callRecipeTool', () => {
     expect((context.issue as { title: string }).title).toBe('Wire it');
   });
 
+  // A recipe explains itself through `message` steps, and this service's asker prints nowhere —
+  // which silently swallowed task-land's warning that it could not verify the checks it was about
+  // to merge past, on the one path every skill uses.
+  it("surfaces a recipe's messages without changing the shape callers already parse", async () => {
+    const result = await callRecipeTool(recipesService(), RECIPE_TOOL_NAMES.run, {
+      name: 'task-new',
+      inputs: { title: 'Say something', typeRole: 'task' },
+    });
+    expect(result.isError).toBeUndefined();
+    // First block is still the run context, exactly as before.
+    const context = parse(result.content[0]?.text ?? '{}');
+    expect((context.issue as { title: string }).title).toBe('Say something');
+    // The prose arrives alongside it rather than instead of it.
+    expect(result.content.length).toBe(2);
+    expect(result.content[1]?.text).toContain('Say something');
+  });
+
   it('rejects a missing required input as RECIPE_INPUT_MISSING (never prompts headless)', async () => {
     const result = await callRecipeTool(recipesService(), RECIPE_TOOL_NAMES.run, {
       name: 'task-start',

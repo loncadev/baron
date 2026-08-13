@@ -677,7 +677,10 @@ export const RECIPE_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
       'Run a named recipe end-to-end as ONE deterministic, rule-enforced workflow (the engine — not ' +
       'you — enforces the step order). Supply all required inputs (from baron_recipe_list) in ' +
       '`inputs`; a missing required input errors rather than prompting. Prefer this over composing the ' +
-      'individual issue/scm/ci tools yourself for a packaged workflow.',
+      'individual issue/scm/ci tools yourself for a packaged workflow. Returns the run context as ' +
+      'JSON, and — when the recipe had anything to say — a SECOND text block with its messages. ' +
+      'Read that block: it is where a recipe reports what it could not verify (task-land warns there ' +
+      'when it merged past checks it could not see).',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -864,13 +867,41 @@ function toDraft(args: Record<string, unknown> | undefined): IssueDraft {
   };
 }
 
-async function run(fn: () => Promise<unknown>): Promise<ToolResult> {
+/**
+ * Pull a recipe run's own words out of its result and hand back the payload the caller should see.
+ *
+ * A recipe explains itself through `message` steps — including task-land's warning that it could not
+ * verify the checks it is about to merge past. Those must reach the agent, and the run context alone
+ * is unchanged so nothing that already reads this tool's output breaks.
+ */
+function recipeNotes(result: unknown): { payload: unknown; notes: readonly string[] } {
+  if (typeof result !== 'object' || result === null) return { payload: result, notes: [] };
+  const { context, notes } = result as { context?: unknown; notes?: unknown };
+  if (context === undefined) return { payload: result, notes: [] };
+  return { payload: context, notes: Array.isArray(notes) ? (notes as string[]) : [] };
+}
+
+async function run(
+  fn: () => Promise<unknown>,
+  /** Splits a result into the JSON payload and any prose the caller must also see. */
+  split?: (result: unknown) => { payload: unknown; notes: readonly string[] },
+): Promise<ToolResult> {
   try {
-    const result = await fn();
+    const raw = await fn();
+    const { payload, notes } = split?.(raw) ?? { payload: raw, notes: [] as readonly string[] };
     // A void primitive (link) has no payload; report a stable success object rather than `undefined`,
     // which JSON.stringify would drop (leaving an invalid non-string text block).
-    const text = result === undefined ? '{"ok":true}' : JSON.stringify(result);
-    return { content: [{ type: 'text', text }] };
+    const text = payload === undefined ? '{"ok":true}' : JSON.stringify(payload);
+    // A separate block, not a wrapper object: prose the agent must read, without changing the shape
+    // of the JSON every existing caller parses out of the first block.
+    return notes.length === 0
+      ? { content: [{ type: 'text', text }] }
+      : {
+          content: [
+            { type: 'text', text },
+            { type: 'text', text: notes.join('\n') },
+          ],
+        };
   } catch (error) {
     // BaronError carries an actionable, branchable code; surface it as an isError result (not a
     // protocol error) so the agent sees the gap and can self-correct (invariant #5: never silent).
@@ -1283,7 +1314,7 @@ export function callRecipeTool(
           requireString(args, 'name'),
           (inputs as Record<string, unknown> | undefined) ?? {},
         );
-      });
+      }, recipeNotes);
     default:
       return run(() => {
         throw new BaronError(`Unknown tool '${name}'.`, 'UNKNOWN_TOOL');

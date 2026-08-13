@@ -2,8 +2,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { BaronError } from '@lonca/baron-core';
 import type { RecipeAsker } from './ask.js';
 import { BUILTIN_RECIPE_NAMES, isBuiltinRecipe, loadBuiltinRecipe } from './builtins.js';
-import { type RecipePorts, runRecipe } from './engine.js';
-import type { RecipeContext } from './interpolate.js';
+import { type RecipePorts, type RunRecipeResult, runRecipe } from './engine.js';
 import { type Recipe, type RecipeInput, loadRecipe, recipeInputs } from './recipe.js';
 
 export interface RecipeSummary {
@@ -19,7 +18,13 @@ export interface RecipeSummary {
  */
 export interface RecipeService {
   list(): RecipeSummary[];
-  run(name: string, inputs: Record<string, unknown>): Promise<RecipeContext>;
+  /**
+   * The full run result, not just its context: a recipe's `message` steps are how it explains what
+   * it did and what it could not verify, and this service's asker deliberately has nowhere to print
+   * them. Dropping them here is what silently swallowed task-land's "could not verify the checks"
+   * warning on the MCP path.
+   */
+  run(name: string, inputs: Record<string, unknown>): Promise<RunRecipeResult>;
 }
 
 const RECIPE_DIR_REL = '.baron/recipes';
@@ -100,8 +105,7 @@ export function createRecipeService(ports: RecipePorts, root: string): RecipeSer
           'RECIPE_INPUT_MISSING',
         );
       }
-      const result = await runRecipe(recipe, { ports, asker: nonInteractiveAsker, inputs });
-      return result.context;
+      return runRecipe(recipe, { ports, asker: nonInteractiveAsker, inputs });
     },
   };
 }
