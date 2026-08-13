@@ -62,7 +62,11 @@ export async function askLine(question: string): Promise<string> {
  * shared, so the mute is always undone — otherwise every later prompt goes silent.
  */
 export async function askSecretLine(question: string): Promise<string> {
-  const muted = reader() as unknown as { _writeToOutput?: (chunk: string) => void };
+  // Optional AND explicitly undefined-able: restoring the original means writing `undefined` back
+  // when there was none, which `exactOptionalPropertyTypes` rejects on a plain optional property.
+  const muted = reader() as unknown as {
+    _writeToOutput?: ((chunk: string) => void) | undefined;
+  };
   const restore = muted._writeToOutput;
   stdout.write(question);
   muted._writeToOutput = () => {};

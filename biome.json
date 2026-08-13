@@ -1,7 +1,9 @@
 {
   "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
-  "files": { "ignore": ["dist/**", "node_modules/**", "coverage/**"] },
+  "files": {
+    "ignore": ["dist/**", "node_modules/**", "coverage/**", ".github/cla-signatures.json"]
+  },
   "formatter": {
     "enabled": true,
     "indentStyle": "space",
