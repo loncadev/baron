@@ -46,7 +46,7 @@ policy.
 | `baron_deploy_deployments` | deploy | List deployments with a normalized `DeployStatus`. |
 | `baron_notify_send` | notify | Send a message (`text`, optional `channel`, optional `threadKey` for threaded replies). |
 | `baron_recipe_list` | recipes | List the runnable recipes (built-ins + project recipes) and the `inputs` each declares. |
-| `baron_recipe_run` | recipes | Run a named recipe end-to-end as ONE deterministic, rule-enforced call (`name`, `inputs`). The engine enforces step order; required inputs are validated up front (`RECIPE_INPUT_MISSING`) — it never prompts. Prefer this over hand-composing the primitives for a packaged workflow. |
+| `baron_recipe_run` | recipes | Run a named recipe end-to-end as ONE deterministic, rule-enforced call (`name`, `inputs`). The engine enforces step order; required inputs are validated up front (`RECIPE_INPUT_MISSING`) — it never prompts. Prefer this over hand-composing the primitives for a packaged workflow. Returns the run context as JSON plus, when the recipe said anything, a second text block carrying its messages — read it, that is where a recipe reports what it could not verify. |
 | `baron_native_request` | — | **Escape hatch (last resort).** A non-portable raw authenticated provider REST call; only reaches providers the policy binds. Prefer the normalized tools above. |
 | `baron_learning_append` | loop | Record a durable learning. |
 | `baron_learning_query` | loop | Query learnings by tag / text. |

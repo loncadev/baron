@@ -54,7 +54,10 @@ steps:
   # all, so refusing on unknown would make task-land unusable for exactly the token `baron init`
   # recommends. It is loud instead, and says what it could not see — silence here would be the same
   # false assurance in a quieter voice.
-  - message: "WARNING — could not verify checks on ${pr.url}: the rollup is 'unknown' (unreadable: ${status.checks.unreadable}). Landing anyway; confirm CI yourself. Grant Actions (Read) + Commit statuses (Read) to see them."
+  # The remedy comes from the provider, not from here: naming GitHub permissions in a recipe that
+  # also runs on Azure — where the rollup is unknown on every PR because the adapter does not read
+  # branch policies — would fire unactionable advice on every single land there.
+  - message: "WARNING — could not verify checks on ${pr.url}: the rollup is 'unknown' (unreadable: ${status.checks.unreadable}). Landing anyway; confirm CI yourself. ${status.checks.remedy}"
     when:
       equals: ["${status.checks.rollup}", "unknown"]
   - message: "Note — ${pr.url} reports no checks at all. Nothing verified this change; that is the repository's configuration, not a Baron failure."

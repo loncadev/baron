@@ -186,7 +186,17 @@ export function createGithubScmTransport(options: GithubTransportOptions): ScmTr
       failed,
       pending,
       rollup,
-      ...(unreadable.length > 0 ? { unreadable } : {}),
+      ...(unreadable.length > 0
+        ? {
+            unreadable,
+            // Named here because it is GitHub's answer, not a recipe's guess. Checks itself cannot
+            // be granted to a fine-grained token at all — that permission exists only for GitHub
+            // Apps — so these two are the only way in.
+            remedy:
+              'Add Actions (Read) and Commit statuses (Read) to the token. A fine-grained token ' +
+              'cannot be granted Checks at all; those two are the only way to see workflow results.',
+          }
+        : {}),
     };
   }
 

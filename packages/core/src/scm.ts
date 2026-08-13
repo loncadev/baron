@@ -226,6 +226,16 @@ export interface CheckSummary {
    * cost a real investigation before this field existed.
    */
   readonly unreadable?: readonly string[] | undefined;
+  /**
+   * What the caller can do about an incomplete view, in the provider's own terms — a permission to
+   * grant, or the fact that this adapter does not read that source yet.
+   *
+   * Provider knowledge, so the provider supplies it. A recipe telling an Azure user to grant
+   * "Actions (Read)" is worse than saying nothing: those permissions do not exist there, the rollup
+   * is unknown on every Azure pull request, and an unactionable warning that fires every time is one
+   * people learn to skip — which is how you lose the one that matters.
+   */
+  readonly remedy?: string | undefined;
 }
 
 /**

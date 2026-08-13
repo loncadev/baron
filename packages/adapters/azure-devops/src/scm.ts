@@ -363,6 +363,11 @@ export function createAzureDevOpsScmTransport(
           pending: 0,
           rollup: 'unknown',
           unreadable: ['policy-evaluations'],
+          // Not a permission the caller can grant: this adapter does not read the Policy API yet.
+          // Say so, rather than let a caller hunt for a setting that would not help.
+          remedy:
+            'Azure PR checks are branch-policy evaluations, which this adapter does not read yet — ' +
+            'no permission change will make them visible. Check the PR in Azure DevOps.',
         },
         url: prWebUrl(id),
       };

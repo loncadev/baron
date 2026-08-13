@@ -47,9 +47,9 @@ describe('RecipeService', () => {
     const service = createRecipeService(ports(), ROOT);
     // task-new creates; task-start then works on the EXISTING item — the reference split.
     const created = await service.run('task-new', { title: 'Wire it', typeRole: 'task' });
-    const issueId = (created.issue as { id: string }).id;
+    const issueId = (created.context.issue as { id: string }).id;
 
-    const context = await service.run('task-start', { issueId });
+    const { context, notes } = await service.run('task-start', { issueId });
     const issue = context.issue as { id: string; role?: string; branchName?: string };
     expect(issue.id).toBe(issueId);
     expect(issue.role).toBe('in_progress');
@@ -57,6 +57,17 @@ describe('RecipeService', () => {
     const branch = context.branch as { name: string };
     expect(branch.name).toBe(issue.branchName);
     expect(branch.name).toContain(`/${issueId}-wire-it`);
+    // A recipe's own account of what it did must survive the service, whose asker prints nowhere.
+    expect(notes.some((n) => n.includes('in progress'))).toBe(true);
+  });
+
+  // The service's asker discards notes by design (nobody is at a terminal), which silently threw
+  // away task-land's "could not verify the checks" warning on the one path every skill uses.
+  it('returns a recipe’s messages even though its asker prints nowhere', async () => {
+    const service = createRecipeService(ports(), ROOT);
+    const created = await service.run('task-new', { title: 'Talk to me', typeRole: 'task' });
+    expect(created.notes.length).toBeGreaterThan(0);
+    expect(created.notes.every((n) => typeof n === 'string' && n.length > 0)).toBe(true);
   });
 
   it('errors with the missing input names when a required input is absent', async () => {
