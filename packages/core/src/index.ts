@@ -7,6 +7,7 @@ export * from './capabilities.js';
 export * from './policy.js';
 export * from './config.js';
 export * from './policy-file.js';
+export * from './credential.js';
 export * from './introspection.js';
 export * from './proposal.js';
 export * from './role-resolver.js';

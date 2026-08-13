@@ -85,6 +85,7 @@ export function defineGithubIssuesAdapter(
 
 export { createGithubTransport, type GithubTransportOptions } from './transport.js';
 export { createGithubIntrospector } from './introspector.js';
+export { acceptedPermission, createGithubCredentialProbe } from './credential.js';
 export {
   createGithubScmTransport,
   defineGithubScmAdapter,

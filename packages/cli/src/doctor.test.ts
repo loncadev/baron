@@ -3,7 +3,13 @@ import {
   createMemoryIntrospector,
   githubIntrospectionFixture,
 } from '@lonca/baron-conformance';
-import { BaronError, WORK_ITEM_TYPE_ROLES } from '@lonca/baron-core';
+import {
+  BaronError,
+  type CredentialCapability,
+  type CredentialProbe,
+  type CredentialStatus,
+  WORK_ITEM_TYPE_ROLES,
+} from '@lonca/baron-core';
 import { describe, expect, it } from 'vitest';
 import { runDoctor } from './doctor.js';
 import { memoryFileSystem, scriptedPrompter } from './fakes.js';
@@ -21,6 +27,25 @@ const FULL_ENV = {
   AZURE_DEVOPS_REPO: 'r',
   AZURE_DEVOPS_TOKEN: 't',
 };
+
+/**
+ * No probe at all — what a provider that cannot report credential permissions looks like. Every
+ * drift-focused case passes this so it never reaches the live registry (and the network) for a
+ * credential answer it is not asserting on.
+ */
+const NO_PROBE = () => undefined;
+
+/** A probe that answers every requested capability with one fixed status. */
+function probeAnswering(status: CredentialStatus): () => CredentialProbe {
+  return () => ({
+    probe: async (capabilities: readonly CredentialCapability[]) =>
+      capabilities.map((capability) => ({
+        capability,
+        status,
+        nativePermission: 'Contents: Read and write',
+      })),
+  });
+}
 
 /** Seed a memory fs with a freshly-written policy for the given provider/fixture. */
 async function seededFs(provider: string, fixture = githubIntrospectionFixture) {
@@ -44,6 +69,7 @@ describe('runDoctor', () => {
       root: ROOT,
       fs,
       introspector: createMemoryIntrospector(azureIntrospectionFixture),
+      probeFor: NO_PROBE,
     });
     expect(report.ok).toBe(true);
     expect(report.drift).toEqual([]);
@@ -60,6 +86,7 @@ describe('runDoctor', () => {
       root: ROOT,
       fs,
       introspector: createMemoryIntrospector(drifted),
+      probeFor: NO_PROBE,
     });
     expect(report.ok).toBe(false);
     expect(report.drift.some((d) => d.includes('Closed'))).toBe(true);
@@ -75,6 +102,7 @@ describe('runDoctor', () => {
       root: ROOT,
       fs,
       introspector: createMemoryIntrospector(drifted),
+      probeFor: NO_PROBE,
     });
     expect(report.ok).toBe(false);
     expect(report.drift.some((d) => d.includes('Task'))).toBe(true);
@@ -90,6 +118,7 @@ describe('runDoctor', () => {
       root: ROOT,
       fs,
       introspector: createMemoryIntrospector(drifted),
+      probeFor: NO_PROBE,
     });
     expect(report.ok).toBe(false);
     expect(report.drift.some((d) => d.includes('Test'))).toBe(true);
@@ -101,11 +130,78 @@ describe('runDoctor', () => {
       root: ROOT,
       fs,
       introspector: createMemoryIntrospector(githubIntrospectionFixture),
+      probeFor: NO_PROBE,
     });
     expect(report.ok).toBe(true);
     // Only the type map is checkable on a flat provider; no native states or columns. One check
     // per abstract type role (all collapse onto GitHub's single 'issue' type).
     expect(report.checks).toBe(WORK_ITEM_TYPE_ROLES.length);
+  });
+
+  // The bug this suite exists to prevent: a policy that matches the provider perfectly, reported as
+  // OK, one command before the first write fails on a permission the credential never had.
+  it('fails when the credential cannot do what a bound port requires', async () => {
+    const fs = await seededFs('github', githubIntrospectionFixture);
+    const report = await runDoctor({
+      root: ROOT,
+      fs,
+      introspector: createMemoryIntrospector(githubIntrospectionFixture),
+      probeFor: probeAnswering('denied'),
+    });
+    expect(report.drift).toEqual([]);
+    expect(report.ok).toBe(false);
+    expect(report.credentials.every((f) => f.status === 'denied')).toBe(true);
+    // The report has to carry the fix, not just the refusal.
+    expect(report.credentials[0]?.nativePermission).toBe('Contents: Read and write');
+  });
+
+  it('passes when every required capability is granted', async () => {
+    const fs = await seededFs('github', githubIntrospectionFixture);
+    const report = await runDoctor({
+      root: ROOT,
+      fs,
+      introspector: createMemoryIntrospector(githubIntrospectionFixture),
+      probeFor: probeAnswering('granted'),
+    });
+    expect(report.ok).toBe(true);
+    expect(report.credentials.map((f) => f.capability).sort()).toEqual([
+      'issues:read',
+      'issues:write',
+      'scm:read',
+      'scm:write',
+    ]);
+  });
+
+  // 'we could not check' must reach the report as its own outcome. Reporting nothing would read as
+  // 'nothing was wrong', which is the same lie in a quieter voice.
+  it('reports unconfirmed capabilities rather than assuming them', async () => {
+    const fs = await seededFs('github', githubIntrospectionFixture);
+    const report = await runDoctor({
+      root: ROOT,
+      fs,
+      introspector: createMemoryIntrospector(githubIntrospectionFixture),
+      probeFor: NO_PROBE,
+    });
+    expect(report.credentials.length).toBeGreaterThan(0);
+    expect(report.credentials.every((f) => f.status === 'unknown')).toBe(true);
+    expect(report.credentials.every((f) => (f.detail ?? '').length > 0)).toBe(true);
+  });
+
+  it('treats a probe that throws as unconfirmed, not as failure', async () => {
+    const fs = await seededFs('github', githubIntrospectionFixture);
+    const report = await runDoctor({
+      root: ROOT,
+      fs,
+      introspector: createMemoryIntrospector(githubIntrospectionFixture),
+      probeFor: () => ({
+        probe: async () => {
+          throw new Error('network down');
+        },
+      }),
+    });
+    expect(report.ok).toBe(true);
+    expect(report.credentials.every((f) => f.status === 'unknown')).toBe(true);
+    expect(report.credentials[0]?.detail).toContain('network down');
   });
 
   it('throws an actionable error when no policy exists', async () => {

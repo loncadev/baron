@@ -1,7 +1,10 @@
 import {
   BaronError,
+  type CredentialFinding,
+  type CredentialProbe,
   type Introspector,
   parsePolicyJson,
+  requiredCredentialCapabilities,
   resolveIssuesConfig,
 } from '@lonca/baron-core';
 import { type Env, getProviderDescriptor } from '@lonca/baron-providers';
@@ -13,7 +16,14 @@ export interface DoctorOptions {
   readonly fs: FileSystem;
   /** Injected introspector (tests). When absent, built from the registry + env credentials. */
   readonly introspector?: Introspector;
+  /** Injected probe lookup (tests). When absent, built from the registry + env credentials. */
+  readonly probeFor?: (provider: string) => CredentialProbe | undefined;
   readonly env?: Env;
+}
+
+/** A capability finding with the provider whose credential it was asked about. */
+export interface DoctorCredentialFinding extends CredentialFinding {
+  readonly provider: string;
 }
 
 export interface DoctorReport {
@@ -24,14 +34,64 @@ export interface DoctorReport {
   readonly drift: readonly string[];
   /** How many references were checked (states, columns, types). */
   readonly checks: number;
+  /**
+   * What each bound provider's credential can actually do. A `denied` here fails the report: it is
+   * the difference between a policy that matches the provider and an installation that works.
+   */
+  readonly credentials: readonly DoctorCredentialFinding[];
+}
+
+/**
+ * Ask each bound provider's credential what it can do. A provider with no probe yields explicit
+ * `unknown` findings rather than none at all — "we did not check" has to reach the report, because
+ * silently assuming a credential works is exactly the failure this check exists to prevent.
+ */
+async function checkCredentials(
+  policy: ReturnType<typeof parsePolicyJson>,
+  probeFor: (provider: string) => CredentialProbe | undefined,
+): Promise<DoctorCredentialFinding[]> {
+  const findings: DoctorCredentialFinding[] = [];
+  for (const [provider, capabilities] of requiredCredentialCapabilities(policy.providers)) {
+    const probe = probeFor(provider);
+    if (probe === undefined) {
+      for (const capability of capabilities) {
+        findings.push({
+          provider,
+          capability,
+          status: 'unknown',
+          detail: `provider '${provider}' cannot report what a credential may do; not checked.`,
+        });
+      }
+      continue;
+    }
+    try {
+      for (const finding of await probe.probe(capabilities)) {
+        findings.push({ provider, ...finding });
+      }
+    } catch (error) {
+      for (const capability of capabilities) {
+        findings.push({
+          provider,
+          capability,
+          status: 'unknown',
+          detail: `probe failed: ${error instanceof Error ? error.message : String(error)}`,
+        });
+      }
+    }
+  }
+  return findings;
 }
 
 /**
  * `baron doctor`: load `.baron/policy.json`, introspect the live issues provider, and report any
- * drift — a mapped native state/type/column that no longer exists. Returns a structured report
+ * drift — a mapped native state/type/column that no longer exists — then verify that each bound
+ * provider's credential can actually perform what those ports imply. Returns a structured report
  * (the CLI shell turns a non-ok report into a non-zero exit) rather than printing directly, so the
  * check is testable. Label-discriminated providers skip native-state checks (labels are
  * Baron-managed, not introspected).
+ *
+ * Drift and credentials answer two different questions, and only checking the first is what made a
+ * green doctor compatible with a `task-start` that fails on the very next command.
  */
 export async function runDoctor(options: DoctorOptions): Promise<DoctorReport> {
   const path = policyPath(options.root);
@@ -99,5 +159,12 @@ export async function runDoctor(options: DoctorOptions): Promise<DoctorReport> {
     }
   }
 
-  return { ok: drift.length === 0, policyPath: path, provider: config.provider, drift, checks };
+  const env = options.env ?? {};
+  const probeFor =
+    options.probeFor ??
+    ((provider: string) => getProviderDescriptor(provider).createCredentialProbe?.(env));
+  const credentials = await checkCredentials(policy, probeFor);
+
+  const ok = drift.length === 0 && !credentials.some((f) => f.status === 'denied');
+  return { ok, policyPath: path, provider: config.provider, drift, checks, credentials };
 }
