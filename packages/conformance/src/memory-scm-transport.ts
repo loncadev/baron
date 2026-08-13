@@ -1,4 +1,5 @@
 import type {
+  CheckSummary,
   MergeOptions,
   NativeBranch,
   NativePullRequest,
@@ -14,7 +15,24 @@ import type {
  * suite (and the MCP/port logic) can be exercised without a live git provider; the live transports
  * are validated separately by gated smoke tests.
  */
-export function createMemoryScmTransport(): ScmTransport {
+export interface MemoryScmTransportOptions {
+  /**
+   * The check summary every PR reports. Defaults to a single passing check. Overridable because the
+   * behavior that matters most here is what a caller does with a rollup it does not like, and a
+   * transport that can only ever say 'succeeded' cannot be asked that question.
+   */
+  readonly checks?: CheckSummary | undefined;
+}
+
+const ALL_GREEN: CheckSummary = {
+  total: 1,
+  succeeded: 1,
+  failed: 0,
+  pending: 0,
+  rollup: 'succeeded',
+};
+
+export function createMemoryScmTransport(opts: MemoryScmTransportOptions = {}): ScmTransport {
   let prSeq = 0;
   let threadSeq = 0;
   const prs: NativePullRequest[] = [];
@@ -97,7 +115,7 @@ export function createMemoryScmTransport(): ScmTransport {
         state: 'open' as const,
         reviewDecision: 'review_required' as const,
         mergeable: true,
-        checks: { total: 1, succeeded: 1, failed: 0, pending: 0, rollup: 'succeeded' as const },
+        checks: opts.checks ?? ALL_GREEN,
         url: `mem://pr/${pullRequestId}`,
       };
     },

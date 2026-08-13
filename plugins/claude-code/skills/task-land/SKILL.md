@@ -48,8 +48,14 @@ is the answer — report it, don't route around it.
    { "name": "task-land", "inputs": { "issueId": "<id>", "strategy": "squash", "deleteSourceBranch": "yes" } }
    ```
 
-   Leave `strategy` out to take the provider's own default. The recipe undrafts only if the PR is
-   actually a draft, then merges.
+   Leave `strategy` out to take the provider's own default. The recipe reads the checks itself
+   before it touches anything, undrafts only if the PR is actually a draft, then merges.
+
+   **The engine enforces step 2, it does not trust you to have done it.** A `failed` or `pending`
+   rollup stops the run before the PR is even taken out of draft; an `unknown` one warns loudly and
+   proceeds, because a fine-grained GitHub token can never be granted Checks and refusing would make
+   landing impossible for the setup `baron init` recommends. Step 2 still matters — asking the user
+   first is better than handing them a hard refusal — but a skipped step 2 can no longer land red.
 5. **Report honestly**:
    - The merge commit and the PR URL.
    - **What happened to the item.** A PR opened with a native closing link (GitHub `Closes #N`)

@@ -1,5 +1,5 @@
 name: task-land
-description: Land the pull request for a work item — take it out of draft, then merge it. Refuses when there is no open PR, and a provider that declines the merge (conflicts, unmet branch policy) surfaces as MERGE_FAILED rather than a false success.
+description: Land the pull request for a work item — verify its checks, take it out of draft, then merge it. Refuses when there is no open PR or when checks are failing or still running; a rollup the credential cannot read warns loudly and proceeds. A provider that declines the merge (conflicts, unmet branch policy) surfaces as MERGE_FAILED rather than a false success.
 steps:
   - ask:
       as: issueId
@@ -33,6 +33,33 @@ steps:
   - require:
       truthy: "${pr}"
       message: "No OPEN pull request on ${issue.branchName} for ${issueId}. Run task-finish to open one — or it may already be landed."
+  # The verification gate, BEFORE the first mutation. This recipe once merged a PR whose checks were
+  # failing and turned main red: nothing read them, and `mergeable` only means "no conflicts". The
+  # whole argument for recipes over an agent behaving well is that the engine enforces the order, so
+  # this is the one step that argument has to survive.
+  - do: scm.pr.status
+    as: status
+    with:
+      pullRequestId: ${pr.id}
+  - require:
+      notEquals: ["${status.checks.rollup}", "failed"]
+      message: "${pr.url} has failing checks (${status.checks.failed} of ${status.checks.total}). Fix them and re-run task-land — landing red is what this guard exists to prevent."
+  # Pending is 'not verified yet', which is the same category of risk as failed, so it stops here too
+  # rather than racing the provider. The tool for "merge it once checks pass" is task-finish's
+  # auto-complete, which hands the wait to the provider instead of guessing at it.
+  - require:
+      notEquals: ["${status.checks.rollup}", "pending"]
+      message: "${pr.url} still has checks running (${status.checks.pending} pending). Wait and re-run task-land, or open it with auto-complete so the provider merges it when they pass."
+  # 'unknown' does NOT stop the land. A fine-grained token cannot be granted the Checks permission at
+  # all, so refusing on unknown would make task-land unusable for exactly the token `baron init`
+  # recommends. It is loud instead, and says what it could not see — silence here would be the same
+  # false assurance in a quieter voice.
+  - message: "WARNING — could not verify checks on ${pr.url}: the rollup is 'unknown' (unreadable: ${status.checks.unreadable}). Landing anyway; confirm CI yourself. Grant Actions (Read) + Commit statuses (Read) to see them."
+    when:
+      equals: ["${status.checks.rollup}", "unknown"]
+  - message: "Note — ${pr.url} reports no checks at all. Nothing verified this change; that is the repository's configuration, not a Baron failure."
+    when:
+      equals: ["${status.checks.rollup}", "none"]
   # Conditional: markPrReady on an already-ready PR is an error on some providers, so only undraft
   # what is actually a draft. task-finish opens drafts on purpose, which is why this step exists.
   - do: scm.pr.ready
