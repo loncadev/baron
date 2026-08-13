@@ -1,5 +1,5 @@
 import type { Introspector, ProviderIntrospection } from '@lonca/baron-core';
-import { Octokit } from 'octokit';
+import { createGithubOctokit } from './octokit.js';
 import { GITHUB_PROVIDER } from './provider.js';
 import type { GithubTransportOptions } from './transport.js';
 
@@ -12,7 +12,9 @@ import type { GithubTransportOptions } from './transport.js';
  */
 export function createGithubIntrospector(options: GithubTransportOptions): Introspector {
   const { owner, repo, token } = options;
-  const octokit = new Octokit({ auth: token });
+  // Raw: an unreadable route here means "the org has not adopted Issue Types", which this code
+  // handles by falling back — turning that 403 into a thrown error would break introspection.
+  const octokit = createGithubOctokit(token);
 
   return {
     async introspect(): Promise<ProviderIntrospection> {

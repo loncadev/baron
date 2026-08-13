@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ request: vi.fn() }));
 
 vi.mock('octokit', () => ({
-  Octokit: vi.fn(() => ({ request: mocks.request })),
+  Octokit: vi.fn(() => ({ hook: { before: vi.fn(), error: vi.fn() }, request: mocks.request })),
 }));
 
 const { createGithubIntrospector } = await import('./introspector.js');
