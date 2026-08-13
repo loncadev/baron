@@ -4,7 +4,7 @@ import type {
   CredentialProbe,
   CredentialStatus,
 } from '@lonca/baron-core';
-import { Octokit } from 'octokit';
+import { acceptedPermission, createGithubOctokit } from './octokit.js';
 import type { GithubTransportOptions } from './transport.js';
 
 /**
@@ -41,21 +41,6 @@ function asHttpFailure(error: unknown): HttpFailure | undefined {
 }
 
 /**
- * The permission GitHub itself says the route needs. Fine-grained tokens get
- * `x-accepted-github-permissions` (`contents=write`); classic tokens get `x-accepted-oauth-scopes`
- * (`repo`). Reading it back beats hardcoding a route→permission table that drifts.
- */
-export function acceptedPermission(
-  headers: Record<string, string | undefined>,
-): string | undefined {
-  const fineGrained = headers['x-accepted-github-permissions'];
-  if (typeof fineGrained === 'string' && fineGrained.length > 0) return fineGrained;
-  const classic = headers['x-accepted-oauth-scopes'];
-  if (typeof classic === 'string' && classic.length > 0) return `scope ${classic}`;
-  return undefined;
-}
-
-/**
  * Live credential probe for GitHub. Reads are confirmed by performing them; writes are confirmed
  * WITHOUT performing them, by sending a request GitHub authorizes before it validates the body — a
  * permitted caller gets 422 (the body is bad), a forbidden one gets 403. Nothing is created either
@@ -64,12 +49,9 @@ export function acceptedPermission(
  */
 export function createGithubCredentialProbe(options: GithubTransportOptions): CredentialProbe {
   const { owner, repo, token } = options;
-  // The write probes send deliberately invalid bodies, so GitHub's commentary about them (route
-  // deprecation notices and the like) describes the probe, not the installation. Errors still speak.
-  const octokit = new Octokit({
-    auth: token,
-    log: { debug: () => {}, info: () => {}, warn: () => {}, error: console.error },
-  });
+  // Deliberately the raw client: this probe's whole job is telling a 403 from a 422, and the
+  // permission-error wrapper would turn the first into a thrown error before it could be classified.
+  const octokit = createGithubOctokit(token);
   const request = octokit.request as unknown as (
     route: string,
     params: Record<string, unknown>,

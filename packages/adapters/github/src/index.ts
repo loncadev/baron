@@ -93,7 +93,8 @@ export function defineGithubIssuesAdapter(
 
 export { createGithubTransport, type GithubTransportOptions } from './transport.js';
 export { createGithubIntrospector } from './introspector.js';
-export { acceptedPermission, createGithubCredentialProbe } from './credential.js';
+export { createGithubCredentialProbe } from './credential.js';
+export { GITHUB_API_VERSION, acceptedPermission, createGithubOctokit } from './octokit.js';
 export {
   createGithubScmTransport,
   defineGithubScmAdapter,
