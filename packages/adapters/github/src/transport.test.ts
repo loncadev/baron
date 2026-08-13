@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({ update: vi.fn(), getAuthenticated: vi.fn(), ge
 
 vi.mock('octokit', () => ({
   Octokit: vi.fn(() => ({
+    // The real client carries hooks, and the transport installs a permission-error hook on it.
+    hook: { error: vi.fn() },
     rest: {
       issues: { update: mocks.update, get: mocks.get },
       users: { getAuthenticated: mocks.getAuthenticated },

@@ -10,7 +10,7 @@ import {
   type Logger,
   type NativeDeployment,
 } from '@lonca/baron-core';
-import { Octokit } from 'octokit';
+import { createGithubOctokit } from './octokit.js';
 import { GITHUB_PROVIDER } from './provider.js';
 import type { GithubTransportOptions } from './transport.js';
 
@@ -39,7 +39,7 @@ const DEFAULT_LIMIT = 20;
 
 export function createGithubDeployTransport(options: GithubTransportOptions): DeployTransport {
   const { owner, repo, token } = options;
-  const octokit = new Octokit({ auth: token });
+  const octokit = createGithubOctokit(token, 'deploy');
 
   return {
     async listEnvironments(query: EnvironmentQuery): Promise<readonly Environment[]> {

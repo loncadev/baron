@@ -16,6 +16,7 @@ import {
 import {
   GITHUB_PROVIDER,
   createGithubCiTransport,
+  createGithubCredentialProbe,
   createGithubDeployTransport,
   createGithubIntrospector,
   createGithubScmTransport,
@@ -46,6 +47,7 @@ import {
   type CiPort,
   type CiStatusMaps,
   type CiTransport,
+  type CredentialProbe,
   type DeployManifest,
   type DeployPort,
   type DeployStatusMaps,
@@ -105,6 +107,12 @@ export interface ProviderDescriptor {
   readonly linkMap?: LinkMap;
   createTransport?(env: Env): IssuesTransport;
   createIntrospector?(env: Env): Introspector;
+  /**
+   * Asks the provider what this credential may actually do. Optional: a provider with no way to
+   * answer simply has none, and `doctor` reports its capabilities as unconfirmed rather than
+   * assuming them — which is the whole point (invariant #5 applied to credentials).
+   */
+  createCredentialProbe?(env: Env): CredentialProbe;
   // scm port
   readonly scmManifest?: ScmManifest;
   /** Env keys for the scm transport (Azure adds AZURE_DEVOPS_REPO over the issues keys). */
@@ -229,6 +237,13 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
     },
     createIntrospector(env) {
       return createGithubIntrospector({
+        owner: env.GITHUB_OWNER ?? '',
+        repo: env.GITHUB_REPO ?? '',
+        token: env.GITHUB_TOKEN ?? '',
+      });
+    },
+    createCredentialProbe(env) {
+      return createGithubCredentialProbe({
         owner: env.GITHUB_OWNER ?? '',
         repo: env.GITHUB_REPO ?? '',
         token: env.GITHUB_TOKEN ?? '',

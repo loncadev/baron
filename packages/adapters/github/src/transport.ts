@@ -9,7 +9,8 @@ import {
   type NativeTarget,
   type NativeUpdateInput,
 } from '@lonca/baron-core';
-import { Octokit } from 'octokit';
+import type { Octokit } from 'octokit';
+import { createGithubOctokit } from './octokit.js';
 
 export interface GithubTransportOptions {
   readonly owner: string;
@@ -69,7 +70,7 @@ function labelNames(labels: IssueResponse['labels']): string[] {
  */
 export function createGithubTransport(options: GithubTransportOptions): IssuesTransport {
   const { owner, repo, token } = options;
-  const octokit = new Octokit({ auth: token });
+  const octokit = createGithubOctokit(token, 'issues');
 
   // '@me' has no REST equivalent on listForRepo; resolve the token's login once and cache it.
   let myLogin: Promise<string> | undefined;

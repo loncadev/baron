@@ -145,13 +145,39 @@ async function provisionRoleLabels(ports: CliPorts, root: string): Promise<void>
 async function cmdDoctor(flags: Record<string, string>, ports: CliPorts): Promise<number> {
   const root = flags.root ?? '.';
   const report = await runDoctor({ root, fs: ports.fs, env: effectiveEnv(ports, root) });
+
+  const denied = report.credentials.filter((f) => f.status === 'denied');
+  const unknown = report.credentials.filter((f) => f.status === 'unknown');
+
   if (report.ok) {
     ports.out(`OK — ${report.checks} reference(s) checked for '${report.provider}', no drift.`);
-    return 0;
+    const granted = report.credentials.length - unknown.length;
+    ports.out(`OK — ${granted} credential capability/capabilities confirmed.`);
+  } else {
+    if (report.drift.length > 0) {
+      ports.err(`Drift detected for '${report.provider}' (${report.drift.length}):`);
+      for (const item of report.drift) ports.err(`  - ${item}`);
+    }
+    if (denied.length > 0) {
+      ports.err(`Credential cannot do what the bound ports require (${denied.length}):`);
+      for (const f of denied) {
+        const permission = f.nativePermission ?? 'the matching permission';
+        ports.err(`  - ${f.provider} '${f.capability}' denied — grant ${permission}.`);
+      }
+      ports.err('  Grant these, then re-run `baron doctor` before starting work.');
+    }
   }
-  ports.err(`Drift detected for '${report.provider}' (${report.drift.length}):`);
-  for (const item of report.drift) ports.err(`  - ${item}`);
-  return 1;
+
+  // Never let 'we could not check' pass as 'it works'. Printed on a green run too, because that is
+  // precisely when an unverified assumption is about to be acted on.
+  if (unknown.length > 0) {
+    ports.err(`Unconfirmed (${unknown.length}) — not checked, not assumed:`);
+    for (const f of unknown) {
+      ports.err(`  - ${f.provider} '${f.capability}': ${f.detail ?? 'no detail'}`);
+    }
+  }
+
+  return report.ok ? 0 : 1;
 }
 
 async function cmdRun(flags: Record<string, string>, ports: CliPorts): Promise<number> {

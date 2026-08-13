@@ -20,7 +20,7 @@ import {
   type ScmManifest,
   type ScmTransport,
 } from '@lonca/baron-core';
-import { Octokit } from 'octokit';
+import { createGithubOctokit } from './octokit.js';
 import { GITHUB_PROVIDER } from './provider.js';
 import type { GithubTransportOptions } from './transport.js';
 
@@ -63,7 +63,7 @@ const MERGE_METHOD: Record<MergeStrategy, 'merge' | 'squash' | 'rebase'> = {
 
 export function createGithubScmTransport(options: GithubTransportOptions): ScmTransport {
   const { owner, repo, token, baseBranch } = options;
-  const octokit = new Octokit({ auth: token });
+  const octokit = createGithubOctokit(token, 'scm');
 
   // '@me' has no REST equivalent; resolve the token's login once and cache it (same contract as the
   // issues transport, so a PR and its work item end up assigned to the same person).

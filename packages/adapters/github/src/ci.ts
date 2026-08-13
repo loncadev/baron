@@ -16,7 +16,7 @@ import {
   type RunQuery,
   type TriggerInput,
 } from '@lonca/baron-core';
-import { Octokit } from 'octokit';
+import { createGithubOctokit } from './octokit.js';
 import { GITHUB_PROVIDER } from './provider.js';
 import type { GithubTransportOptions } from './transport.js';
 
@@ -97,7 +97,7 @@ function toNativeRun(r: GhRun): NativeRun {
  */
 export function createGithubCiTransport(options: GithubTransportOptions): CiTransport {
   const { owner, repo, token } = options;
-  const octokit = new Octokit({ auth: token });
+  const octokit = createGithubOctokit(token, 'ci');
 
   return {
     async listPipelines(query: PipelineQuery): Promise<readonly Pipeline[]> {
