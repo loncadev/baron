@@ -290,6 +290,30 @@ export function createAzureDevOpsTransport(options: AzureDevOpsTransportOptions)
       );
     },
 
+    /**
+     * The symmetric write. Optional on the transport contract for providers whose roles do not ride
+     * labels — which Azure's do not — but Azure tags are perfectly removable, and leaving it out
+     * made the orthogonal blocked flag a one-way door here: `block` wrote the tag and `unblock`
+     * refused, so the only way out was the Azure UI.
+     */
+    async removeLabel(id: string, label: string): Promise<void> {
+      const witApi = await api();
+      const current = await fetch(witApi, Number(id));
+      const tags = parseTags(current.fields?.[FIELD.TAGS]);
+      if (!tags.includes(label)) return;
+      await witApi.updateWorkItem(
+        null,
+        [
+          {
+            op: Operation.Add,
+            path: fieldPath(FIELD.TAGS),
+            value: tags.filter((tag) => tag !== label).join('; '),
+          },
+        ],
+        Number(id),
+      );
+    },
+
     async addComment(id: string, body: string): Promise<NativeComment> {
       const witApi = await api();
       const comment = await witApi.addComment({ text: body }, project, Number(id));

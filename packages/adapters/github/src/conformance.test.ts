@@ -24,7 +24,7 @@ import {
 
 runIssuesConformance({
   label: 'github',
-  build(gapPolicy, typeMap = exampleGithubTypeMap) {
+  build(gapPolicy, typeMap = exampleGithubTypeMap, fidelity = {}) {
     const logger = new RecordingLogger();
     const transport = createMemoryTransport({
       stateKey: exampleGithubRoleMap.stateKey,
@@ -36,6 +36,7 @@ runIssuesConformance({
       // `listForRepo` cannot filter by type. Filtering here would let the suite prove a server-side
       // filter this adapter does not have, and the port's emulation would never be exercised.
       filtersByType: false,
+      ...fidelity,
     });
     const adapter = defineGithubIssuesAdapter(
       { roleMap: exampleGithubRoleMap, typeMap, gapPolicy },
