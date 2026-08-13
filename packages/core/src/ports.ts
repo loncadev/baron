@@ -447,6 +447,31 @@ export class BaseIssuesAdapter implements IssuesPort {
         'TYPE_MAPPING',
       );
     }
+    // A provider whose query cannot filter by type will IGNORE the one we hand it and return
+    // everything, which reads as a successful filter and is the worst of both outcomes. Negotiate it
+    // like any other missing capability rather than letting it pass silently (invariant #5).
+    let postFilterTypeRole: WorkItemTypeRole | undefined;
+    if (filter.typeRole !== undefined && !this.manifest.issues.typeFiltering) {
+      const { behavior } = resolveGap(
+        'typeFiltering',
+        this.manifest,
+        this.cfg.gapPolicy,
+        this.logger,
+      );
+      if (behavior.kind === 'emulate') {
+        if (behavior.strategy !== 'post-filter') {
+          throw new BaronError(
+            `Unknown emulation strategy '${behavior.strategy}' for 'typeFiltering' on provider ` +
+              `'${this.cfg.provider}'. Only 'post-filter' is implemented.`,
+            'GAP_STRATEGY',
+          );
+        }
+        postFilterTypeRole = filter.typeRole;
+      }
+      // `degrade` falls through with no post-filter: the warning is already logged, and the caller
+      // gets an honestly-unfiltered result rather than a silently-unfiltered one.
+    }
+
     // Resolve the '@current' iteration sentinel to a concrete path. When nothing is current, a
     // "@current" filter can match nothing — return early rather than querying without the filter.
     let iterationPath = filter.iteration;
@@ -459,10 +484,18 @@ export class BaseIssuesAdapter implements IssuesPort {
       ...(nativeType !== undefined ? { nativeType } : {}),
       ...(filter.assignee !== undefined ? { assignee: filter.assignee } : {}),
       ...(iterationPath !== undefined ? { iterationPath } : {}),
-      ...(filter.limit !== undefined ? { limit: filter.limit } : {}),
+      // When the type filter is emulated, `limit` cannot be a transport hint: the transport would
+      // return that many items of every type and the filter would then cut it below what was asked
+      // for. It becomes a budget applied after filtering instead.
+      ...(filter.limit !== undefined && postFilterTypeRole === undefined
+        ? { limit: filter.limit }
+        : {}),
     };
     const natives = await this.transport.queryIssues(query);
-    return natives.map((native) => this.toIssue(native));
+    const issues = natives.map((native) => this.toIssue(native));
+    if (postFilterTypeRole === undefined) return issues;
+    const matching = issues.filter((issue) => issue.typeRole === postFilterTypeRole);
+    return filter.limit === undefined ? matching : matching.slice(0, filter.limit);
   }
 
   private toIssue(native: NativeIssue): Issue {

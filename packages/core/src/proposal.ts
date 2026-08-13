@@ -245,6 +245,9 @@ export function proposeGapPolicy(manifest: CapabilityManifest): {
   if (!caps.arbitraryStates) gapPolicy.arbitraryStates = 'emulate:labels';
   if (!caps.issueLinks) gapPolicy.issueLinks = 'emulate:labels';
   if (!caps.sprints) gapPolicy.sprints = 'degrade';
+  // Post-filtering is the only honest emulation: the alternative is returning items of every type
+  // to a caller that asked for one, which is what this capability exists to stop.
+  if (!caps.typeFiltering) gapPolicy.typeFiltering = 'emulate:post-filter';
   if (!caps.subIssues) gapPolicy.subIssues = 'degrade';
   if (!caps.comments) gapPolicy.comments = 'degrade';
 

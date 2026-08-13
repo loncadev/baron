@@ -49,6 +49,13 @@ export interface MemoryTransportOptions {
    * exactly how a dropped type-role label reached a real repository.
    */
   readonly untypedNativeType?: string | undefined;
+  /**
+   * Set false for a provider whose query cannot filter by work-item type (GitHub's `listForRepo`
+   * takes labels, state and assignee and nothing else). It then IGNORES the type in a query, exactly
+   * as the real one does — which is what makes the suite able to see an unfiltered result being
+   * handed back as if it were filtered.
+   */
+  readonly filtersByType?: boolean | undefined;
 }
 
 /**
@@ -183,7 +190,13 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
       const results: NativeIssue[] = [];
       for (const rec of store.values()) {
         if (discriminator !== undefined && rec.discriminator !== discriminator) continue;
-        if (query.nativeType !== undefined && rec.nativeType !== query.nativeType) continue;
+        if (
+          opts.filtersByType !== false &&
+          query.nativeType !== undefined &&
+          rec.nativeType !== query.nativeType
+        ) {
+          continue;
+        }
         // '@me' resolves to a fixed fake identity so the suite can exercise the sentinel path.
         const wanted = query.assignee === '@me' ? MEMORY_ME : query.assignee;
         if (wanted !== undefined && rec.assignee !== wanted) continue;

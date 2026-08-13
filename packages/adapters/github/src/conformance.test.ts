@@ -33,6 +33,9 @@ runIssuesConformance({
       // the map asked for. Echoing the requested type here would prove a fidelity this adapter
       // does not have — and did, right up until a bug started branching feature/.
       untypedNativeType: 'issue',
+      // `listForRepo` cannot filter by type. Filtering here would let the suite prove a server-side
+      // filter this adapter does not have, and the port's emulation would never be exercised.
+      filtersByType: false,
     });
     const adapter = defineGithubIssuesAdapter(
       { roleMap: exampleGithubRoleMap, typeMap, gapPolicy },

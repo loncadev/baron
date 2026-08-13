@@ -32,13 +32,20 @@ knowledge, not user-confirmed roles. `notify` (Slack) uses `SLACK_BOT_TOKEN` + `
 | `separateBoardColumn` | ✅ | ❌ | n/a |
 | `sprints` | ✅ | ❌ | `degrade` |
 | `nativeLabels` | ✅ | ✅ | — |
+| `nativeTypes` (a type is stored at create and read back) | ✅ | ❌ | the role rides a `type:<role>` label |
+| `typeFiltering` (the provider's query filters by type) | ✅ | ❌ | `emulate:post-filter` |
 | `comments` | ✅ | ✅ | — |
 | `issueLinks` (typed links) | ✅ | ❌ | `emulate:labels` (`<type>:<id>`) |
 
 GitHub's flatness is the point: the same `issue.create` / `transition` produce correct-but-different
 behavior, and every gap is negotiated explicitly — never silent. The recommended GitHub gap policy
-(`baron init` proposes it) emulates hierarchy / arbitrary states / links via labels and degrades
-sprints.
+(`baron init` proposes it) emulates hierarchy / arbitrary states / links via labels, post-filters
+type queries, and degrades sprints.
+
+Two of those gaps exist because GitHub has no work-item type Baron can write: `POST /issues` accepts
+none, so an item created through Baron reads back untyped whatever the type map says. The type role
+survives on a `type:<role>` label, and a query filtered by type role is filtered by Baron rather than
+by GitHub. Without a `typeFiltering` policy that query is **refused**, not answered with everything.
 
 ### Known provider quirks
 

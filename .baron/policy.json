@@ -36,7 +36,8 @@
       "hierarchy": "emulate:labels",
       "arbitraryStates": "emulate:labels",
       "issueLinks": "emulate:labels",
-      "sprints": "degrade"
+      "sprints": "degrade",
+      "typeFiltering": "emulate:post-filter"
     }
   }
 }

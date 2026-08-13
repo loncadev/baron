@@ -31,6 +31,8 @@ export const githubManifest: CapabilityManifest = {
     // `POST /repos/{owner}/{repo}/issues` accepts no type: an org's Issue Types can only be set
     // after the fact, so anything Baron creates reads back untyped and the role rides a label.
     nativeTypes: false,
+    // `listForRepo` takes labels, state and assignee — a type filter handed to it is ignored.
+    typeFiltering: false,
     comments: true,
     issueLinks: false,
     assignment: true,
@@ -74,6 +76,9 @@ export const recommendedGithubGapPolicy: GapPolicy = {
   arbitraryStates: { kind: 'emulate', strategy: 'labels' },
   sprints: { kind: 'degrade' },
   issueLinks: { kind: 'emulate', strategy: 'labels' },
+  // GitHub's issue list cannot filter by type, so Baron filters the results itself. Degrading
+  // instead would hand back items of every type to a caller that asked for one kind.
+  typeFiltering: { kind: 'emulate', strategy: 'post-filter' },
 };
 
 export type GithubIssuesConfig = Omit<IssuesProviderConfig, 'provider'>;
