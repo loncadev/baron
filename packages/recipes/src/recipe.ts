@@ -11,6 +11,8 @@ export const RECIPE_OPS = {
   issueUpdate: 'issue.update',
   issueTransition: 'issue.transition',
   issueReconcile: 'issue.reconcile',
+  issueBlock: 'issue.block',
+  issueUnblock: 'issue.unblock',
   issueComment: 'issue.comment',
   issueLink: 'issue.link',
   issueAssign: 'issue.assign',

@@ -589,3 +589,91 @@ steps:
     );
   });
 });
+
+// Blocking is orthogonal, so it is its own op rather than a role a transition could take. Without
+// these a recipe could not set or clear the flag at all — and could not guard on it, so nothing
+// could express "refuse to land a blocked item", which is the first rule anyone would want.
+describe('issue.block / issue.unblock as recipe ops', () => {
+  const blockThenRead = `
+name: block-it
+steps:
+  - do: issue.create
+    as: issue
+    with: { title: "stuck", typeRole: task }
+  - do: issue.transition
+    as: issue
+    with: { id: "\${issue.id}", role: in_review }
+  - do: issue.block
+    as: blocked
+    with: { id: "\${issue.id}", reason: "waiting on the vendor" }
+  - message: "\${blocked.key} blocked=\${blocked.blocked} role=\${blocked.role}"
+`;
+
+  it('blocks without moving the item, and the role survives in the run context', async () => {
+    const asker = scriptedAsker();
+    const { context } = await runRecipe(loadRecipe(blockThenRead), { ports: allPorts(), asker });
+    const blocked = context.blocked as { blocked: boolean; role?: string };
+    expect(blocked.blocked).toBe(true);
+    expect(blocked.role).toBe('in_review');
+    expect(
+      asker.notes.some((n) => n.includes('blocked=true') && n.includes('role=in_review')),
+    ).toBe(true);
+  });
+
+  it('a guard can refuse on the flag — the reason recipes exist', async () => {
+    const recipe = loadRecipe(`
+name: refuse-blocked
+steps:
+  - do: issue.create
+    as: issue
+    with: { title: "stuck", typeRole: task }
+  - do: issue.block
+    as: issue
+    with: { id: "\${issue.id}", reason: "waiting" }
+  - require:
+      falsy: "\${issue.blocked}"
+      message: "\${issue.key} is blocked — unblock it before landing."
+  - do: issue.comment
+    with: { id: "\${issue.id}", body: "never reached" }
+`);
+    await expect(runRecipe(recipe, { ports: allPorts(), asker: scriptedAsker() })).rejects.toThrow(
+      /is blocked/,
+    );
+  });
+
+  it('unblock clears the flag and leaves the role where it was', async () => {
+    const recipe = loadRecipe(`
+name: unblock-it
+steps:
+  - do: issue.create
+    as: issue
+    with: { title: "stuck", typeRole: task }
+  - do: issue.transition
+    with: { id: "\${issue.id}", role: in_review }
+  - do: issue.block
+    with: { id: "\${issue.id}", reason: "waiting" }
+  - do: issue.unblock
+    as: cleared
+    with: { id: "\${issue.id}", reason: "vendor replied" }
+`);
+    const { context } = await runRecipe(recipe, { ports: allPorts(), asker: scriptedAsker() });
+    const cleared = context.cleared as { blocked: boolean; role?: string };
+    expect(cleared.blocked).toBe(false);
+    expect(cleared.role).toBe('in_review');
+  });
+
+  it('refuses a block with no reason, from the engine rather than the agent', async () => {
+    const recipe = loadRecipe(`
+name: no-reason
+steps:
+  - do: issue.create
+    as: issue
+    with: { title: "stuck", typeRole: task }
+  - do: issue.block
+    with: { id: "\${issue.id}", reason: "" }
+`);
+    await expect(runRecipe(recipe, { ports: allPorts(), asker: scriptedAsker() })).rejects.toThrow(
+      /reason/i,
+    );
+  });
+});
