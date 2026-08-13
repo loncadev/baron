@@ -36,6 +36,7 @@ const githubManifest: CapabilityManifest = {
     arbitraryStates: false,
     nativeLabels: true,
     nativeTypes: false,
+    typeFiltering: false,
     comments: true,
     issueLinks: false,
     assignment: true,

@@ -41,6 +41,15 @@ export interface IssuesConformanceTarget {
 const emulateStates: GapPolicy = { arbitraryStates: { kind: 'emulate', strategy: 'labels' } };
 
 /**
+ * A provider that filters by type server-side ignores this; one that cannot needs it, and every gap
+ * policy is per-install anyway — the suite states the behavior it is asserting rather than relying
+ * on the adapter's recommended default.
+ */
+const emulateTypeFiltering: GapPolicy = {
+  typeFiltering: { kind: 'emulate', strategy: 'post-filter' },
+};
+
+/**
  * The contract every `issues` adapter must satisfy. It asserts provider-agnostic behavior while
  * branching on the adapter's own manifest, so the same suite proves correct-but-different handling
  * for a rich provider (Azure) and a flat one (GitHub).
@@ -77,6 +86,46 @@ export function runIssuesConformance(target: IssuesConformanceTarget): void {
         expect(created.typeRole).toBe(typeRole);
         expect((await adapter.get(created.id)).typeRole).toBe(typeRole);
       }
+    });
+
+    // With no policy for it, a provider that cannot filter by type must REFUSE rather than hand back
+    // an unfiltered result. Strict-by-default is what turns this from a wrong answer into a question.
+    it('refuses a type-role query it cannot honor when no gap policy allows it', async () => {
+      const { adapter } = target.build({});
+      if (adapter.manifest.issues.typeFiltering) return;
+      await adapter.create({ title: 'a task', typeRole: 'task' });
+      await expect(adapter.query({ typeRole: 'task' })).rejects.toBeInstanceOf(CapabilityGapError);
+    });
+
+    // A provider that cannot filter by type server-side IGNORES the filter and returns everything,
+    // which reads as a successful filter — the worst of both outcomes, and a silent gap by any
+    // reading of invariant #5. Whether the filter happens in the provider or in the port, what comes
+    // back must be what was asked for.
+    it('a query filtered by type role returns only that type role', async () => {
+      const { adapter } = target.build(emulateTypeFiltering, target.distinctTypeMap);
+      await adapter.create({ title: 'a bug', typeRole: 'bug' });
+      await adapter.create({ title: 'a task', typeRole: 'task' });
+      await adapter.create({ title: 'another task', typeRole: 'task' });
+
+      const bugs = await adapter.query({ typeRole: 'bug' });
+      expect(bugs.length).toBe(1);
+      expect(bugs.every((i) => i.typeRole === 'bug')).toBe(true);
+
+      const tasks = await adapter.query({ typeRole: 'task' });
+      expect(tasks.length).toBe(2);
+      expect(tasks.every((i) => i.typeRole === 'task')).toBe(true);
+    });
+
+    // `limit` has to survive the emulation. Handing it to a transport that cannot filter would make
+    // it a budget over the WRONG set: N items of every type, then cut down to fewer than N.
+    it('honors limit alongside a type-role filter', async () => {
+      const { adapter } = target.build(emulateTypeFiltering, target.distinctTypeMap);
+      await adapter.create({ title: 'noise', typeRole: 'bug' });
+      for (let i = 0; i < 3; i += 1) await adapter.create({ title: `task ${i}`, typeRole: 'task' });
+
+      const some = await adapter.query({ typeRole: 'task', limit: 2 });
+      expect(some.length).toBe(2);
+      expect(some.every((i) => i.typeRole === 'task')).toBe(true);
     });
 
     // The same contract under a type map that does NOT collapse. It has to be stated separately,
@@ -362,7 +411,7 @@ export function runIssuesConformance(target: IssuesConformanceTarget): void {
     });
 
     it('query filters by role and by type role', async () => {
-      const { adapter } = target.build(emulateStates);
+      const { adapter } = target.build({ ...emulateStates, ...emulateTypeFiltering });
       const issue = await adapter.create({ title: 'q', typeRole: 'task' });
       await adapter.transition(issue.id, target.mappedMidRole);
 

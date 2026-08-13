@@ -27,6 +27,8 @@ export const azureDevOpsManifest: CapabilityManifest = {
     nativeLabels: true,
     // A work item's type is chosen at create time and reported back verbatim.
     nativeTypes: true,
+    // WIQL carries a `[System.WorkItemType] = …` clause, so the provider filters it server-side.
+    typeFiltering: true,
     comments: true,
     issueLinks: true,
     assignment: true,

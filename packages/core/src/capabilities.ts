@@ -28,6 +28,13 @@ export interface IssuesCapabilities {
    * moment the type map stopped collapsing.
    */
   nativeTypes: boolean;
+  /**
+   * The provider's own query can filter by work-item type. Azure: yes (a WIQL
+   * `[System.WorkItemType] = …` clause). GitHub: no — `listForRepo` takes labels, state and
+   * assignee, and nothing else, so a type filter handed to it is simply ignored and the caller gets
+   * every item back believing it asked for one kind.
+   */
+  typeFiltering: boolean;
   /** Comments/discussion on a work item. */
   comments: boolean;
   /**
