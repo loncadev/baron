@@ -282,6 +282,15 @@ async function dispatchOp(ports: RecipePorts, op: RecipeOp, params: Params): Pro
     }
     case RECIPE_OPS.issueTransition:
       return issues(ports, op).transition(reqStr(params, 'id', op), reqRole(params, 'role', op));
+    // Blocking is orthogonal, so it is its own op rather than a role a transition could take.
+    case RECIPE_OPS.issueBlock:
+      return issues(ports, op).block(reqStr(params, 'id', op), reqStr(params, 'reason', op));
+    case RECIPE_OPS.issueUnblock: {
+      const reason = optStr(params, 'reason', op);
+      const port = issues(ports, op);
+      const id = reqStr(params, 'id', op);
+      return reason === undefined ? port.unblock(id) : port.unblock(id, reason);
+    }
     case RECIPE_OPS.issueComment:
       return issues(ports, op).comment(reqStr(params, 'id', op), reqStr(params, 'body', op));
     case RECIPE_OPS.issueAssign:
