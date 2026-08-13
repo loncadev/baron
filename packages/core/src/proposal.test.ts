@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CapabilityManifest } from './capabilities.js';
 import type { ProviderIntrospection } from './introspection.js';
 import { proposeGapPolicy, proposePolicy, proposeRoleMap, proposeTypeMap } from './proposal.js';
+import { WORK_ITEM_TYPE_ROLES } from './roles.js';
 
 const richManifest: CapabilityManifest = {
   provider: 'azure-devops',
@@ -146,6 +147,57 @@ describe('proposeTypeMap', () => {
     expect(typeMap.epic).toBe('issue');
     expect(typeMap.task).toBe('issue');
     expect(notes.some((n) => n.includes('lossy'))).toBe(true);
+  });
+
+  // A hole is not "that role is unavailable" — it is `issue.create` refusing a role the steering
+  // block still advertises, discovered at the first run rather than at setup.
+  it('leaves no type role unmapped, borrowing from the nearest neighbour', () => {
+    const { typeMap, notes } = proposeTypeMap(richIntrospection);
+    for (const role of WORK_ITEM_TYPE_ROLES) {
+      expect(typeMap[role], `type role '${role}' is unmapped`).toBeDefined();
+    }
+    // No 'Initiative' or 'Sub-task' type exists on this provider, so each borrows from the nearest
+    // role that matched: initiative -> epic, subtask -> task.
+    expect(typeMap.initiative).toBe('Epic');
+    expect(typeMap.subtask).toBe('Task');
+    expect(notes.some((n) => n.includes("'initiative'"))).toBe(true);
+  });
+
+  // The regression that made task-start refuse every issue in Baron's own repository: an org had
+  // Task/Bug/Feature defined and assigned to none of its issues, so all of them reported the plain
+  // 'issue' type — which keyword matching mapped from nothing.
+  it("maps the provider's default type when richer types exist but nothing matched it", () => {
+    const { typeMap } = proposeTypeMap({
+      provider: 'github',
+      stateKey: 'label',
+      workItemTypes: [
+        { name: 'issue', isDefault: true },
+        { name: 'Task' },
+        { name: 'Bug' },
+        { name: 'Feature' },
+      ],
+      states: [
+        { name: 'open', category: 'proposed' },
+        { name: 'closed', category: 'completed' },
+      ],
+    });
+    expect(Object.values(typeMap)).toContain('issue');
+    expect(typeMap.task).toBe('Task');
+    expect(typeMap.bug).toBe('Bug');
+    expect(typeMap.epic).toBe('Feature');
+    for (const role of WORK_ITEM_TYPE_ROLES) {
+      expect(typeMap[role], `type role '${role}' is unmapped`).toBeDefined();
+    }
+  });
+
+  it('notes a native type that no type role maps back from', () => {
+    const { notes } = proposeTypeMap({
+      provider: 'acme',
+      stateKey: 'state',
+      workItemTypes: [{ name: 'Task' }, { name: 'Bug' }, { name: 'Spike' }],
+      states: [{ name: 'New', category: 'proposed' }],
+    });
+    expect(notes.some((n) => n.includes("'Spike'") && n.includes('canonical branch'))).toBe(true);
   });
 });
 

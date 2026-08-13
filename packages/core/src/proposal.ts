@@ -2,7 +2,12 @@ import type { CapabilityManifest } from './capabilities.js';
 import type { NativeTarget, TypeMap } from './config.js';
 import type { IntrospectedState, ProviderIntrospection, StateCategory } from './introspection.js';
 import type { PolicyRoleMapEntry } from './policy-file.js';
-import type { WorkItemTypeRole, WorkflowRole } from './roles.js';
+import {
+  TYPE_ROLE_COLLAPSE_ORDER,
+  WORK_ITEM_TYPE_ROLES,
+  type WorkItemTypeRole,
+  type WorkflowRole,
+} from './roles.js';
 
 /**
  * A draft policy for one provider, produced from introspection for a human to confirm. Every fuzzy
@@ -138,8 +143,20 @@ export function proposeRoleMap(
 }
 
 /**
- * Propose a type map from introspection. A provider with a single native type (GitHub) collapses
- * every type role onto it (lossy — noted); a provider with many types matches each role by keyword.
+ * Propose a type map from introspection. A provider with a single native type (GitHub without Issue
+ * Types) collapses every type role onto it; a provider with many types matches each role by keyword
+ * and then FILLS the gaps, because a hole in this map is not a harmless omission.
+ *
+ * Two failures come from an incomplete map, and this repository produced both. A role nothing maps
+ * to makes `issue.create` refuse it while `AGENTS.md` advertises it. Worse, a native type nothing
+ * maps FROM leaves every item reporting it with no type role and therefore no canonical branch —
+ * which is why `task-start` once refused every issue here: the org had Task/Bug/Feature defined,
+ * keyword matching claimed those three, and the plain 'issue' that all twelve issues actually
+ * reported was mapped by nobody.
+ *
+ * So unmatched roles land on the provider's default type when it declares one, and otherwise borrow
+ * from their nearest neighbour ({@link TYPE_ROLE_COLLAPSE_ORDER}). Both are lossy, both are noted,
+ * and a role that still cannot be placed is reported rather than quietly dropped.
  */
 export function proposeTypeMap(introspection: ProviderIntrospection): {
   typeMap: TypeMap;
@@ -152,7 +169,7 @@ export function proposeTypeMap(introspection: ProviderIntrospection): {
   if (types.length === 1) {
     const only = types[0]?.name;
     if (only !== undefined) {
-      for (const role of Object.keys(TYPE_KEYWORDS) as WorkItemTypeRole[]) {
+      for (const role of WORK_ITEM_TYPE_ROLES) {
         typeMap[role] = only;
       }
       notes.push(
@@ -163,14 +180,51 @@ export function proposeTypeMap(introspection: ProviderIntrospection): {
     return { typeMap: typeMap as TypeMap, notes };
   }
 
-  for (const [role, probe] of Object.entries(TYPE_KEYWORDS) as [WorkItemTypeRole, RegExp][]) {
-    const match = types.find((t) => probe.test(t.name));
-    if (match !== undefined) {
-      typeMap[role] = match.name;
+  const unmatched: WorkItemTypeRole[] = [];
+  for (const role of WORK_ITEM_TYPE_ROLES) {
+    const match = types.find((t) => TYPE_KEYWORDS[role].test(t.name));
+    if (match !== undefined) typeMap[role] = match.name;
+    else unmatched.push(role);
+  }
+
+  const defaultType = types.find((t) => t.isDefault === true)?.name;
+  for (const role of unmatched) {
+    if (defaultType !== undefined) {
+      typeMap[role] = defaultType;
+      notes.push(
+        `No native type matched type role '${role}'; mapped onto '${defaultType}', the type an ` +
+          'item reports when none is set. Reverse resolution for that type is lossy.',
+      );
+      continue;
+    }
+    const borrowed = TYPE_ROLE_COLLAPSE_ORDER[role]
+      .map((from) => typeMap[from])
+      .find((native): native is string => native !== undefined);
+    if (borrowed !== undefined) {
+      typeMap[role] = borrowed;
+      notes.push(
+        `No native type matched type role '${role}'; collapsed onto '${borrowed}'. Items of that ` +
+          'native type no longer resolve back to a single role.',
+      );
     } else {
-      notes.push(`No native type matched type role '${role}'; left unmapped.`);
+      notes.push(
+        `No native type matched type role '${role}', and no neighbouring role is mapped either — ` +
+          `it is left unmapped. \`issue.create\` with typeRole '${role}' will fail until you map it.`,
+      );
     }
   }
+
+  // A native type nothing maps FROM is the other half of coverage, and the one that costs items
+  // their branch. Report it; the human confirming the proposal is the only one who can judge
+  // whether that type is in use.
+  for (const type of types) {
+    if (Object.values(typeMap).includes(type.name)) continue;
+    notes.push(
+      `Native type '${type.name}' is mapped from no type role; items reporting it will have no ` +
+        'type role and therefore no canonical branch.',
+    );
+  }
+
   return { typeMap: typeMap as TypeMap, notes };
 }
 
