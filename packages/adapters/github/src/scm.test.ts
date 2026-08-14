@@ -243,3 +243,70 @@ describe('github PR issue link relation', () => {
     expect(bodyOf()).not.toContain('#');
   });
 });
+
+// The failure that produced this guard: a PR opened with relation `relates` whose description said
+// "Does not close #62" closed #62 one second after the merge. GitHub reads the keyword, not the
+// sentence — and Baron composed that body while holding the caller's `relates` instruction.
+describe('github PR body contradicting the relation', () => {
+  beforeEach(() => {
+    mocks.create.mockReset();
+    mocks.create.mockResolvedValue(CREATED_PR);
+  });
+
+  const open = (body: string, linkedIssueKey = '62') =>
+    transport().createPullRequest({
+      title: 't',
+      sourceBranch: 'feature/x',
+      targetBranch: 'main',
+      draft: false,
+      linkedIssueKey,
+      linkedIssueRelation: 'relates',
+      body,
+    });
+
+  it('refuses the exact sentence that caused this, negation and all', async () => {
+    await expect(open('Does not close #62: the migration is still to do.')).rejects.toMatchObject({
+      code: 'PR_LINK_CONTRADICTION',
+    });
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it('quotes the offending phrase and says both ways out', async () => {
+    await expect(open('This fixes #62 partially.')).rejects.toThrow(/fixes #62/i);
+    await expect(open('This fixes #62 partially.')).rejects.toThrow(/linkedIssueRelation/);
+  });
+
+  it('catches every keyword GitHub honours', async () => {
+    for (const phrase of [
+      'close #62',
+      'closes #62',
+      'closed #62',
+      'fix #62',
+      'fixed #62',
+      'resolve #62',
+      'resolves #62',
+    ]) {
+      await expect(open(`Note: ${phrase} eventually.`), phrase).rejects.toMatchObject({
+        code: 'PR_LINK_CONTRADICTION',
+      });
+    }
+  });
+
+  it('leaves a body describing OTHER work alone', async () => {
+    // "closes #12" while linking #62 is a description of other work, not a contradiction.
+    await open('Also closes #12 as a side effect.');
+    expect((mocks.create.mock.calls[0]?.[0] as { body: string }).body).toContain('Refs #62');
+  });
+
+  it('does not police a body when the caller asked to close', async () => {
+    await transport().createPullRequest({
+      title: 't',
+      sourceBranch: 'feature/x',
+      targetBranch: 'main',
+      draft: false,
+      linkedIssueKey: '62',
+      body: 'This closes #62.',
+    });
+    expect(mocks.create).toHaveBeenCalled();
+  });
+});

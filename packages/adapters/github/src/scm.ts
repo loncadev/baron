@@ -55,13 +55,46 @@ export const githubScmManifest: ScmManifest = {
  */
 const GITHUB_LINK_KEYWORD: Record<PrIssueRelation, string> = { closes: 'Closes', relates: 'Refs' };
 
+/**
+ * GitHub's closing keywords, as it documents them. It scans the WHOLE pull-request body for these,
+ * not just the line Baron appends — and it does not parse negation, so a sentence written to say an
+ * item will NOT be closed closes it.
+ */
+const CLOSING_KEYWORD = 'close[sd]?|fix(e[sd])?|resolve[sd]?';
+
+/**
+ * Refuse a body that contradicts the relation the caller asked for.
+ *
+ * This is not defensive politeness. `relates` was added so a spike, a partial change or the first of
+ * several PRs could reference an item without finishing it — and then a description reading "does
+ * not close #62" closed #62 anyway, one second after the merge, because GitHub reads the keyword and
+ * not the sentence. Baron composed that body and was told `relates`; it held both halves and checked
+ * neither against the other, which is the same silence invariant #5 forbids.
+ *
+ * Scoped to the SAME key on purpose: a body that legitimately says "closes #12" while linking #62 is
+ * describing other work, not contradicting itself.
+ */
+function refuseContradictoryBody(body: string, issueNumber: string): void {
+  const contradiction = new RegExp(`\\b(${CLOSING_KEYWORD})\\s+#${issueNumber}\\b`, 'i').exec(body);
+  if (contradiction === null) return;
+  throw new BaronError(
+    `This pull request asks to RELATE to #${issueNumber}, but its description says ` +
+      `"${contradiction[0]}" — GitHub reads that keyword anywhere in the body and will close the ` +
+      'item on merge, negation included. Reword that phrase (for example "does not finish #' +
+      `${issueNumber}"), or pass linkedIssueRelation 'closes' if closing is what you meant.`,
+    'PR_LINK_CONTRADICTION',
+  );
+}
+
 function withIssueLink(
   body: string | undefined,
   issueKey: string | undefined,
   relation: PrIssueRelation = 'closes',
 ): string | undefined {
   if (issueKey === undefined || issueKey.length === 0) return body;
-  const link = `${GITHUB_LINK_KEYWORD[relation]} #${issueKey.replace(/^#/, '')}`;
+  const issueNumber = issueKey.replace(/^#/, '');
+  if (relation === 'relates' && body !== undefined) refuseContradictoryBody(body, issueNumber);
+  const link = `${GITHUB_LINK_KEYWORD[relation]} #${issueNumber}`;
   return body === undefined || body.length === 0 ? link : `${body}\n\n${link}`;
 }
 
