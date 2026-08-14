@@ -92,8 +92,11 @@ for one-off actions, and never hand-compose the primitives to emulate a recipe.
 - `baron_recipe_list` — discover the runnable recipes and the `inputs` each declares.
 - `baron_recipe_run` `{ name, inputs }` — run one end-to-end. Required inputs are validated up front
   (`RECIPE_INPUT_MISSING`); it never prompts. Built-ins: `task-new` (CREATE an item),
-  `task-start` (start an EXISTING item — branch + in_progress), `task-finish` (draft PR; the role
-  deliberately does NOT move — the merge outcome is the provider's: one that closes the linked item lands it in done, otherwise task-move/task-sync settles it), `ship`. Project recipes live in
+  `task-start` (start an EXISTING item — branch + in_progress), `task-move` (change an item's role,
+  with a reason required for a regression or a reopen; also block/unblock), `task-finish` (draft PR;
+  the role deliberately does NOT move — the merge outcome is the provider's: one that closes the
+  linked item lands it in done, otherwise task-move/task-sync settles it), `task-land` (undraft +
+  merge, refusing a red or unfinished checks rollup), `ship`. Project recipes live in
   `.baron/recipes/*.yaml`.
 
 Dedicated skills wrap the built-ins — `/baron:task-new`, `/baron:task-start`, `/baron:task-finish`,
