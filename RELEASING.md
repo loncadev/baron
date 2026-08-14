@@ -44,6 +44,14 @@ until step 2 is done.
       current one expires ~2026-09-30, regenerate then). Pitfall: `npm login` writes its own 2-hour
       *session token* into `~/.npmrc`, silently shadowing yours — if publish fails with `EOTP`, check
       that the `_authToken` line in `~/.npmrc` is the bypass token, not the session token.
+
+      > **This token type is being withdrawn — see [#62](https://github.com/loncadev/baron/issues/62).**
+      > Since **early August 2026** a bypass-2FA token can no longer perform account or package
+      > *management*, which includes **minting its own replacement**: when the current one expires
+      > around 2026-09-30, create the new one interactively with 2FA on the npm site, not from the
+      > expiring token. Around **January 2027** these tokens lose direct publish entirely — the
+      > release process moves to trusted publishing (OIDC from CI) or staged publishing with a human
+      > approval. Publishing still works today; v0.32.0 shipped this way.
 - [x] **`@lonca/baron-conformance` is `private: true` for now** (marked in v0.1.0) — it's only ever a
       *devDependency* of the adapters/cli/mcp-server, so no published package needs it at runtime. To
       publish it later (so third parties can conformance-test their own adapters), split its entry
