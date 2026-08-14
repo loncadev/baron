@@ -310,6 +310,7 @@ describe('TOOL_DEFINITIONS', () => {
       MCP_TOOL_NAMES.update,
       MCP_TOOL_NAMES.transition,
       MCP_TOOL_NAMES.reconcile,
+      MCP_TOOL_NAMES.classify,
       MCP_TOOL_NAMES.block,
       MCP_TOOL_NAMES.unblock,
       MCP_TOOL_NAMES.comment,

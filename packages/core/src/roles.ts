@@ -15,6 +15,31 @@
 export const WORKFLOW_ROLES = ['backlog', 'ready', 'in_progress', 'in_review', 'done'] as const;
 
 /**
+ * What a move from one workflow role to another IS, against the ordered lifecycle above.
+ *
+ * The order is core vocabulary — `WORKFLOW_ROLES` is a sequence, not a set — so naming a move is a
+ * fact about the lifecycle rather than an opinion about it. What to DO about a `regress` (the
+ * reference asks for a recorded reason) is workflow opinion and stays in a recipe, which is the line
+ * invariant #3 draws.
+ */
+export const ROLE_MOVES = ['advance', 'regress', 'reopen', 'noop', 'unknown'] as const;
+
+export type RoleMove = (typeof ROLE_MOVES)[number];
+
+/**
+ * Classify a move. `unknown` when the item's current role cannot be read at all — an unmapped state
+ * or a cold read — because guessing there would let a guard fire on nothing, or fail to.
+ */
+export function classifyRoleMove(from: WorkflowRole | undefined, to: WorkflowRole): RoleMove {
+  if (from === undefined) return 'unknown';
+  if (from === to) return 'noop';
+  // Leaving the terminal role is its own thing: it is not a step backwards along the line, it is
+  // reopening finished work, and the two deserve different words in a message a human reads.
+  if (from === WORKFLOW_ROLES[WORKFLOW_ROLES.length - 1]) return 'reopen';
+  return WORKFLOW_ROLES.indexOf(to) > WORKFLOW_ROLES.indexOf(from) ? 'advance' : 'regress';
+}
+
+/**
  * The label carrying the orthogonal blocked flag. A Baron-managed constant rather than policy, like
  * the `type:<role>` and `parent:<id>` emulation labels — it names a fact about the item, not a
  * mapping onto anything the provider already has.

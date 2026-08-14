@@ -213,6 +213,23 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
     },
   },
   {
+    name: MCP_TOOL_NAMES.classify,
+    mutatesProvider: false,
+    description:
+      'What moving this item to `role` WOULD be — advance / regress / reopen / noop, or unknown when ' +
+      "the item's current role cannot be read — without moving it. A fact about the lifecycle order, " +
+      'not a judgement about the move.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['id', 'role'],
+      properties: {
+        id: { type: 'string', minLength: 1 },
+        role: { type: 'string', enum: ROLE_ENUM },
+      },
+    },
+  },
+  {
     name: MCP_TOOL_NAMES.block,
     mutatesProvider: true,
     description:
@@ -997,6 +1014,8 @@ export function callTool(
       return run(() => port.transition(requireString(args, 'id'), requireRole(args)));
     case MCP_TOOL_NAMES.reconcile:
       return run(() => port.reconcile(requireString(args, 'id')));
+    case MCP_TOOL_NAMES.classify:
+      return run(() => port.classifyMove(requireString(args, 'id'), requireRole(args)));
     case MCP_TOOL_NAMES.block:
       return run(() => port.block(requireString(args, 'id'), requireString(args, 'reason')));
     case MCP_TOOL_NAMES.unblock: {

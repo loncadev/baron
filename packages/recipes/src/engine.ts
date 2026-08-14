@@ -282,6 +282,10 @@ async function dispatchOp(ports: RecipePorts, op: RecipeOp, params: Params): Pro
     }
     case RECIPE_OPS.issueTransition:
       return issues(ports, op).transition(reqStr(params, 'id', op), reqRole(params, 'role', op));
+    // Read-only: what the move WOULD be. The lifecycle order is core vocabulary; what to do about a
+    // regress is the recipe's opinion, which is why this answers rather than decides.
+    case RECIPE_OPS.issueClassify:
+      return issues(ports, op).classifyMove(reqStr(params, 'id', op), reqRole(params, 'role', op));
     // Blocking is orthogonal, so it is its own op rather than a role a transition could take.
     case RECIPE_OPS.issueBlock:
       return issues(ports, op).block(reqStr(params, 'id', op), reqStr(params, 'reason', op));

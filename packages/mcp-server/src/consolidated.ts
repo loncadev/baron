@@ -49,6 +49,7 @@ export const OP_ROUTES: Record<string, Readonly<Record<string, string>>> = {
     get: MCP_TOOL_NAMES.get,
     query: MCP_TOOL_NAMES.query,
     iterations: MCP_TOOL_NAMES.iterations,
+    classify: MCP_TOOL_NAMES.classify,
   },
   [TOOL_NAMES.issueWrite]: {
     create: MCP_TOOL_NAMES.create,

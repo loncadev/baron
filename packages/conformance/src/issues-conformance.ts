@@ -123,6 +123,31 @@ export function runIssuesConformance(target: IssuesConformanceTarget): void {
       await expect(adapter.unblock(issue.id)).rejects.toMatchObject({ code: 'NOT_SUPPORTED' });
     });
 
+    // The lifecycle order is core vocabulary, so naming a move is a fact every adapter must report
+    // the same way — it is what lets a recipe hold the opinion ("a regress needs a reason") without
+    // the engine needing an ordering comparator it does not have.
+    it('classifies a move without performing it', async () => {
+      const { adapter } = target.build(emulateStates);
+      const issue = await adapter.create({ title: 'classify me', typeRole: 'task' });
+      await adapter.transition(issue.id, target.mappedMidRole);
+      const at = (await adapter.get(issue.id)).role;
+
+      expect((await adapter.classifyMove(issue.id, target.mappedMidRole)).kind).toBe('noop');
+      expect((await adapter.classifyMove(issue.id, target.mappedDoneRole)).kind).toBe('advance');
+      // and nothing moved
+      expect((await adapter.get(issue.id)).role).toBe(at);
+    });
+
+    it('calls leaving the terminal role a reopen, not a step backwards', async () => {
+      const { adapter } = target.build(emulateStates);
+      const issue = await adapter.create({ title: 'finished', typeRole: 'task' });
+      await adapter.transition(issue.id, target.mappedDoneRole);
+      const move = await adapter.classifyMove(issue.id, target.mappedMidRole);
+      expect(move.kind).toBe('reopen');
+      expect(move.from).toBe(target.mappedDoneRole);
+      expect(move.to).toBe(target.mappedMidRole);
+    });
+
     it('refuses to block without a reason', async () => {
       const { adapter } = target.build({});
       const issue = await adapter.create({ title: 'stuck', typeRole: 'task' });

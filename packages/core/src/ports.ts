@@ -11,10 +11,20 @@ import { resolveCapabilityGap, resolveGap } from './policy.js';
 import { RoleResolver } from './role-resolver.js';
 import {
   BLOCKED_LABEL,
+  type RoleMove,
   type WorkItemTypeRole,
   type WorkflowRole,
+  classifyRoleMove,
   isWorkItemTypeRole,
 } from './roles.js';
+
+/** What {@link IssuesPort.classifyMove} answers: the move's kind, and the roles it is between. */
+export interface RoleMoveResult {
+  readonly kind: RoleMove;
+  /** The item's current role; absent when it could not be read (then `kind` is `unknown`). */
+  readonly from?: WorkflowRole | undefined;
+  readonly to: WorkflowRole;
+}
 
 /**
  * Prefix of the label that carries a work-item TYPE ROLE on providers whose native types are flat
@@ -156,6 +166,15 @@ export interface IssuesPort {
   /** The caller's own handle (what `@me` resolves to) — lets a recipe ask "is this item mine?". */
   whoAmI(): Promise<string>;
   transition(id: string, role: WorkflowRole): Promise<Issue>;
+  /**
+   * What moving this item to `role` would BE — advance, regress, reopen, noop — without moving it.
+   *
+   * Read-only, and deliberately a fact rather than a judgement: the lifecycle order is core
+   * vocabulary, while "a regress needs a recorded reason" is workflow opinion that belongs in a
+   * recipe. Without this a recipe could not tell the two apart at all: the condition grammar has
+   * truthy/falsy/equals/notEquals and no way to compare positions in an order.
+   */
+  classifyMove(id: string, role: WorkflowRole): Promise<RoleMoveResult>;
   /**
    * Set the orthogonal blocked flag with a reason, leaving the workflow role alone. Separate from
    * `transition` on purpose: "can it move?" and "where is it?" are different questions, and folding
@@ -319,6 +338,15 @@ export class BaseIssuesAdapter implements IssuesPort {
       this.cfg.gapPolicy,
       this.logger,
     );
+  }
+
+  async classifyMove(id: string, role: WorkflowRole): Promise<RoleMoveResult> {
+    const issue = await this.get(id);
+    return {
+      kind: classifyRoleMove(issue.role, role),
+      to: role,
+      ...(issue.role !== undefined ? { from: issue.role } : {}),
+    };
   }
 
   async transition(id: string, role: WorkflowRole): Promise<Issue> {
