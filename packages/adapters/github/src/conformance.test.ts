@@ -10,9 +10,11 @@ import {
   runIntrospectionConformance,
   runIssuesConformance,
   runScmConformance,
+  runTransportFidelityConformance,
 } from '@lonca/baron-conformance';
 import { RecordingLogger } from '@lonca/baron-core';
 import {
+  createGithubTransport,
   defineGithubCiAdapter,
   defineGithubDeployAdapter,
   defineGithubIssuesAdapter,
@@ -106,4 +108,10 @@ runDeployConformance({
     const adapter = defineGithubDeployAdapter(transport, gapPolicy, logger);
     return { adapter, logger };
   },
+});
+
+runTransportFidelityConformance({
+  label: 'github',
+  manifest: githubManifest,
+  build: () => createGithubTransport({ owner: 'o', repo: 'r', token: 't' }),
 });
