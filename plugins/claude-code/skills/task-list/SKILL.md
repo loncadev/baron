@@ -18,7 +18,9 @@ A thin, read-only wrapper over `baron_issue_read op=query` that maps everyday wo
   handle.
 - **Role:** `in_progress` / "active" / "devam eden" → `role: "in_progress"`; `in_review` / "test" /
   "review" → `role: "in_review"`; `backlog` / "new" → `role: "backlog"`; `ready` → `role: "ready"`;
-  `done` / "closed" → `role: "done"`; `blocked` → `role: "blocked"`.
+  `done` / "closed" → `role: "done"`. **"blocked" is not a role and not a query filter** — every
+  returned item carries a `blocked` boolean, so answer "what is blocked?" by filtering the results,
+  never by sending `blocked` as a role — the core rejects it.
 - **Type:** `bugs` → `typeRole: "bug"`; `tasks` → `task`; `stories` → `story`; `epics` → `epic`.
 - **Sprint:** `sprint` / "this sprint" / "aktif sprint" → `iteration: "@current"` (the active sprint);
   a literal iteration path → that iteration. On providers without sprints this yields nothing.

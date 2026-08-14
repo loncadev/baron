@@ -15,7 +15,9 @@ providers are whatever `.baron/policy.json` binds (run `baron init` first if it 
 
 ## Vocabulary (never use provider-native states)
 
-- Workflow roles: `backlog → ready → in_progress → in_review → done`, plus `blocked`.
+- Workflow roles: `backlog → ready → in_progress → in_review → done`. **`blocked` is not among
+  them** — it is an orthogonal flag (`baron_issue_move { op: "block" | "unblock" }`), so a blocked
+  item keeps the role its work is actually in, and unblocking returns it there.
 - Type roles: `initiative`, `epic`, `story`, `task`, `bug`, `subtask`.
 - Link types: `relates`, `blocks`, `blocked_by`, `duplicates`.
 

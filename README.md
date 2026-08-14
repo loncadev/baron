@@ -20,7 +20,8 @@ creating work items, moving them, cutting branches, opening and merging PRs — 
 does damage when it guesses a vendor's state machine wrong.
 
 The agent speaks one abstract vocabulary in terms of **roles** (`backlog → ready → in_progress →
-in_review → done`, plus `blocked`), and Baron translates to each provider's real API, states, and
+in_review → done`; blocking is an orthogonal flag, so a blocked item keeps the role the work is
+actually in), and Baron translates to each provider's real API, states, and
 quirks. You confirm that mapping once, at `baron init`, and it is committed to your repo as
 configuration — not re-guessed by the model on every call.
 
