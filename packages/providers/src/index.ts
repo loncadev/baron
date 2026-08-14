@@ -14,10 +14,12 @@ import {
   exampleAzureDevOpsLinkMap,
 } from '@lonca/baron-adapter-azure-devops';
 import {
+  type DeviceAuth,
   GITHUB_PROVIDER,
   createGithubCiTransport,
   createGithubCredentialProbe,
   createGithubDeployTransport,
+  createGithubDeviceAuth,
   createGithubIntrospector,
   createGithubScmTransport,
   createGithubTransport,
@@ -113,6 +115,12 @@ export interface ProviderDescriptor {
    * assuming them — which is the whole point (invariant #5 applied to credentials).
    */
   createCredentialProbe?(env: Env): CredentialProbe;
+  /**
+   * Interactive credential acquisition, where the provider supports it and this installation has an
+   * app id to use. Absent means the only way in is a token the user assembles by hand — which works,
+   * and is what every install did, but discovers each permission mistake by failing.
+   */
+  createDeviceAuth?(env: Env): DeviceAuth | undefined;
   // scm port
   readonly scmManifest?: ScmManifest;
   /** Env keys for the scm transport (Azure adds AZURE_DEVOPS_REPO over the issues keys). */
@@ -212,6 +220,9 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
   [GITHUB_PROVIDER]: {
     id: GITHUB_PROVIDER,
     credentialsHelp: [
+      'Set BARON_GITHUB_CLIENT_ID to an OAuth/GitHub App id and `baron init` offers browser sign-in',
+      'instead of any of this. Without it, or if you want the narrower credential:',
+      '',
       'GitHub needs a fine-grained personal access token (PAT).',
       '  1. Create one at: https://github.com/settings/personal-access-tokens/new',
       '  2. Repository access: "Only select repositories" → the repo you are setting up.',
@@ -240,6 +251,16 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
         owner: env.GITHUB_OWNER ?? '',
         repo: env.GITHUB_REPO ?? '',
         token: env.GITHUB_TOKEN ?? '',
+      });
+    },
+    createDeviceAuth(env) {
+      // Public by design (the device flow has no secret), but still an app SOMEBODY registered — so
+      // it is configuration, not a constant baked in here. Absent means the flow is not offered.
+      const clientId = env.BARON_GITHUB_CLIENT_ID;
+      if (clientId === undefined || clientId.length === 0) return undefined;
+      return createGithubDeviceAuth({
+        clientId,
+        ...(env.BARON_GITHUB_SCOPE !== undefined ? { scope: env.BARON_GITHUB_SCOPE } : {}),
       });
     },
     createCredentialProbe(env) {

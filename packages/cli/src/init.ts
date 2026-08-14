@@ -182,11 +182,38 @@ async function ensureCredentials(
     prompter.note('');
   }
 
+  // The provider can hand a token over directly where it supports it. Offered rather than forced:
+  // a fine-grained PAT is narrower than any scope an OAuth app can request, so someone who wants
+  // the tighter credential should not have to fight the friendlier path to get it.
+  const deviceAuth = descriptor.createDeviceAuth?.(env);
+  let authorized: string | undefined;
+  const tokenKey = missing.find((key) => SECRET_KEY.test(key) && detected[key] === undefined);
+  if (deviceAuth !== undefined && tokenKey !== undefined) {
+    const useIt = await prompter.confirm(
+      `Sign in to ${descriptor.id} in your browser instead of pasting a token?`,
+      true,
+    );
+    if (useIt) {
+      authorized = await deviceAuth.authorize((code) => {
+        prompter.note('');
+        prompter.note(`  Open ${code.verificationUri} and enter:  ${code.userCode}`);
+        prompter.note(
+          `  Waiting for approval (the code expires in ${Math.round(code.expiresInSeconds / 60)} min)…`,
+        );
+      });
+      prompter.note('  Signed in.');
+    }
+  }
+
   for (const key of missing) {
     const auto = detected[key];
     if (auto !== undefined) {
       prompter.note(`  ${key} = ${auto}  (detected from your git remote)`);
       fileValues[key] = auto;
+      continue;
+    }
+    if (key === tokenKey && authorized !== undefined) {
+      fileValues[key] = authorized;
       continue;
     }
     const secret = SECRET_KEY.test(key);

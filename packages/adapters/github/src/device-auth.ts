@@ -1,0 +1,143 @@
+import { BaronError } from '@lonca/baron-core';
+
+/** What the user has to be shown to complete the flow, and how long they have to do it. */
+export interface DeviceCodePrompt {
+  /** The short code the user types into the browser. */
+  readonly userCode: string;
+  /** Where to type it. */
+  readonly verificationUri: string;
+  readonly expiresInSeconds: number;
+}
+
+/**
+ * Interactive credential acquisition for a provider that supports it.
+ *
+ * Onboarding otherwise means reading a list of permissions, creating a token by hand, ticking the
+ * right boxes and pasting it — every step a place to get it wrong, and until `baron doctor` learned
+ * to probe (#24) the only feedback was a command failing halfway through a run. Catching a bad
+ * manual step is not the same as removing it.
+ */
+export interface DeviceAuth {
+  /**
+   * Run the whole flow: request a code, hand it to `onPrompt` for display, poll until the user
+   * approves, and return the token. Rejects with an actionable {@link BaronError} on denial or
+   * expiry — never returns an empty string.
+   */
+  authorize(onPrompt: (prompt: DeviceCodePrompt) => void): Promise<string>;
+}
+
+export interface GithubDeviceAuthOptions {
+  /**
+   * The OAuth App or GitHub App client id. Public by design — the device flow has no client secret,
+   * which is exactly why a CLI can use it without operating a server.
+   */
+  readonly clientId: string;
+  /**
+   * Scopes to request. Only meaningful for an OAuth App; a GitHub App grants the permissions it was
+   * installed with and ignores this. `repo` is the narrowest single scope that covers issues,
+   * contents and pull requests — broader than a fine-grained PAT, which is the honest trade for not
+   * making the user assemble one.
+   */
+  readonly scope?: string;
+  /** Injected for tests. Defaults to the global fetch. */
+  readonly fetchImpl?: typeof fetch;
+  /** Injected for tests so polling does not really wait. */
+  readonly sleep?: (ms: number) => Promise<void>;
+}
+
+const DEVICE_CODE_URL = 'https://github.com/login/device/code';
+const TOKEN_URL = 'https://github.com/login/oauth/access_token';
+const DEFAULT_SCOPE = 'repo';
+/** GitHub's floor when it does not say; it asks for a longer one via `slow_down`. */
+const DEFAULT_INTERVAL_SECONDS = 5;
+
+const AUTH_CODE = 'DEVICE_AUTH_FAILED';
+
+interface DeviceCodeResponse {
+  device_code?: string;
+  user_code?: string;
+  verification_uri?: string;
+  expires_in?: number;
+  interval?: number;
+  error?: string;
+  error_description?: string;
+}
+
+interface TokenResponse {
+  access_token?: string;
+  error?: string;
+  error_description?: string;
+}
+
+/**
+ * GitHub's device flow: the CLI asks for a code, the user approves it in a browser, and the token
+ * comes back with the permissions the app declared. No client secret, so no server — which is what
+ * makes it available to a local tool at all. `gh` works the same way.
+ */
+export function createGithubDeviceAuth(options: GithubDeviceAuthOptions): DeviceAuth {
+  const doFetch = options.fetchImpl ?? fetch;
+  const sleep = options.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
+
+  async function post<T>(url: string, body: Record<string, string>): Promise<T> {
+    const response = await doFetch(url, {
+      method: 'POST',
+      headers: { accept: 'application/json', 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    return (await response.json()) as T;
+  }
+
+  return {
+    async authorize(onPrompt): Promise<string> {
+      const started = await post<DeviceCodeResponse>(DEVICE_CODE_URL, {
+        client_id: options.clientId,
+        scope: options.scope ?? DEFAULT_SCOPE,
+      });
+      if (started.device_code === undefined || started.user_code === undefined) {
+        throw new BaronError(
+          `GitHub refused the device-code request: ${started.error_description ?? started.error ?? 'no code returned'}. ` +
+            'Check that the client id belongs to an app with the device flow enabled.',
+          AUTH_CODE,
+        );
+      }
+
+      onPrompt({
+        userCode: started.user_code,
+        verificationUri: started.verification_uri ?? 'https://github.com/login/device',
+        expiresInSeconds: started.expires_in ?? 900,
+      });
+
+      // GitHub sets the polling interval and raises it with `slow_down`; polling faster than it asks
+      // gets the request rejected, so the interval is theirs to decide, not ours.
+      let intervalMs = (started.interval ?? DEFAULT_INTERVAL_SECONDS) * 1000;
+      const deadline = Date.now() + (started.expires_in ?? 900) * 1000;
+
+      while (Date.now() < deadline) {
+        await sleep(intervalMs);
+        const token = await post<TokenResponse>(TOKEN_URL, {
+          client_id: options.clientId,
+          device_code: started.device_code,
+          grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+        });
+        if (typeof token.access_token === 'string' && token.access_token.length > 0) {
+          return token.access_token;
+        }
+        if (token.error === 'authorization_pending') continue;
+        if (token.error === 'slow_down') {
+          intervalMs += 5000;
+          continue;
+        }
+        // Anything else is terminal: denial, an expired code, a wrong client id. Say which.
+        throw new BaronError(
+          `GitHub did not issue a token: ${token.error_description ?? token.error ?? 'unknown error'}.`,
+          AUTH_CODE,
+        );
+      }
+
+      throw new BaronError(
+        'The device code expired before it was approved. Run `baron init` again.',
+        AUTH_CODE,
+      );
+    },
+  };
+}
