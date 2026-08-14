@@ -57,8 +57,11 @@ COPY --from=builder --chown=baron:baron /app ./
 COPY --from=builder --chown=baron:baron /src/.baron /app/.baron
 ENV BARON_ROOT=/app
 
-# Mount your project here and point the server at it:
-#   docker run -i --rm -v "$PWD:/project" -e BARON_ROOT=/project ghcr.io/loncadev/baron
+# Mount your project here and point the server at it. Built locally on purpose: no image is
+# published anywhere, because the one consumer that needs a container (Glama) builds it in its own
+# sandbox, and the Docker catalog — the surface a published image would serve — is deliberately last.
+#   docker build -t baron-mcp .
+#   docker run -i --rm -v "$PWD:/project" -e BARON_ROOT=/project baron-mcp
 VOLUME ["/project"]
 
 USER baron
