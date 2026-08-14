@@ -106,14 +106,25 @@ The official registry (`registry.modelcontextprotocol.io`) is the surface severa
 it goes first and in the same week as a release — that ranking weights recency.
 
 ```bash
-curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_windows_amd64.tar.gz" | tar xz mcp-publisher
-mcp-publisher login github            # device flow; approve in a browser as a loncadev member
-mcp-publisher publish                 # reads ./server.json
+curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_windows_amd64.tar.gz" | tar xz   # ships mcp-publisher.exe on Windows
+mcp-publisher login github --token "$(gh auth token)"   # see below — plain `login github` will NOT do
+mcp-publisher publish                                   # reads ./server.json from the cwd
 ```
 
-The namespace `io.github.loncadev/baron` is authenticated by the GitHub login, so whoever publishes
-must have access to the `loncadev` org. Publish **after** the npm release, not before: the registry
-validates that the referenced npm version exists and carries the matching `mcpName`.
+> **The org namespace needs a `read:org` token, and `mcp-publisher login github` does not mint one.**
+> The registry grants `io.github.<org>/*` only after calling `GET /user/memberships/orgs`, which
+> requires the `read:org` scope. A token without it gets a 403 that the registry **deliberately
+> swallows** as "no admin orgs" so personal publishing keeps working — so the device flow succeeds,
+> reports nothing wrong, and silently leaves you with `io.github.keparlak/*` only. The 403 from
+> `publish` then blames private org membership, which is about an older code path and is *not* the
+> gate. Passing a token that carries `read:org` (the `gh` CLI's does) is what actually works. This
+> cost three rounds of browser sign-in on the first submission.
+
+Two further conditions, both real: whoever publishes must be an **Owner** of `loncadev` (membership
+`role: admin`, `state: active` — an unaccepted invitation does not count), and the publish must come
+**after** the npm release, because the registry fetches the referenced npm version and compares its
+`mcpName` against `server.json`'s `name`. A freshly published npm version can 404 for a moment; the
+registry says so explicitly, so retry once before suspecting the marker.
 
 ## Commercial tier (later)
 
