@@ -45,6 +45,24 @@ export interface GithubDeviceAuthOptions {
   readonly sleep?: (ms: number) => Promise<void>;
 }
 
+/**
+ * Baron's own OAuth App, registered under the `loncadev` org.
+ *
+ * Shipping an id is what makes the device flow actually happen: without one it is never offered, and
+ * every user has to register an app before they can avoid registering a token — one chore for
+ * another. Every comparable CLI ships one (gh, VS Code, Docker), and it is safe to because the
+ * device flow has NO client secret: the id is public by construction, and holding it lets an
+ * attacker start a flow the victim still has to approve in their own browser.
+ *
+ * Tokens are per-user. Each person authorizes this app themselves, the token lands in their own
+ * `.baron/credentials`, and it never reaches whoever registered the app. The corresponding
+ * responsibility is real: the app appears in every user's authorized-applications list, and deleting
+ * it drops everyone's token at once — which is why it lives in the org and not a personal account.
+ *
+ * `BARON_GITHUB_CLIENT_ID` overrides it; setting that to empty opts out of the offer entirely.
+ */
+export const BARON_GITHUB_CLIENT_ID = 'Ov23liWMo83LU7TGifWW';
+
 const DEVICE_CODE_URL = 'https://github.com/login/device/code';
 const TOKEN_URL = 'https://github.com/login/oauth/access_token';
 const DEFAULT_SCOPE = 'repo';

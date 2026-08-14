@@ -197,7 +197,9 @@ describe('runInit', () => {
     const fs = memoryFileSystem({
       [gitConfigPath(ROOT)]: '[remote "origin"]\n\turl = https://github.com/acme/widgets.git\n',
     });
-    const prompter = scriptedPrompter([true], ['ghp_secret_value']); // confirm write; token answer
+    // Decline the browser sign-in: this case is specifically about the paste-a-token path, which
+    // stays available precisely so someone wanting the narrower fine-grained credential can use it.
+    const prompter = scriptedPrompter([false, true], ['ghp_secret_value']);
     const result = await runInit({
       root: ROOT,
       issuesProvider: 'github',
@@ -217,6 +219,27 @@ describe('runInit', () => {
     const said = prompter.notes.join('\n');
     expect(said).toContain('github.com/settings/personal-access-tokens');
     expect(said).toMatch(/gitignored|never committed/i);
+  });
+
+  it('never offers the browser sign-in on a --force run', async () => {
+    // --force means "do not ask me". The device flow is nothing but asking: it waits up to fifteen
+    // minutes for a human to approve a code, so offering it where nobody can answer hangs the run
+    // rather than degrading. The scripted `true` below is the trap — if the offer is ever made on a
+    // forced run, it is accepted, and this test reaches for the network instead of finishing.
+    const fs = memoryFileSystem({
+      [gitConfigPath(ROOT)]: '[remote "origin"]\n\turl = https://github.com/acme/widgets.git\n',
+    });
+    const prompter = scriptedPrompter([true], ['ghp_from_the_prompt']);
+    await runInit({
+      root: ROOT,
+      issuesProvider: 'github',
+      fs,
+      env: {},
+      force: true,
+      prompter,
+      introspector: createMemoryIntrospector(githubIntrospectionFixture),
+    });
+    expect(fs.read(credentialsPath(ROOT))).toContain('GITHUB_TOKEN=ghp_from_the_prompt');
   });
 
   it('fails loudly when a required credential is left blank rather than introspecting with it empty', async () => {
