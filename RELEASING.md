@@ -93,9 +93,15 @@ a bare package name makes `npx` reuse its cached install without re-checking the
 be smoke-testing a stale version):
 
 ```bash
-npx -y @lonca/baron-mcp-server@latest     # should start the MCP server (Ctrl-C to stop)
-npx -y @lonca/baron-cli@latest --help     # should print the CLI usage
+node scripts/mcp-handshake.mjs npx -y @lonca/baron-mcp-server@latest   # speaks the protocol to it
+npx -y @lonca/baron-cli@latest --help                                  # should print the CLI usage
 ```
+
+The handshake script is worth using over a bare `npx`: a server that starts and then fails to answer
+looks identical to a working one from the terminal, and the failure that matters — anything on stdout
+that is not JSON-RPC — is invisible until a client chokes on it. It runs `initialize` + `tools/list`
+and prints the version and tool count, so a stale cache or a broken publish shows up as the wrong
+number rather than as silence.
 
 Consumers launching via `@latest` (the plugin manifest and the documented `.mcp.json` shape do) pick
 up the new release on their next MCP restart automatically.

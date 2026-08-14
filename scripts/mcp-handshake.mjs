@@ -12,6 +12,7 @@
 // else. A stray console.log anywhere in startup shows up here as unparseable output, not as a subtle
 // client-side failure weeks later.
 import { spawn } from 'node:child_process';
+import { platform } from 'node:process';
 
 const argv = process.argv.slice(2);
 if (argv.length === 0) {
@@ -20,7 +21,16 @@ if (argv.length === 0) {
 }
 
 const TIMEOUT_MS = 60_000;
-const child = spawn(argv[0], argv.slice(1), { stdio: ['pipe', 'pipe', 'inherit'] });
+
+// npx on Windows is npx.cmd, and spawn will not resolve an extensionless shim without a shell —
+// which made this script fail on precisely the launch path RELEASING.md tells you to smoke-test
+// after every publish, on the platform it is released from. The trade-off, stated rather than
+// hidden: under a shell the arguments are re-parsed, so an argument containing spaces would need
+// quoting that the argv form does not. Every caller here passes a command line it wrote itself.
+const child = spawn(argv[0], argv.slice(1), {
+  stdio: ['pipe', 'pipe', 'inherit'],
+  shell: platform === 'win32',
+});
 
 const send = (message) => child.stdin.write(`${JSON.stringify(message)}\n`);
 send({
