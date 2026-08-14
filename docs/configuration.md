@@ -108,8 +108,11 @@ Baron-managed).
 ## Signing in instead of pasting a token (GitHub)
 
 `baron init` can take you through GitHub's **device flow** rather than asking you to assemble a
-fine-grained token by hand: it prints a short code, you approve it in a browser, and the token comes
-back with the permissions the app was granted. No client secret is involved, which is precisely why a
+fine-grained token by hand: it prints a short code, opens the approval page for you, and the token
+comes back with the permissions the app was granted. The URL and the code are always printed first
+and never replaced by the browser — every reason the opener fails (headless, SSH, a container, no
+registered handler) is a reason you still need to read them off the screen, and nothing is opened at
+all when output is not going to a terminal. No client secret is involved, which is precisely why a
 local CLI can do it — the same mechanism `gh` uses.
 
 **It is on by default.** Baron ships the client id of its own GitHub App, registered under the

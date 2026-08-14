@@ -16,6 +16,7 @@ import {
   mergeCredentials,
   parseCredentials,
 } from '@lonca/baron-providers';
+import { openInBrowser } from './open-browser.js';
 import {
   BARON_DIR,
   CREDENTIALS_IGNORE_ENTRY,
@@ -38,6 +39,8 @@ export interface InitOptions {
   readonly env?: Env;
   /** Overwrite an existing policy without confirming. */
   readonly force?: boolean;
+  /** Injected browser opener (tests). Returns whether an attempt was made. */
+  readonly openBrowser?: (url: string) => boolean;
 }
 
 export interface InitResult {
@@ -151,6 +154,7 @@ async function ensureCredentials(
   env: Env,
   /** `--force` means "do not ask me"; a browser sign-in is nothing but asking. */
   nonInteractive: boolean,
+  openBrowser: (url: string) => boolean,
 ): Promise<Env> {
   const required = [
     ...new Set([
@@ -200,7 +204,15 @@ async function ensureCredentials(
     if (useIt) {
       authorized = await deviceAuth.authorize((code) => {
         prompter.note('');
+        // Printed before any attempt to open a browser, and never replaced by it: every reason the
+        // opener fails — headless, SSH, a container, no registered handler — is a reason the user
+        // still needs to read the URL and the code off the screen.
         prompter.note(`  Open ${code.verificationUri} and enter:  ${code.userCode}`);
+        // The provider's pre-filled variant, when it offers one, saves typing the code. The user
+        // still confirms the code on screen matches, which is what makes the shortcut safe.
+        if (openBrowser(code.verificationUriComplete ?? code.verificationUri)) {
+          prompter.note('  (opening that page in your browser…)');
+        }
         prompter.note(
           `  Waiting for approval (the code expires in ${Math.round(code.expiresInSeconds / 60)} min)…`,
         );
@@ -458,6 +470,7 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
     descriptor,
     options.env ?? {},
     options.force === true,
+    options.openBrowser ?? openInBrowser,
   );
 
   const introspector = options.introspector ?? createIntrospector(effectiveEnv);

@@ -6,6 +6,13 @@ export interface DeviceCodePrompt {
   readonly userCode: string;
   /** Where to type it. */
   readonly verificationUri: string;
+  /**
+   * The same page with the code already in the query string, when the provider offers one. Always
+   * present it alongside `verificationUri` rather than instead of it: it is optional in the spec, it
+   * is the wrong thing to read aloud or copy into another machine, and a browser that opens it still
+   * asks the user to confirm the code shown on screen matches.
+   */
+  readonly verificationUriComplete?: string;
   readonly expiresInSeconds: number;
 }
 
@@ -75,6 +82,7 @@ interface DeviceCodeResponse {
   device_code?: string;
   user_code?: string;
   verification_uri?: string;
+  verification_uri_complete?: string;
   expires_in?: number;
   interval?: number;
   error?: string;
@@ -122,6 +130,9 @@ export function createGithubDeviceAuth(options: GithubDeviceAuthOptions): Device
       onPrompt({
         userCode: started.user_code,
         verificationUri: started.verification_uri ?? 'https://github.com/login/device',
+        ...(started.verification_uri_complete !== undefined
+          ? { verificationUriComplete: started.verification_uri_complete }
+          : {}),
         expiresInSeconds: started.expires_in ?? 900,
       });
 
