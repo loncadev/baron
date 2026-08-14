@@ -15,23 +15,32 @@ Azure DevOps, GitHub, and Slack. Workflows run as deterministic YAML recipes thr
 is missing is not capability — it is the discipline of a tool that has been installed by someone
 other than its author.
 
-The next three gates are about closing that distance, in order.
+Gate 1 is done. What is left is the distance between "works when its author runs it" and "installs
+next to the servers it is meant to sit above", plus two contract defects that only a provider Baron
+has no adapter for can settle.
 
-## Gate 1 — Foundation and message
+## Gate 1 — Foundation and message — **done**
 
-Get the contributor and licensing groundwork right while it is still cheap, make the README describe
-what Baron actually does, and put Baron on Baron: this repository's own issues, branches, and pull
-requests are managed through Baron's GitHub adapter, with the role labels (`in-progress`,
-`in-review`, `done`) mapped exactly as `exampleGithubRoleMap` describes.
+The contributor and licensing groundwork is in place, the README describes what Baron actually does,
+and Baron runs on Baron: this repository's issues, branches and pull requests go through its own
+GitHub adapter, with the role labels (`in-progress`, `in-review`, `done`) mapped exactly as
+`exampleGithubRoleMap` describes.
 
 Dogfooding here is a test, not a feature pipeline. When Baron hits a gap while running this
-repository, that gap is filed and labelled — it does not become a reason to grow the surface.
+repository, that gap is filed — it does not become a reason to grow the surface.
+
+It paid immediately, and the list is the point rather than a footnote: `baron doctor` reported a
+sound installation for a token that could not write; no recipe with more than one `ask` could be
+driven from a pipe, which is how CI and an agent drive them; `task-land` merged a pull request whose
+checks were failing and turned this repository's own main red; `baron init` was still proposing a
+type map that left items with no canonical branch. None of that was visible from the test suite, and
+none of it survived two hours of actually using the thing.
 
 ## Gate 2 — Installability and reach
 
-Today Baron publishes 34 MCP tools. Cursor caps a session at 40 tools in total, so Baron alone
-consumes most of a user's budget and cannot be installed next to the provider MCP servers it is
-meant to sit above. That is the opposite of the point.
+Baron publishes 36 MCP tools. Cursor caps a session at 40 tools in total, so Baron alone consumes
+most of a user's budget and cannot be installed next to the provider MCP servers it is meant to sit
+above. That is the opposite of the point.
 
 This gate consolidates the tool surface by verb rather than by endpoint, ships a default toolset of
 around seven tools, and uses something no other server can: `policy.json` already knows which ports
@@ -42,22 +51,27 @@ registration on the surfaces where MCP servers are actually discovered.
 
 ## Gate 3 — Contract debt and first users
 
-Three defects in the role contract are known and scheduled here, while the cost of changing them is
-still near zero:
+Defects in the role contract are fixed here while the cost of changing them is still near zero.
 
-- `blocked` is currently a member of `WORKFLOW_ROLES`, so transitioning to it destroys the previous
-  role. It is documented as orthogonal and must become orthogonal — a relation, not a state. Jira,
-  Linear, and GitLab all model it this way.
+Two have shipped:
+
+- `blocked` was a member of `WORKFLOW_ROLES`, so transitioning to it destroyed the previous role and
+  unblocking had nowhere to return to. It is now an orthogonal flag (`issue.block` / `issue.unblock`)
+  that coexists with whatever role an item holds, the way Jira, Linear and GitLab all model it. A
+  policy that still maps it is migrated on load and told so.
+- Baron's central promise moved from convention into code. Recipes are meant to be enforced by the
+  engine rather than by the agent's good behaviour, but the MCP server exposed every mutating
+  primitive alongside `baron_recipe_run` — a claim anyone reading the tool list could disprove.
+  `policy.mutations.channel: "recipe-only"` now refuses a direct provider mutation with
+  `MUTATION_OUTSIDE_RECIPE` and names the recipe to use instead. The tools stay listed: hiding them
+  would trade an enforceable rule for an obscured one.
+
+Two remain, and both are shaped by providers Baron has no adapter for yet:
+
 - `applyTarget` assumes a state can be set directly. Jira requires discovering the available
   transitions first, then supplying any fields its transition screen demands.
 - The role map keys on state *names*. Linear scopes workflow states per team and does not guarantee
   a stable `type` vocabulary, so the map has to key on state IDs and carry scope.
-
-This gate also moves Baron's central promise from convention into code. Recipes are meant to be
-enforced by the engine rather than by the agent's good behaviour, but the MCP server currently
-exposes every mutating primitive alongside `baron_recipe_run`. Mutations will require a run token
-issued by the recipe engine — which is exactly the explicit-handle pattern the 2026-07-28 MCP
-specification settled on after removing sessions.
 
 ## What Baron will not do
 
