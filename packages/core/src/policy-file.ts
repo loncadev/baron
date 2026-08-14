@@ -84,6 +84,9 @@ function parseNativeTarget(value: unknown, path: string): NativeTarget {
 /** What `blocked` was called when it was still a workflow role, so an old policy can be recognised. */
 const LEGACY_BLOCKED_ROLE = 'blocked';
 
+/** Everything a role-map entry may carry. Anything else is a typo or a key Baron does not have yet. */
+const ROLE_MAP_ENTRY_KEYS = ['stateKey', 'states'] as const;
+
 function parseRoleMapEntry(
   value: unknown,
   provider: string,
@@ -92,6 +95,18 @@ function parseRoleMapEntry(
   const { stateKey, states } = record;
   if (typeof stateKey !== 'string' || stateKey.length === 0) {
     fail(`policy.roleMap.${provider}.stateKey must be a non-empty string.`);
+  }
+  // Every sibling level rejects a key it does not know; this one destructured what it wanted and
+  // dropped the rest. That is what makes a hand-written `scope` — the thing #16 is about — parse
+  // cleanly and vanish, so an install runs a whole team's work against the wrong state map and is
+  // never told. Reject it here, where it costs a line.
+  for (const key of Object.keys(record)) {
+    if (!(ROLE_MAP_ENTRY_KEYS as readonly string[]).includes(key)) {
+      fail(
+        `policy.roleMap.${provider} has unknown key '${key}'. ` +
+          `Keys are: ${ROLE_MAP_ENTRY_KEYS.join(', ')}.`,
+      );
+    }
   }
   const statesRecord = requireRecord(states, `roleMap.${provider}.states`);
   const out: Record<string, NativeTarget> = {};

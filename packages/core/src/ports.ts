@@ -333,7 +333,9 @@ export class BaseIssuesAdapter implements IssuesPort {
     const applied = await this.transport.applyTarget(id, target);
     // On a label-keyed provider the write only ADDS the new role's label; without clearing the
     // others an item ends up tagged in-progress AND in-review (and a stale label outlives a close).
-    const keep = target[this.cfg.roleMap.stateKey];
+    // Through the resolver, not past it: which key discriminates is the resolver's knowledge, and
+    // this was the one place in the adapter that reached into the raw role map to ask.
+    const keep = target[this.resolver.discriminatorKey];
     const stale = this.resolver
       .roleLabels()
       .filter((label) => label !== keep && applied.labels.includes(label));
