@@ -287,7 +287,7 @@ const STEERING_END = '<!-- baron:end -->';
 
 /** The provider facts that change how an agent should behave — derived from the manifest + role map,
  * so the steering's "on this provider" note is always accurate, never guessed. */
-interface SteeringContext {
+export interface SteeringContext {
   readonly provider: string;
   /** Roles ride labels (GitHub) vs the provider's native states (Azure). */
   readonly rolesRideLabels: boolean;
@@ -308,12 +308,12 @@ interface SteeringContext {
  * agent which capabilities exist here — so a degraded capability's empty result isn't mistaken for a
  * bug (the exact confusion a flat provider caused in dogfooding).
  */
-function steeringBlock(ctx: SteeringContext): string {
+export function steeringBlock(ctx: SteeringContext): string {
   const roles = ctx.rolesRideLabels
     ? 'labels (Baron provisions `in-progress` / `in-review` / `done`)'
     : "the provider's native states";
   const sprints = ctx.sprints
-    ? 'available (`baron_issue_iterations`, filter by `@current`)'
+    ? 'available (`baron_issue_read { op: "iterations" }`, filter by `@current`)'
     : 'NOT available — sprint queries degrade to empty. That empty is expected here, not a bug';
   const hierarchy = ctx.hierarchy ? 'native parent/child' : 'emulated via a `parent:<id>` label';
   const typeRoles =
@@ -327,16 +327,20 @@ providers behind one contract, so speak its abstract vocabulary, never a vendor'
 
 - **Roles, not native states.** Move work by role: \`backlog → ready → in_progress → in_review → done\`.
   Say "move it to in_progress", never "set the state to Active" — Baron maps the role to the provider.
-- **Blocking is orthogonal, not a role.** \`baron_issue_block { id, reason }\` and
-  \`baron_issue_unblock\` set and clear a flag; the item keeps the role it is blocked in, so
+- **Blocking is orthogonal, not a role.** \`baron_issue_move { op: "block", id, reason }\` and
+  \`{ op: "unblock", id }\` set and clear a flag; the item keeps the role it is blocked in, so
   unblocking returns it to where the work actually was. A reason is required — an item blocked for no
   recorded reason is one nobody can unblock.
 - **Type roles this policy maps:** ${typeRoles}.
   Asking for one it does not map is an error, not a degrade — that list is what \`issue.create\`
   accepts here.
-- **Tools:** \`baron_issue_*\` (create / get / update / transition / comment / assign / link / query),
-  \`baron_scm_*\` (branch / PR), \`baron_recipe_run\`, and \`baron_learning_*\` / \`baron_followup_*\` for
-  durable decisions and follow-ups.
+- **Tools:** every write takes an \`op\`. \`baron_issue_read\` (get / query / iterations / classify),
+  \`baron_issue_write\` (create / update / comment / assign / link / set_iteration),
+  \`baron_issue_move\` (transition / reconcile / block / unblock), \`baron_scm_read\` and
+  \`baron_scm_write\` (branch_create / pr_create / pr_thread / pr_ready / pr_merge),
+  \`baron_recipe_list\` + \`baron_recipe_run\`, and \`baron_memory_append\` / \`baron_memory_query\`
+  for durable decisions and follow-ups. Call \`baron_recipe_list\` if you are unsure what exists —
+  do not guess a tool name.
 - **Daily loop — prefer the skills:** \`/baron:task-new\` (create), \`/baron:task-start <id>\` (cut the
   canonical branch, move to in_progress, assign you), \`/baron:task-finish\` (draft PR),
   \`/baron:task-land\` (undraft + merge — never \`gh\`/\`az\`), \`/baron:task-move\`,
