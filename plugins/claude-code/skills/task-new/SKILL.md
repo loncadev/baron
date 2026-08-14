@@ -38,7 +38,7 @@ branch or change your checkout (that's `/task-start`).
 
 3. **Resolve the parent** (a dangling item gets lost):
    - `bug`/`task` belong under a **story**; a `story` belongs under an **epic**.
-   - Find candidates with `baron_issue_query` (`typeRole: "story"` or `"epic"`) and offer the best
+   - Find candidates with `baron_issue_read op=query` (`typeRole: "story"` or `"epic"`) and offer the best
      2-3 via `AskUserQuestion`, plus "no parent". Never invent a parent id.
    - On providers without native hierarchy the parent is emulated/degraded per policy — Baron's job.
 
@@ -55,7 +55,7 @@ branch or change your checkout (that's `/task-start`).
 
 ## Rules
 
-- Call `baron_recipe_run` **once**; do not also call `baron_issue_create` yourself.
+- Call `baron_recipe_run` **once**; do not also call `baron_issue_write op=create` yourself.
 - **Never create a title-only item from a thin request without either grilling or an explicit
   "just the title".** The whole point is an actionable item.
 - Take the title from the user's request — sharpen wording, don't change meaning.

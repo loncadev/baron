@@ -33,7 +33,7 @@ your job is the inputs, the local git, the ownership check, and the briefing.
    *"AB#N is assigned to `<them>`, not you (`<you>`). Assign it to yourself first…"*. On that error:
    - **Ask the user** (AskUserQuestion: "AB#N is assigned to `<them>`. Take it over and start?" →
      Take over / Cancel).
-   - On **Take over** → `baron_issue_assign { id: "<id>", assignee: "@me" }`, then re-run the recipe
+   - On **Take over** → `baron_issue_write { op: "assign", id: "<id>", assignee: "@me" }`, then re-run the recipe
      from step 3 (the guard now passes because the item is yours).
    - On **Cancel** → stop. Do not start, do not reassign.
 
@@ -46,8 +46,8 @@ your job is the inputs, the local git, the ownership check, and the briefing.
    ```
 6. **Pull into the active sprint if needed** (sprint providers only): compare the item's `iteration`
    with the active sprint. If it's in a *past* iteration or has none while a sprint is active
-   (`baron_issue_iterations` → the one with `current: true`), ask whether to pull it in, and on yes
-   call `baron_issue_set_iteration { id, iteration: "@current" }`. If no sprint is current, skip
+   (`baron_issue_read op=iterations` → the one with `current: true`), ask whether to pull it in, and on yes
+   call `baron_issue_write { op: "set_iteration", id, iteration: "@current" }`. If no sprint is current, skip
    silently. (This is the "scope creep" checkpoint — the user opts in by pulling mid-sprint.)
 7. **Understand the work before coding — read the whole item, not just the title.** Baron's read
    already gives you the `body` (a Bug's repro steps, otherwise the description), type, labels, and
@@ -78,9 +78,9 @@ your job is the inputs, the local git, the ownership check, and the briefing.
   `RECIPE_*`/`ROLE_MAPPING`/branch error, or a real implementation fork you can't resolve. "Nothing
   to decide" ⇒ don't ask, just work.
 - Run the **mutation** as one `baron_recipe_run` call — do NOT hand-compose
-  `baron_scm_branch_create`/`baron_issue_transition`. `task-start` declares exactly one input,
+  `baron_scm_write op=branch_create`/`baron_issue_move op=transition`. `task-start` declares exactly one input,
   `issueId`; there is no hidden takeover flag. Taking over is the explicit
-  `baron_issue_assign { assignee: "@me" }` in step 4.
+  `baron_issue_write { op: "assign", assignee: "@me" }` in step 4.
 - A failure carrying `RECIPE_INPUT_MISSING` / `ROLE_MAPPING` / branch-name errors: surface the code
   and stop. In particular, an epic/initiative has **no branch name by design** — ask the user for a
   child story/task/bug instead of inventing a branch.

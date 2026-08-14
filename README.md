@@ -89,7 +89,7 @@ See [Getting started](./docs/getting-started.md) for the full walkthrough. Contr
 itself? Run from source with `pnpm baron …` — see [CONTRIBUTING](./CONTRIBUTING.md).
 
 Or wire the **MCP server** into your agent and call the tools directly across every port —
-`baron_issue_create`, `baron_scm_pr_create`, `baron_ci_runs`, `baron_deploy_deployments`,
+`baron_issue_write op=create`, `baron_scm_write op=pr_create`, `baron_ci_read op=runs`, `baron_deploy_read op=deployments`,
 `baron_notify_send`, plus `baron_recipe_run` for whole workflows. In Claude Code, the plugin also
 ships per-recipe **skills** (`/baron:task-start`, `/baron:ship`). See [docs/mcp.md](./docs/mcp.md).
 

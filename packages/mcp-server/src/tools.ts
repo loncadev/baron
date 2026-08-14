@@ -40,6 +40,14 @@ import {
 } from '@lonca/baron-knowledge-loop';
 import type { NativeRequest, NativeResponse } from '@lonca/baron-providers';
 import type { RecipeService } from '@lonca/baron-recipes';
+import {
+  CONSOLIDATED_CI_DEFINITIONS,
+  CONSOLIDATED_DEPLOY_DEFINITIONS,
+  CONSOLIDATED_ISSUE_DEFINITIONS,
+  CONSOLIDATED_LOOP_DEFINITIONS,
+  CONSOLIDATED_SCM_DEFINITIONS,
+  routeOp,
+} from './consolidated.js';
 
 /** The provider-native escape hatch (decision #18), restricted by the caller to bound providers. */
 export type NativeAccess = (provider: string, request: NativeRequest) => Promise<NativeResponse>;
@@ -68,96 +76,19 @@ export interface McpPorts {
   readonly toolsPublish?: ToolPublication;
 }
 
-/** Tool names: snake_case, `baron_` (product) namespace, singular noun to mirror the primitives. */
-export const MCP_TOOL_NAMES = {
-  create: 'baron_issue_create',
-  get: 'baron_issue_get',
-  update: 'baron_issue_update',
-  transition: 'baron_issue_transition',
-  reconcile: 'baron_issue_reconcile',
-  block: 'baron_issue_block',
-  unblock: 'baron_issue_unblock',
-  comment: 'baron_issue_comment',
-  link: 'baron_issue_link',
-  assign: 'baron_issue_assign',
-  iterations: 'baron_issue_iterations',
-  setIteration: 'baron_issue_set_iteration',
-  query: 'baron_issue_query',
-} as const;
-
-export const SCM_TOOL_NAMES = {
-  branchCreate: 'baron_scm_branch_create',
-  prCreate: 'baron_scm_pr_create',
-  prThread: 'baron_scm_pr_thread',
-  prStatus: 'baron_scm_pr_status',
-  prForBranch: 'baron_scm_pr_for_branch',
-  prReady: 'baron_scm_pr_ready',
-  prMerge: 'baron_scm_pr_merge',
-} as const;
-
-export const CI_TOOL_NAMES = {
-  pipelines: 'baron_ci_pipelines',
-  runs: 'baron_ci_runs',
-  runGet: 'baron_ci_run_get',
-  runLogs: 'baron_ci_run_logs',
-  runTrigger: 'baron_ci_run_trigger',
-  runCancel: 'baron_ci_run_cancel',
-} as const;
-
-export const NOTIFY_TOOL_NAMES = {
-  send: 'baron_notify_send',
-} as const;
-
-export const DEPLOY_TOOL_NAMES = {
-  environments: 'baron_deploy_environments',
-  deployments: 'baron_deploy_deployments',
-} as const;
-
-export const NATIVE_TOOL_NAMES = {
-  request: 'baron_native_request',
-} as const;
-
-export const RECIPE_TOOL_NAMES = {
-  list: 'baron_recipe_list',
-  run: 'baron_recipe_run',
-} as const;
-
-export const LOOP_TOOL_NAMES = {
-  learningAppend: 'baron_learning_append',
-  learningQuery: 'baron_learning_query',
-  followupAppend: 'baron_followup_append',
-  followupList: 'baron_followup_list',
-} as const;
-
-/** A tool definition shaped for the MCP ListTools response (plain JSON Schema, no zod). */
-export interface ToolDefinition {
-  readonly name: string;
-  /**
-   * Whether calling this changes something in a PROVIDER — a work item, a branch, a PR, a pipeline.
-   * Required, so a new tool cannot be added without someone deciding; a hand-kept list elsewhere
-   * would drift the first time one was.
-   *
-   * False for the knowledge loop's appends: they write Baron's own store, and refusing them would
-   * cost the record of a decision without preventing a single provider write. False for
-   * `baron_recipe_run`, which IS the sanctioned channel — it mutates only by running primitives the
-   * engine ordered, which is the entire point of {@link MUTATION_CHANNELS}.
-   */
-  readonly mutatesProvider: boolean;
-  readonly description: string;
-  readonly inputSchema: {
-    readonly type: 'object';
-    readonly properties: Record<string, unknown>;
-    readonly required?: readonly string[];
-    readonly additionalProperties: false;
-  };
-}
-
-/** The MCP text result shape (structurally a CallToolResult); kept SDK-agnostic for testability. */
-export interface ToolResult {
-  readonly content: ReadonlyArray<{ readonly type: 'text'; readonly text: string }>;
-  readonly isError?: boolean;
-  readonly structuredContent?: Record<string, unknown>;
-}
+export * from './names.js';
+import {
+  CI_TOOL_NAMES,
+  DEPLOY_TOOL_NAMES,
+  LOOP_TOOL_NAMES,
+  MCP_TOOL_NAMES,
+  NATIVE_TOOL_NAMES,
+  NOTIFY_TOOL_NAMES,
+  RECIPE_TOOL_NAMES,
+  SCM_TOOL_NAMES,
+  type ToolDefinition,
+  type ToolResult,
+} from './names.js';
 
 // Enums are sourced from the core unions (single source of truth) so adding a role/type role in
 // core auto-updates the tool surface — no hand-copied magic-string lists (invariant: no magic
@@ -1478,14 +1409,14 @@ const TOOLSET_DEFINITIONS: Record<
   Toolset,
   { readonly bound: (ports: McpPorts) => boolean; readonly tools: readonly ToolDefinition[] }
 > = {
-  issues: { bound: (p) => p.issues !== undefined, tools: TOOL_DEFINITIONS },
-  scm: { bound: (p) => p.scm !== undefined, tools: SCM_TOOL_DEFINITIONS },
-  ci: { bound: (p) => p.ci !== undefined, tools: CI_TOOL_DEFINITIONS },
+  issues: { bound: (p) => p.issues !== undefined, tools: CONSOLIDATED_ISSUE_DEFINITIONS },
+  scm: { bound: (p) => p.scm !== undefined, tools: CONSOLIDATED_SCM_DEFINITIONS },
+  ci: { bound: (p) => p.ci !== undefined, tools: CONSOLIDATED_CI_DEFINITIONS },
   notify: { bound: (p) => p.notify !== undefined, tools: NOTIFY_TOOL_DEFINITIONS },
-  deploy: { bound: (p) => p.deploy !== undefined, tools: DEPLOY_TOOL_DEFINITIONS },
+  deploy: { bound: (p) => p.deploy !== undefined, tools: CONSOLIDATED_DEPLOY_DEFINITIONS },
   recipes: { bound: (p) => p.recipes !== undefined, tools: RECIPE_TOOL_DEFINITIONS },
   native: { bound: (p) => p.nativeAccess !== undefined, tools: NATIVE_TOOL_DEFINITIONS },
-  knowledge: { bound: (p) => p.knowledge !== undefined, tools: LOOP_TOOL_DEFINITIONS },
+  knowledge: { bound: (p) => p.knowledge !== undefined, tools: CONSOLIDATED_LOOP_DEFINITIONS },
 };
 
 /**
@@ -1518,7 +1449,17 @@ export function activeToolDefinitions(ports: McpPorts): ToolDefinition[] {
 
 /** Route a tool call to the right port by its name prefix; unbound ports / unknown names error. */
 /** Every tool this server publishes, across all ports. */
+/**
+ * Both vocabularies: the consolidated tools a client is offered, and the primitives they route to.
+ * The mutation gate has to know both — a primitive is still reachable through `dispatchTool` even
+ * though nothing publishes it, and a gate that only knew the published names would wave it through.
+ */
 const ALL_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
+  ...CONSOLIDATED_ISSUE_DEFINITIONS,
+  ...CONSOLIDATED_SCM_DEFINITIONS,
+  ...CONSOLIDATED_CI_DEFINITIONS,
+  ...CONSOLIDATED_DEPLOY_DEFINITIONS,
+  ...CONSOLIDATED_LOOP_DEFINITIONS,
   ...TOOL_DEFINITIONS,
   ...SCM_TOOL_DEFINITIONS,
   ...CI_TOOL_DEFINITIONS,
@@ -1568,6 +1509,11 @@ function refuseIfOutsideRecipe(ports: McpPorts, name: string): ToolResult | unde
   };
 }
 
+/**
+ * A published tool names a VERB and carries the op; this routes it to the primitive it names, and
+ * everything below dispatches primitives — which are internal now. Keeping the two apart is what
+ * lets every per-primitive handler and its tests stay exactly as they were.
+ */
 export function dispatchTool(
   ports: McpPorts,
   name: string,
@@ -1575,6 +1521,21 @@ export function dispatchTool(
 ): Promise<ToolResult> {
   const refusal = refuseIfOutsideRecipe(ports, name);
   if (refusal !== undefined) return Promise.resolve(refusal);
+  try {
+    const routed = routeOp(name, args);
+    return dispatchPrimitive(ports, routed.primitive, routed.args);
+  } catch (error) {
+    return run(() => {
+      throw error;
+    });
+  }
+}
+
+function dispatchPrimitive(
+  ports: McpPorts,
+  name: string,
+  args: Record<string, unknown> | undefined,
+): Promise<ToolResult> {
   if (name.startsWith('baron_issue_')) {
     if (ports.issues === undefined) {
       return run(() => {
