@@ -288,7 +288,7 @@ with the conformance suite + per-adapter status maps:
 - **`notify`** (decision #8 P0): core port + the **Slack** adapter (`chat.postMessage`, channels +
   threads); `baron_notify_send`.
 - **`deploy` / environments** (#17): Azure Environments + GitHub Environments, normalized
-  `DeployStatus`; `baron_deploy_environments` / `deployments`.
+  `DeployStatus`; `baron_deploy_read { op: "environments" }` / `deployments`.
 - **`scm` monitoring** (#17): `scm.pr.status` → normalized state / review decision / mergeability /
   checks rollup.
 - **Provider-native escape hatch** (#18): `baron_native_request`, scoped to policy-bound providers.

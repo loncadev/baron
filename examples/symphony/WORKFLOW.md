@@ -67,7 +67,7 @@ above does.
 
 ## Flow
 
-1. **Read the item.** `baron_issue_get` with the id Symphony dispatched.
+1. **Read the item.** `baron_issue_read { op: "get" }` with the id Symphony dispatched.
 
 2. **Start it.** Run the `task-start` recipe rather than composing the steps yourself. It loads the
    item, refuses to proceed if it is already done or assigned to someone else, cuts the canonical
@@ -88,7 +88,7 @@ above does.
 
 6. **Handle review feedback.** Treat every actionable reviewer comment, human or bot, as blocking
    until the code changes or you post a justified reply. Record each item and its resolution in the
-   workpad comment via `baron_issue_comment`.
+   workpad comment via `baron_issue_write { op: "comment" }`.
 
 7. **Land it.** Run `task-land`. Do not call `gh pr merge` directly.
 

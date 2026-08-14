@@ -201,11 +201,11 @@ Claude will now see the `baron_*` tools for the bound ports (e.g. `baron_issue_*
 
 Ask in plain language; Claude picks the tools:
 
-- *"Using Baron, list my backlog."* → `baron_issue_query { role: backlog }`
-- *"Create a Baron task 'Try the issues port' and move it to in progress."* → `baron_issue_create` + `baron_issue_transition`
+- *"Using Baron, list my backlog."* → `baron_issue_read { op: "query", role: backlog }`
+- *"Create a Baron task 'Try the issues port' and move it to in progress."* → `baron_issue_write { op: "create" }` + `baron_issue_move { op: "transition" }`
 - *"Start a task 'X': create it, branch for it, move it to in progress."* → run the `task-start` recipe (issues + scm)
-- *"Show my pipelines and the latest run's status."* → `baron_ci_pipelines` + `baron_ci_runs`
-- *"Is PR 42 ready to merge?"* → `baron_scm_pr_status`
+- *"Show my pipelines and the latest run's status."* → `baron_ci_read { op: "pipelines" }` + `baron_ci_read { op: "runs" }`
+- *"Is PR 42 ready to merge?"* → `baron_scm_read { op: "pr_status" }`
 
 You can also run a packaged recipe directly:
 
@@ -229,7 +229,7 @@ azure-devops MCP only for research Baron doesn't cover."*
 | `doctor` reports drift | A state/type/column in `policy.json` no longer exists in the project — update the map. |
 | Claude doesn't see `baron_*` tools | `.mcp.json` not picked up — restart Claude Code; on Windows try `pnpm.cmd`; confirm the server starts (step 7). |
 | `baron_deploy_*` returns nothing | Your project uses pipeline stages, not Azure **Environments** — that's correct-empty, not an error. |
-| A query returns a huge result | `baron_issue_query` defaults to 50 and is project-scoped + lean; pass a larger `limit` only if you need it. |
+| A query returns a huge result | `baron_issue_read { op: "query" }` defaults to 50 and is project-scoped + lean; pass a larger `limit` only if you need it. |
 
 ---
 

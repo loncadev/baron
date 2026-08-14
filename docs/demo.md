@@ -55,7 +55,7 @@ Show the agent using Baron's MCP tools / skills. Type these prompts; let the too
 2. **Query it back in the abstract vocabulary:**
    > What's in progress right now?
 
-   Baron calls `baron_issue_query` with `role: in_progress` — provider-scoped, normalized results (no
+   Baron calls `baron_issue_read { op: "query" }` with `role: in_progress` — provider-scoped, normalized results (no
    294KB vendor dump; it's role-filtered).
 
 3. **Ship it — cross-port in one call:**
