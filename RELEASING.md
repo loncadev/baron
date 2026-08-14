@@ -65,6 +65,8 @@ until step 2 is done.
 **Each release:**
 
 ```bash
+# Bump the ten package.json versions first, then:
+pnpm sync:server-json                 # server.json carries the version twice; it is what the MCP Registry ingests
 pnpm install && pnpm build            # publishConfig flips main/types/exports to dist; bins already point there
 pnpm test && pnpm licenses:check      # never publish red
 

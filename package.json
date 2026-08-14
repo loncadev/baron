@@ -20,7 +20,8 @@
     "baron": "tsx packages/cli/src/bin.ts",
     "baron:mcp": "tsx packages/mcp-server/src/bin.ts",
     "demo": "pnpm --filter @lonca/baron-recipes exec tsx scripts/demo.ts",
-    "demo:cast": "node scripts/gen-cast.mjs"
+    "demo:cast": "node scripts/gen-cast.mjs",
+    "sync:server-json": "node scripts/sync-server-json.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
