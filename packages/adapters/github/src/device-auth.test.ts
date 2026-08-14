@@ -43,6 +43,33 @@ describe('github device flow', () => {
     );
   });
 
+  it('carries the pre-filled verification URL through when the provider offers one', async () => {
+    // GitHub puts the code in the query string of verification_uri_complete, which is what lets a
+    // CLI open a page the user only has to confirm. It is optional in the spec, so it is surfaced
+    // alongside the plain URL rather than instead of it.
+    const complete = 'https://github.com/login/device?user_code=ABCD-1234';
+    const { device } = auth([
+      { ...CODE, verification_uri_complete: complete },
+      { access_token: 'gho_x' },
+    ]);
+    const prompt = vi.fn();
+    await device.authorize(prompt);
+    expect(prompt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        verificationUri: CODE.verification_uri,
+        verificationUriComplete: complete,
+      }),
+    );
+  });
+
+  it('leaves the pre-filled URL unset when the provider omits it, rather than inventing one', async () => {
+    // Guessing the query-string shape would produce a URL that looks authoritative and may not work.
+    const { device } = auth([CODE, { access_token: 'gho_x' }]);
+    const prompt = vi.fn();
+    await device.authorize(prompt);
+    expect(prompt.mock.calls[0]?.[0]).not.toHaveProperty('verificationUriComplete');
+  });
+
   it('sends no client secret — which is why a CLI can do this at all', async () => {
     const { device, fetchImpl } = auth([CODE, { access_token: 'gho_x' }]);
     await device.authorize(() => {});
