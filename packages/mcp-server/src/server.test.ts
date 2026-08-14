@@ -10,8 +10,9 @@ import type { IssuesPort, ScmPort } from '@lonca/baron-core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { describe, expect, it } from 'vitest';
+import { TOOL_NAMES } from './consolidated.js';
 import { SERVER_INSTRUCTIONS, createMcpServer } from './server.js';
-import { MCP_TOOL_NAMES, type McpPorts, SCM_TOOL_NAMES } from './tools.js';
+import type { McpPorts } from './tools.js';
 
 function githubPort(): IssuesPort {
   return defineGithubIssuesAdapter(
@@ -62,25 +63,12 @@ function textOf(result: ToolCallResult): string {
 }
 
 describe('createMcpServer (end-to-end over the MCP protocol)', () => {
-  it('advertises only the issue tools when only the issues port is bound', async () => {
+  it('advertises three issue tools when only the issues port is bound', async () => {
     const client = await connectClient({ issues: githubPort() });
     const { tools } = await client.listTools();
+    // One per verb rather than one per endpoint: thirteen primitives behind three published tools.
     expect(tools.map((t) => t.name).sort()).toEqual(
-      [
-        MCP_TOOL_NAMES.create,
-        MCP_TOOL_NAMES.get,
-        MCP_TOOL_NAMES.update,
-        MCP_TOOL_NAMES.transition,
-        MCP_TOOL_NAMES.reconcile,
-        MCP_TOOL_NAMES.block,
-        MCP_TOOL_NAMES.unblock,
-        MCP_TOOL_NAMES.comment,
-        MCP_TOOL_NAMES.link,
-        MCP_TOOL_NAMES.assign,
-        MCP_TOOL_NAMES.iterations,
-        MCP_TOOL_NAMES.setIteration,
-        MCP_TOOL_NAMES.query,
-      ].sort(),
+      [TOOL_NAMES.issueRead, TOOL_NAMES.issueWrite, TOOL_NAMES.issueMove].sort(),
     );
   });
 
@@ -88,17 +76,16 @@ describe('createMcpServer (end-to-end over the MCP protocol)', () => {
     const client = await connectClient({ issues: githubPort(), scm: githubScmPort() });
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name);
-    expect(names).toContain(MCP_TOOL_NAMES.create);
-    expect(names).toContain(SCM_TOOL_NAMES.branchCreate);
-    expect(names).toContain(SCM_TOOL_NAMES.prCreate);
-    expect(names).toContain(SCM_TOOL_NAMES.prThread);
+    expect(names).toContain(TOOL_NAMES.issueWrite);
+    expect(names).toContain(TOOL_NAMES.scmRead);
+    expect(names).toContain(TOOL_NAMES.scmWrite);
   });
 
   it('appends an outdated notice as a separate content block over the real protocol', async () => {
     const client = await connectClient({ issues: githubPort() }, '⚠️ baron outdated');
     const result = (await client.callTool({
-      name: MCP_TOOL_NAMES.create,
-      arguments: { title: 'x', typeRole: 'task' },
+      name: TOOL_NAMES.issueWrite,
+      arguments: { op: 'create', title: 'x', typeRole: 'task' },
     })) as ToolCallResult;
     expect(result.content).toHaveLength(2);
     // First block stays parseable JSON; the notice rides its own block.
@@ -108,14 +95,19 @@ describe('createMcpServer (end-to-end over the MCP protocol)', () => {
 
   it('creates an issue through a tool call (result shape passes SDK validation)', async () => {
     const client = await connectClient({ issues: githubPort() });
-    const result = await call(client, MCP_TOOL_NAMES.create, { title: 'e2e', typeRole: 'task' });
+    const result = await call(client, TOOL_NAMES.issueWrite, {
+      op: 'create',
+      title: 'e2e',
+      typeRole: 'task',
+    });
     expect(result.isError).toBeFalsy();
     expect(JSON.parse(textOf(result)).provider).toBe('github');
   });
 
   it('opens a pull request through an scm tool call', async () => {
     const client = await connectClient({ scm: githubScmPort() });
-    const result = await call(client, SCM_TOOL_NAMES.prCreate, {
+    const result = await call(client, TOOL_NAMES.scmWrite, {
+      op: 'pr_create',
       title: 'e2e pr',
       sourceBranch: 'feature/x',
       targetBranch: 'main',
@@ -127,7 +119,8 @@ describe('createMcpServer (end-to-end over the MCP protocol)', () => {
 
   it('routes an scm call to a PORT_UNBOUND error when scm is not configured', async () => {
     const client = await connectClient({ issues: githubPort() });
-    const result = await call(client, SCM_TOOL_NAMES.branchCreate, {
+    const result = await call(client, TOOL_NAMES.scmWrite, {
+      op: 'branch_create',
       name: 'feature/x',
       fromBranch: 'main',
     });
@@ -137,9 +130,17 @@ describe('createMcpServer (end-to-end over the MCP protocol)', () => {
 
   it('surfaces a BaronError as an isError tool result carrying the code', async () => {
     const client = await connectClient({ issues: githubPort() });
-    const created = await call(client, MCP_TOOL_NAMES.create, { title: 'x', typeRole: 'task' });
+    const created = await call(client, TOOL_NAMES.issueWrite, {
+      op: 'create',
+      title: 'x',
+      typeRole: 'task',
+    });
     const id = JSON.parse(textOf(created)).id as string;
-    const result = await call(client, MCP_TOOL_NAMES.transition, { id, role: 'ready' });
+    const result = await call(client, TOOL_NAMES.issueMove, {
+      op: 'transition',
+      id,
+      role: 'ready',
+    });
     expect(result.isError).toBe(true);
     expect(result.structuredContent?.code).toBe('ROLE_MAPPING');
   });
@@ -174,9 +175,13 @@ describe('mutation channel over the MCP protocol', () => {
     const { tools } = await client.listTools();
     // Still listed: hiding it would trade an enforceable rule for an obscured one, and an agent
     // that cannot see a tool cannot be told why it may not use it.
-    expect(tools.map((t) => t.name)).toContain(MCP_TOOL_NAMES.transition);
+    expect(tools.map((t) => t.name)).toContain(TOOL_NAMES.issueMove);
 
-    const result = await call(client, MCP_TOOL_NAMES.transition, { id: '1', role: 'in_review' });
+    const result = await call(client, TOOL_NAMES.issueMove, {
+      op: 'transition',
+      id: '1',
+      role: 'in_review',
+    });
     expect(result.isError).toBe(true);
     expect(result.structuredContent?.code).toBe('MUTATION_OUTSIDE_RECIPE');
   });

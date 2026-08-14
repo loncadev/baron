@@ -24,14 +24,14 @@ Baron translates these to each provider's native states/types/links and negotiat
 
 ## MCP tools (this plugin registers the `baron` MCP server)
 
-Issues port: `baron_issue_create`, `baron_issue_get`, `baron_issue_update` (edit title/body — a
+Issues port: `baron_issue_write op=create`, `baron_issue_read op=get`, `baron_issue_write op=update` (edit title/body — a
 patch, omitted fields keep their value; the body lands in the field the type uses, so a bug's body
 is its repro steps. Use it to fix a title or fill in a description after creation; it does NOT move
-the role or the assignee), `baron_issue_transition`,
-`baron_issue_comment`, `baron_issue_link`, `baron_issue_assign` (provider-native handle: Azure
-email, GitHub login), `baron_issue_iterations` + `baron_issue_set_iteration` (sprints — each
+the role or the assignee), `baron_issue_move op=transition`,
+`baron_issue_write op=comment`, `baron_issue_write op=link`, `baron_issue_write op=assign` (provider-native handle: Azure
+email, GitHub login), `baron_issue_read op=iterations` + `baron_issue_write op=set_iteration` (sprints — each
 iteration has a `current` flag; move by path or `@current`; providers without sprints negotiate the
-gap), `baron_issue_query` (filters: `role`, `typeRole`, `assignee` — a handle or `@me`; `iteration`
+gap), `baron_issue_read op=query` (filters: `role`, `typeRole`, `assignee` — a handle or `@me`; `iteration`
 — a path or `@current` for the active sprint). Note: on GitHub, an `@me`/assignee filter is
 *eventually consistent* — a just-assigned item can take a few seconds to appear (Azure's `@me` is
 immediate); don't conclude "not assigned" from a query run right after an assign. Every returned issue carries `branchName` — the
@@ -39,13 +39,13 @@ canonical `<prefix>/<id>-<slug>` branch derived by the core; use it verbatim, ne
 names (unset for epics/initiatives = don't branch on those) — plus its current `iteration` path when
 the provider has sprints.
 
-Issues also has `baron_issue_reconcile`: it makes an item's emulated role labels agree with the
+Issues also has `baron_issue_move op=reconcile`: it makes an item's emulated role labels agree with the
 state the provider itself reports. It commands no role, so it is safe after anything that changed an
 item outside Baron — a merge that closes its issue leaves the old role label behind, and this is what
 clears it. `task-land` already calls it; reach for it directly when cleaning up drift.
 
-Scm port: `baron_scm_branch_create`, `baron_scm_pr_create`, `baron_scm_pr_thread`,
-`baron_scm_pr_status`, `baron_scm_pr_for_branch`, `baron_scm_pr_ready`, `baron_scm_pr_merge`.
+Scm port: `baron_scm_write op=branch_create`, `baron_scm_write op=pr_create`, `baron_scm_write op=pr_thread`,
+`baron_scm_read op=pr_status`, `baron_scm_read op=pr_for_branch`, `baron_scm_write op=pr_ready`, `baron_scm_write op=pr_merge`.
 **Landing a PR is Baron's job too** — don't shell out to `gh`/`az`: `pr_ready` takes a draft out of
 draft (task-finish opens drafts on purpose), and `pr_merge { pullRequestId, strategy?, deleteSourceBranch? }`
 merges it (`strategy`: `merge` | `squash` | `rebase`, defaulting to the provider's own). A refusal —
@@ -61,13 +61,13 @@ normalized `PullRequestStatus`: `state` (`open|merged|closed|unknown`), `reviewD
 Baron could not look; never read the second as a green light)
 (`succeeded|failed|pending|none`) — reach for it to gate "is this PR ready to merge?".
 
-Ci / pipelines port: `baron_ci_pipelines`, `baron_ci_runs`, `baron_ci_run_get`,
-`baron_ci_run_logs`, `baron_ci_run_trigger`, `baron_ci_run_cancel`. Run state is the normalized
+Ci / pipelines port: `baron_ci_read op=pipelines`, `baron_ci_read op=runs`, `baron_ci_read op=run_get`,
+`baron_ci_read op=run_logs`, `baron_ci_run op=trigger`, `baron_ci_run op=cancel`. Run state is the normalized
 `RunStatus` = `queued|running|succeeded|failed|canceled|skipped|waiting|unknown` (collapsed from each
 provider's native phase + result; per-stage status appears in `run_get`; `run_logs` is a size-aware
 tail). `runs` defaults `limit` 50. Use these to list/trigger/cancel CI and inspect why a run failed.
 
-Deploy / environments port: `baron_deploy_environments`, `baron_deploy_deployments`. Deployment
+Deploy / environments port: `baron_deploy_read op=environments`, `baron_deploy_read op=deployments`. Deployment
 state is the normalized `DeployStatus` = `pending|running|succeeded|failed|canceled|skipped|unknown`.
 Use these to see environments and what's deployed where.
 
@@ -103,10 +103,10 @@ single `baron_recipe_run` call. (`baron run --recipe <path>` runs the same recip
 Two more skills complete the task-* family (also *not* recipes — interactive, over the primitives):
 - `/baron:task-move <id> <role>` — move an item to a role, guarding backward/reopen/block moves
   behind a required one-line reason (posted on the item first). Roles, not vendor columns.
-- `/baron:task-list [@me|in_progress|bugs|…]` — read-only listing over `baron_issue_query`.
+- `/baron:task-list [@me|in_progress|bugs|…]` — read-only listing over `baron_issue_read op=query`.
 - `/baron:task-sync [@me|all]` — reconcile in-flight items against their branch's PR reality (the
-  "PR merged but the card is still in progress" drift) via `baron_issue_query` +
-  `baron_scm_pr_for_branch {state:"merged"}` over the core-derived `branchName`, and batch-fix it.
+  "PR merged but the card is still in progress" drift) via `baron_issue_read op=query` +
+  `baron_scm_read {op: "pr_for_branch", state:"merged"}` over the core-derived `branchName`, and batch-fix it.
 
 **Boundary rule:** recipes/tools own PROVIDER truth (work items, remote branches, PRs); the LOCAL
 working tree (git status/fetch/switch/push) is the agent's job around the call — see the per-recipe

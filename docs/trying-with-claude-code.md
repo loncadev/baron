@@ -52,15 +52,15 @@ Claude Code reads a project's `.mcp.json`. Create **`BeeMaster/.mcp.json`**:
 </details>
 
 With a policy that binds both ports (what `baron init` writes by default), Claude sees the issues
-tools (`baron_issue_create/get/update/transition/comment/link/assign/query`), the scm tools
+tools (`baron_issue_write op=create/get/update/transition/comment/link/assign/query`), the scm tools
 (`baron_scm_*`), and `baron_learning_*` / `baron_followup_*`.
 
 ### Example prompts to Claude
 
-- "Using Baron, list BeeMaster's backlog items." → `baron_issue_query { role: backlog }`
-- "Create a Baron task 'Try the issues port' and move it to in progress." → `baron_issue_create` + `baron_issue_transition`
-- "Add a comment to issue 117 via Baron." → `baron_issue_comment`
-- "Record a learning that the review state is 'Test'." → `baron_learning_append`
+- "Using Baron, list BeeMaster's backlog items." → `baron_issue_read { op: "query", role: backlog }`
+- "Create a Baron task 'Try the issues port' and move it to in progress." → `baron_issue_write op=create` + `baron_issue_move op=transition`
+- "Add a comment to issue 117 via Baron." → `baron_issue_write op=comment`
+- "Record a learning that the review state is 'Test'." → `baron_memory_append op=learning`
 
 ---
 
@@ -80,15 +80,15 @@ tools (`baron_issue_create/get/update/transition/comment/link/assign/query`), th
 - [ ] Claude Code lists the `baron_*` tools (issue + learning + followup).
 - [ ] "List BeeMaster's backlog" returns the real New items (e.g. *Master UI*, *API*, *Deployment*) — proves the live WIQL query path. The query is scoped to the project and returns a lean projection (no body) capped at 50 by default; pass a higher `limit` for more.
 - [ ] "Get issue 117" returns a normalized issue with `role: backlog`, `nativeType: Product Backlog Item`.
-- [ ] `baron_learning_append` then `baron_learning_query` round-trips a note (writes a markdown file under `BeeMaster/.baron/knowledge/` — local, safe).
+- [ ] `baron_memory_append op=learning` then `baron_memory_query op=learning` round-trips a note (writes a markdown file under `BeeMaster/.baron/knowledge/` — local, safe).
 
 ### Phase 2 — While running (writes to the real board — opt-in)
 
-- [ ] `baron_issue_create { title: "Baron smoke", typeRole: task }` creates a work item; note its id.
-- [ ] `baron_issue_transition { id, role: in_progress }` → the item's State becomes **Active** in Azure.
+- [ ] `baron_issue_write { op: "create", title: "Baron smoke", typeRole: task }` creates a work item; note its id.
+- [ ] `baron_issue_move { op: "transition", id, role: in_progress }` → the item's State becomes **Active** in Azure.
 - [ ] `… role: in_review` → State becomes **Test**; `… role: done` → State becomes **Closed**.
-- [ ] `baron_issue_comment { id, body: "via Baron" }` adds the comment.
-- [ ] A capability gap is loud, not silent: e.g. `baron_issue_transition { role: ready }` returns an `isError` result with code `ROLE_MAPPING` (ready is unmapped in the policy).
+- [ ] `baron_issue_write { op: "comment", id, body: "via Baron" }` adds the comment.
+- [ ] A capability gap is loud, not silent: e.g. `baron_issue_move { op: "transition", role: ready }` returns an `isError` result with code `ROLE_MAPPING` (ready is unmapped in the policy).
 
 ### Phase 3 — After (confirm + clean up)
 
@@ -104,19 +104,19 @@ keys and **no `baron init` step** (CI/deploy status maps are vendor-fixed adapte
 user-confirmed). `notify` (Slack) is separate: set `SLACK_BOT_TOKEN` + `SLACK_CHANNEL` and bind
 `providers.notify` to use it.
 
-- [ ] `baron_ci_pipelines` lists BeeMaster's pipelines; `baron_ci_runs { pipeline }` returns recent runs (defaults to the last 50) with a normalized `status` (`queued|running|succeeded|failed|canceled|skipped|waiting|unknown`).
-- [ ] `baron_ci_run_get { id }` returns run detail incl. per-stage status; `baron_ci_run_logs { id }` returns a size-aware tail of the logs.
-- [ ] `baron_deploy_environments` lists environments; `baron_deploy_deployments { environment }` returns deployments with a normalized `status` (`pending|running|succeeded|failed|canceled|skipped|unknown`).
+- [ ] `baron_ci_read op=pipelines` lists BeeMaster's pipelines; `baron_ci_read { op: "runs", pipeline }` returns recent runs (defaults to the last 50) with a normalized `status` (`queued|running|succeeded|failed|canceled|skipped|waiting|unknown`).
+- [ ] `baron_ci_read { op: "run_get", id }` returns run detail incl. per-stage status; `baron_ci_read { op: "run_logs", id }` returns a size-aware tail of the logs.
+- [ ] `baron_deploy_read op=environments` lists environments; `baron_deploy_read { op: "deployments", environment }` returns deployments with a normalized `status` (`pending|running|succeeded|failed|canceled|skipped|unknown`).
 - [ ] `baron_notify_send { text: "BeeMaster CI green" }` posts to the configured Slack channel (add `threadKey` to reply in a thread).
-- [ ] **Opt-in (writes/triggers):** `baron_ci_run_trigger { pipeline }` queues a run; `baron_ci_run_cancel { id }` cancels one. Only run these if you mean to.
+- [ ] **Opt-in (writes/triggers):** `baron_ci_run { op: "trigger", pipeline }` queues a run; `baron_ci_run { op: "cancel", id }` cancels one. Only run these if you mean to.
 
 **Example prompts to Claude**
 
-- "Using Baron, show me BeeMaster's pipelines and the status of the latest run." → `baron_ci_pipelines` + `baron_ci_runs`
-- "Fetch the logs for run 4821 and tell me why it failed." → `baron_ci_run_logs`
-- "List BeeMaster's environments and their latest deployments." → `baron_deploy_environments` + `baron_deploy_deployments`
+- "Using Baron, show me BeeMaster's pipelines and the status of the latest run." → `baron_ci_read op=pipelines` + `baron_ci_read op=runs`
+- "Fetch the logs for run 4821 and tell me why it failed." → `baron_ci_read op=run_logs`
+- "List BeeMaster's environments and their latest deployments." → `baron_deploy_read op=environments` + `baron_deploy_read op=deployments`
 - "Post 'CI is green on main' to Slack via Baron." → `baron_notify_send`
-- "Trigger the CI pipeline for BeeMaster." → `baron_ci_run_trigger` *(opt-in write)*
+- "Trigger the CI pipeline for BeeMaster." → `baron_ci_run op=trigger` *(opt-in write)*
 
 ---
 

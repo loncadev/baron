@@ -24,8 +24,8 @@ For each in-flight item, correlate it to its branch's PR via the **core-derived 
 - **C — closed with a stale role label** (label-keyed providers): the item's role reads `done`
   (the provider closed it — a PR merging with `Closes #N`) but `labels` still carries another
   role's label, so boards and label filters keep showing it as in-flight. Auto-fixable: run
-  `baron_issue_reconcile`. It commands no role — it clears the label the provider's own state
-  contradicts. Prefer it over `baron_issue_transition` here: transitioning would work on GitHub
+  `baron_issue_move op=reconcile`. It commands no role — it clears the label the provider's own state
+  contradicts. Prefer it over `baron_issue_move op=transition` here: transitioning would work on GitHub
   and be wrong on a provider where a close does not mean `done`. Since task-land reconciles after
   every merge, this class should now only appear for items landed before that, or where the
   provider had not closed the item yet when the run finished.
@@ -37,18 +37,18 @@ For each in-flight item, correlate it to its branch's PR via the **core-derived 
 
 1. **Scope.** Default to the current user's items (`@me`); `all` sweeps everyone. Query the two
    candidate sets:
-   - `baron_issue_query { role: "in_progress", assignee: "@me" }`  (drop `assignee` for `all`)
-   - `baron_issue_query { role: "in_review", assignee: "@me" }`
+   - `baron_issue_read { op: "query", role: "in_progress", assignee: "@me" }`  (drop `assignee` for `all`)
+   - `baron_issue_read { op: "query", role: "in_review", assignee: "@me" }`
 2. **Correlate each candidate** (skip any with no `branchName` — containers never have one):
-   - Scenario A: `baron_scm_pr_for_branch { sourceBranch: "<branchName>", state: "merged" }`.
+   - Scenario A: `baron_scm_read { op: "pr_for_branch", sourceBranch: "<branchName>", state: "merged" }`.
      A non-null result → **drift A** (merged but still in_progress).
-   - Scenario B: `baron_scm_pr_for_branch { sourceBranch: "<branchName>", state: "all" }`.
+   - Scenario B: `baron_scm_read { op: "pr_for_branch", sourceBranch: "<branchName>", state: "all" }`.
      A null result → **drift B** (in_review with no PR at all).
 3. **Report + confirm.** Show a compact table (key · title · current role · finding · suggested fix).
    If nothing drifted, say so and stop. For the drift-A set, batch-confirm with `AskUserQuestion`
    ("N items merged but still in progress — move them to in_review?"). Drift-B items are reported for
    manual attention only.
-4. **Apply** the confirmed drift-A fixes: `baron_issue_transition { id, role: "in_review" }` for each,
+4. **Apply** the confirmed drift-A fixes: `baron_issue_move { op: "transition", id, role: "in_review" }` for each,
    then re-report what moved.
 
 ## Rules

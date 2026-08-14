@@ -19,13 +19,13 @@ Idempotent finish: push the branch, check for an existing PR first, and only the
 2. **Preflight local git**: `git status --porcelain` — dirty tree → stop (commit/stash first). Then
    **push**: `git push -u origin HEAD` (never `--force`; on a non-fast-forward reject, explain the
    rebase path and stop).
-3. **Idempotency check** — call `baron_scm_pr_for_branch` with the branch:
+3. **Idempotency check** — call `baron_scm_read op=pr_for_branch` with the branch:
    - **PR exists** (non-null): do NOT create another. Report its URL, and add a
-     `baron_scm_pr_thread` note only if there is genuinely new context (new commits since).
+     `baron_scm_write op=pr_thread` note only if there is genuinely new context (new commits since).
    - **null**: continue.
 4. **Compose the PR description — never open an empty PR.** A reviewer should not have to
    reconstruct the change from the diff. Write it from what you actually have: the work item
-   (`baron_issue_get`) plus the real commits/diff on the branch (`git log <base>..HEAD --oneline`,
+   (`baron_issue_read op=get`) plus the real commits/diff on the branch (`git log <base>..HEAD --oneline`,
    `git diff --stat`). Cover, briefly:
    - **What changed** — the substance, not a file list.
    - **Why** — the problem from the item; call out any decision you made along the way.
@@ -64,5 +64,5 @@ Idempotent finish: push the branch, check for an existing PR first, and only the
 - **Never open a PR with an empty description.** Compose it (step 4) from the item + the real diff.
 - Call `baron_recipe_run` **once**, and only after the null check in step 3.
 - Do NOT transition the issue here — not manually either. If the user explicitly asks to move it,
-  use `baron_issue_transition` and say why (they own the exception).
+  use `baron_issue_move op=transition` and say why (they own the exception).
 - Surface `isError` codes with their hint and stop; never retry blindly.

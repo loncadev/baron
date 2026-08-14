@@ -9,7 +9,7 @@ argument-hint: "[@me | in_progress | in_review | backlog | bugs | tasks | storie
 
 # List work items
 
-A thin, read-only wrapper over `baron_issue_query` that maps everyday words to its normalized filters
+A thin, read-only wrapper over `baron_issue_read op=query` that maps everyday words to its normalized filters
 (`role`, `typeRole`, `assignee`, `limit`). It never mutates anything.
 
 ## Token → filter mapping
@@ -23,13 +23,13 @@ A thin, read-only wrapper over `baron_issue_query` that maps everyday words to i
 - **Sprint:** `sprint` / "this sprint" / "aktif sprint" → `iteration: "@current"` (the active sprint);
   a literal iteration path → that iteration. On providers without sprints this yields nothing.
 
-Filters are AND-combined. `baron_issue_query` returns a lightweight projection (no body); default cap
+Filters are AND-combined. `baron_issue_read op=query` returns a lightweight projection (no body); default cap
 is 50 — pass a higher `limit` only when the user asks for more.
 
 ## Steps
 
 1. **Parse** the tokens from the argument (combinable: `@me bugs`, `in_review`, …).
-2. **Query.** One `baron_issue_query` call with the mapped filters. `baron_issue_query` takes a single
+2. **Query.** One `baron_issue_read op=query` call with the mapped filters. `baron_issue_read op=query` takes a single
    `role`, so if the user asks for a set that spans roles (e.g. "my open work" = in_progress +
    in_review), run one query per role and merge. Default with no argument: `assignee: "@me"` across
    the active roles (in_progress + in_review).

@@ -32,6 +32,7 @@ import {
 import { KnowledgeLoop, createMemoryKnowledgeStore } from '@lonca/baron-knowledge-loop';
 import { type RecipeService, createRecipeService } from '@lonca/baron-recipes';
 import { describe, expect, it } from 'vitest';
+import { OP_ROUTES, TOOL_NAMES } from './consolidated.js';
 import {
   CI_TOOL_NAMES,
   DEPLOY_TOOL_NAMES,
@@ -109,10 +110,10 @@ describe('ci tools', () => {
   });
 
   it('advertises ci tools only when the ci port is bound', () => {
-    expect(activeToolDefinitions({ ci: ciPort() }).some((t) => t.name === CI_TOOL_NAMES.runs)).toBe(
+    expect(activeToolDefinitions({ ci: ciPort() }).some((t) => t.name === TOOL_NAMES.ciRead)).toBe(
       true,
     );
-    expect(activeToolDefinitions({}).some((t) => t.name === CI_TOOL_NAMES.runs)).toBe(false);
+    expect(activeToolDefinitions({}).some((t) => t.name === TOOL_NAMES.ciRead)).toBe(false);
   });
 
   it('dispatches ci tools and reports PORT_UNBOUND when unbound', async () => {
@@ -270,13 +271,9 @@ describe('deploy tools', () => {
 
   it('advertises + dispatches deploy only when the port is bound', async () => {
     expect(
-      activeToolDefinitions({ deploy: deployPort() }).some(
-        (t) => t.name === DEPLOY_TOOL_NAMES.deployments,
-      ),
+      activeToolDefinitions({ deploy: deployPort() }).some((t) => t.name === TOOL_NAMES.deployRead),
     ).toBe(true);
-    expect(activeToolDefinitions({}).some((t) => t.name === DEPLOY_TOOL_NAMES.deployments)).toBe(
-      false,
-    );
+    expect(activeToolDefinitions({}).some((t) => t.name === TOOL_NAMES.deployRead)).toBe(false);
     const unbound = await dispatchTool({}, DEPLOY_TOOL_NAMES.deployments, {});
     expect(unbound.structuredContent?.code).toBe('PORT_UNBOUND');
   });
@@ -747,7 +744,8 @@ describe('mutation channel', () => {
   });
 
   it('refuses a direct provider mutation, naming the channel and how to proceed', async () => {
-    const result = await dispatchTool(recipeOnly(), SCM_TOOL_NAMES.prMerge, {
+    const result = await dispatchTool(recipeOnly(), TOOL_NAMES.scmWrite, {
+      op: 'pr_merge',
       pullRequestId: '1',
     });
     expect(result.isError).toBe(true);
@@ -760,11 +758,11 @@ describe('mutation channel', () => {
     const ports = recipeOnly();
     const created = await dispatchTool(
       { ...ports, mutationChannel: DEFAULT_OPEN },
-      MCP_TOOL_NAMES.create,
-      { title: 'readable', typeRole: 'task' },
+      TOOL_NAMES.issueWrite,
+      { op: 'create', title: 'readable', typeRole: 'task' },
     );
     const id = (parse(created.content[0]?.text ?? '{}').id as string) ?? '1';
-    const read = await dispatchTool(ports, MCP_TOOL_NAMES.get, { id });
+    const read = await dispatchTool(ports, TOOL_NAMES.issueRead, { op: 'get', id });
     expect(read.isError).toBeUndefined();
   });
 
@@ -781,8 +779,8 @@ describe('mutation channel', () => {
   it("still allows the knowledge loop's own writes", async () => {
     const result = await dispatchTool(
       { ...recipeOnly(), knowledge: loop() },
-      LOOP_TOOL_NAMES.learningAppend,
-      { title: 'decided X', body: 'because Y', tags: ['design'] },
+      TOOL_NAMES.memoryAppend,
+      { op: 'learning', title: 'decided X', body: 'because Y', tags: ['design'] },
     );
     expect(result.isError).toBeUndefined();
   });
@@ -790,8 +788,8 @@ describe('mutation channel', () => {
   it('is open unless the policy says otherwise', async () => {
     const result = await dispatchTool(
       { issues: githubPort(), scm: scmPort() },
-      MCP_TOOL_NAMES.create,
-      { title: 'open by default', typeRole: 'task' },
+      TOOL_NAMES.issueWrite,
+      { op: 'create', title: 'open by default', typeRole: 'task' },
     );
     expect(result.isError).toBeUndefined();
   });
@@ -802,11 +800,11 @@ describe('mutation channel', () => {
       expect(typeof tool.mutatesProvider, tool.name).toBe('boolean');
     }
     const mutating = ALL_PUBLISHED.filter((t) => t.mutatesProvider).map((t) => t.name);
-    expect(mutating).toContain(SCM_TOOL_NAMES.prMerge);
-    expect(mutating).toContain(MCP_TOOL_NAMES.transition);
+    expect(mutating).toContain(TOOL_NAMES.scmWrite);
+    expect(mutating).toContain(TOOL_NAMES.issueMove);
     expect(mutating).toContain(NATIVE_TOOL_NAMES.request);
     expect(mutating).not.toContain(RECIPE_TOOL_NAMES.run);
-    expect(mutating).not.toContain(MCP_TOOL_NAMES.get);
+    expect(mutating).not.toContain(TOOL_NAMES.issueRead);
   });
 });
 
@@ -827,12 +825,11 @@ describe('tool publication', () => {
     const published = names({ toolsPublish: 'minimal' });
     expect(published).toContain(RECIPE_TOOL_NAMES.run);
     expect(published).toContain(RECIPE_TOOL_NAMES.list);
-    expect(published).toContain(MCP_TOOL_NAMES.get);
-    expect(published).toContain(MCP_TOOL_NAMES.query);
-    expect(published).toContain(SCM_TOOL_NAMES.prStatus);
-    // The mutating primitives are what you opt into — and they are exactly what recipe-only refuses.
-    expect(published).not.toContain(MCP_TOOL_NAMES.create);
-    expect(published).not.toContain(SCM_TOOL_NAMES.prMerge);
+    expect(published).toContain(TOOL_NAMES.issueRead);
+    expect(published).toContain(TOOL_NAMES.scmRead);
+    // The mutating tools are what you opt into — and they are exactly what recipe-only refuses.
+    expect(published).not.toContain(TOOL_NAMES.issueWrite);
+    expect(published).not.toContain(TOOL_NAMES.scmWrite);
   });
 
   it('cuts an issues+scm install well inside a client budget', () => {
@@ -844,22 +841,97 @@ describe('tool publication', () => {
   // name, so a smaller default would break them out of the box.
   it('publishes every tool the bound ports offer when the policy says nothing', () => {
     const published = names();
-    expect(published).toContain(MCP_TOOL_NAMES.create);
-    expect(published).toContain(SCM_TOOL_NAMES.prMerge);
+    expect(published).toContain(TOOL_NAMES.issueWrite);
+    expect(published).toContain(TOOL_NAMES.scmWrite);
   });
 
   it('an explicit list publishes exactly those toolsets, whole', () => {
     const published = names({ toolsPublish: ['issues'] });
-    expect(published).toContain(MCP_TOOL_NAMES.create);
-    expect(published).toContain(MCP_TOOL_NAMES.get);
+    expect(published).toContain(TOOL_NAMES.issueWrite);
+    expect(published).toContain(TOOL_NAMES.issueRead);
     // Explicit means explicit: asking for issues does not quietly add the recipe channel back.
     expect(published).not.toContain(RECIPE_TOOL_NAMES.run);
-    expect(published).not.toContain(SCM_TOOL_NAMES.prStatus);
+    expect(published).not.toContain(TOOL_NAMES.scmRead);
   });
 
   it('never publishes a toolset whose port is unbound, whatever the rule says', () => {
     expect(
       activeToolDefinitions({ issues: githubPort(), toolsPublish: ['scm', 'ci'] }),
     ).toHaveLength(0);
+  });
+});
+
+// One tool per verb, not per endpoint. Publishing one per primitive spent 27 of Cursor's 40-tool
+// session budget on an issues+scm install and 36 with every port bound, so Baron alone consumed most
+// of a user's budget and could not sit next to the provider servers it exists to sit above.
+describe('consolidated tool surface', () => {
+  const everything = {
+    issues: githubPort(),
+    scm: scmPort(),
+    ci: ciPort(),
+    deploy: deployPort(),
+    notify: notifyPort(),
+    recipes: recipesService(),
+    knowledge: loop(),
+    nativeAccess: (async () => ({ status: 200, ok: true, body: {}, truncated: false })) as never,
+  };
+
+  it('publishes 14 tools with every port bound', () => {
+    expect(activeToolDefinitions(everything)).toHaveLength(14);
+  });
+
+  it('routes an op to the primitive it names', async () => {
+    const ports = { issues: githubPort() };
+    const created = await dispatchTool(ports, TOOL_NAMES.issueWrite, {
+      op: 'create',
+      title: 'routed',
+      typeRole: 'task',
+    });
+    expect(created.isError).toBeUndefined();
+    expect(parse(created.content[0]?.text ?? '{}').title).toBe('routed');
+  });
+
+  it('does not pass the op down as an argument to the primitive', async () => {
+    // additionalProperties is false on every primitive schema, and requireString would not see `op`
+    // as a field — but the contract is that `op` SELECTS, it is not an argument. Prove it by using a
+    // primitive that rejects unknown input shapes.
+    const read = await dispatchTool({ issues: githubPort() }, TOOL_NAMES.issueRead, {
+      op: 'query',
+      limit: 1,
+    });
+    expect(read.isError).toBeUndefined();
+  });
+
+  it('names the available ops when one is missing', async () => {
+    const result = await dispatchTool({ issues: githubPort() }, TOOL_NAMES.issueWrite, {
+      title: 'no op',
+    });
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent?.code).toBe('INVALID_ARGS');
+    expect(result.content[0]?.text).toContain('create');
+  });
+
+  it('names them again when one is wrong, rather than only saying no', async () => {
+    const result = await dispatchTool({ issues: githubPort() }, TOOL_NAMES.issueMove, {
+      op: 'teleport',
+      id: '1',
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain('transition');
+    expect(result.content[0]?.text).toContain('block');
+  });
+
+  it('every op routes to a primitive dispatch actually handles', async () => {
+    // A route naming a primitive nobody dispatches would fail only when an agent tried that op.
+    const ports = { issues: githubPort(), scm: scmPort(), ci: ciPort(), deploy: deployPort() };
+    for (const [tool, ops] of Object.entries(OP_ROUTES)) {
+      for (const [op, primitive] of Object.entries(ops)) {
+        const result = await dispatchTool(ports, tool, { op });
+        // Bad arguments are fine — UNKNOWN_TOOL is not: it means the route points nowhere.
+        expect(result.structuredContent?.code, `${tool}.${op} -> ${primitive}`).not.toBe(
+          'UNKNOWN_TOOL',
+        );
+      }
+    }
   });
 });

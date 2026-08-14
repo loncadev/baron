@@ -20,7 +20,7 @@ is the answer — report it, don't route around it.
 1. **Identify the work item**: parse the current branch (`git rev-parse --abbrev-ref HEAD`) as
    `<prefix>/<id>-<slug>`. If the branch doesn't match, ask which item to land — never merge a PR
    you inferred.
-2. **Check before you merge** — call `baron_scm_pr_for_branch`, then `baron_scm_pr_status` on the
+2. **Check before you merge** — call `baron_scm_read op=pr_for_branch`, then `baron_scm_read op=pr_status` on the
    PR it returns. Read three things and say them out loud:
    - **checks** (`rollup`) — `failed` or `pending` means STOP and ask, rather than merging red or
      unfinished. `unknown` means the view was incomplete, and `checks.unreadable` names exactly
