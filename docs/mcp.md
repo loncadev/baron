@@ -51,22 +51,22 @@ sourced from the core's abstract vocabulary, so they never expose provider-nativ
 
 ## Toolsets: what an install publishes
 
-Cursor caps a session at **40 tools in total**. Publishing everything a policy binds spends 27 of
-that on an issues+scm install, so Baron cannot sit next to the provider MCP servers it is meant to
-sit above — the opposite of the point.
+**You probably do not need this.** Cursor caps a session at 40 tools, and consolidating by verb
+brought a typical issues+scm install to **10** — Baron already sits comfortably next to the provider
+MCP servers it exists to sit above. Toolsets predate that fix; they now serve taste and policy rather
+than budget.
 
-`minimal` publishes the **recipe channel plus every tool that changes no provider**: 11 on an
-issues+scm install instead of 27. That follows the product's own argument — work goes through
-recipes, so the mutating primitives are the ones you opt into, and they are exactly the ones
-`recipe-only` would refuse anyway.
+`minimal` publishes the **recipe channel plus every tool that changes no provider**. That follows the
+product's own argument — work goes through recipes, so the mutating primitives are the ones you opt
+into, and they are exactly the ones `recipe-only` would refuse anyway.
 
 ```json
 { "tools": { "publish": "minimal" } }
 ```
 
-- `all` (absent) — everything the bound ports offer. Still the default, because the shipped Claude
-  Code skills call mutating primitives **by name**: `minimal` hides the tools they call and breaks
-  them out of the box. Flipping the default waits on those skills going through recipes.
+- `all` (absent) — everything the bound ports offer. The default, and expected to stay one: the
+  shipped Claude Code skills need provider writes, so `minimal` hides tools they call. With the
+  budget problem gone there is nothing to buy by flipping it.
 - `minimal` — the recipe channel whole, plus every tool that does not change a provider.
 - a list of toolsets — `issues`, `scm`, `ci`, `deploy`, `notify`, `recipes`, `knowledge`, `native`.
   Explicit means explicit: asking for `["issues"]` does not quietly add the recipe channel back.

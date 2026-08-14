@@ -36,15 +36,18 @@ checks were failing and turned this repository's own main red; `baron init` was 
 type map that left items with no canonical branch. None of that was visible from the test suite, and
 none of it survived two hours of actually using the thing.
 
-## Gate 2 — Installability and reach
+## Gate 2 — Installability and reach — **done**
 
-Baron publishes 36 MCP tools. Cursor caps a session at 40 tools in total, so Baron alone consumes
-most of a user's budget and cannot be installed next to the provider MCP servers it is meant to sit
-above. That is the opposite of the point.
+Baron published 36 MCP tools against Cursor's cap of 40 per session, so it consumed most of a user's
+budget and could not be installed next to the provider MCP servers it is meant to sit above — the
+opposite of the point.
 
-This gate consolidates the tool surface by verb rather than by endpoint, ships a default toolset of
-around seven tools, and uses something no other server can: `policy.json` already knows which ports
-are bound, so tools for unbound ports are never published at all.
+Consolidating by **verb** rather than by endpoint settled it: **14 published tools** with every port
+bound, **10** on a typical issues+scm install. Measurement changed the plan on the way: a small
+default toolset was tried first and abandoned, because the shipped skills legitimately need provider
+writes and hiding them would have broken the install rather than slimmed it. `policy.json` still
+does the other half — it already knows which ports are bound, so tools for unbound ports are never
+published at all.
 
 Alongside it: a short demo that shows one recipe moving a work item and opening a pull request, and
 registration on the surfaces where MCP servers are actually discovered.

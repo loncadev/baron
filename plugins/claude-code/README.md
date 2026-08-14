@@ -22,7 +22,7 @@ plugins/claude-code/
   skills/task-finish/SKILL.md   # /baron:task-finish → push + draft PR (idempotent; role unmoved — merge outcome is the provider's)
   skills/task-land/SKILL.md     # /baron:task-land   → undraft + merge through Baron (never gh/az); MERGE_FAILED is an answer
   skills/task-move/SKILL.md     # /baron:task-move   → move to a role; backward/reopen needs a reason
-  skills/task-list/SKILL.md     # /baron:task-list   → read-only listing over baron_issue_query
+  skills/task-list/SKILL.md     # /baron:task-list   → read-only listing over baron_issue_read { op: "query" }
   skills/task-sync/SKILL.md     # /baron:task-sync   → sweep board↔PR drift (merged-but-stuck) + batch-fix
   skills/ship/SKILL.md          # /baron:ship        → runs the ship recipe
   skills/run-recipe/SKILL.md    # /baron:run-recipe  → runs any recipe by name (incl. project recipes)
