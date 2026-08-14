@@ -1,0 +1,25 @@
+# The build context is the repo root (pnpm workspace: the lockfile and every sibling package have to
+# be reachable), which means everything not excluded here is copied into a build layer.
+
+# Credentials must never enter an image layer. `.baron/credentials` is gitignored, so it is invisible
+# to `git ls-files` but very much present in a working checkout — and a layer keeps it even if a
+# later step deletes the file. The committed `.baron/policy.json` is deliberately NOT excluded: it is
+# policy only, and it is what lets the server start and answer an introspection exchange.
+.baron/credentials
+**/.baron/credentials
+*.env
+.env*
+
+# Rebuilt inside the image; copying host artifacts risks a stale or platform-wrong binary.
+node_modules
+**/node_modules
+**/dist
+.git
+
+# Nothing the server needs at build or run time.
+.github
+docs
+examples
+**/*.test.ts
+**/*.md
+!README.md

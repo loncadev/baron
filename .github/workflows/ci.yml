@@ -51,3 +51,29 @@ jobs:
       # non-commercial/proprietary dep before it can poison the permissive/commercial distribution.
       - name: License check
         run: pnpm licenses:check
+
+  # Glama builds every open-source MCP server in a sandbox and withholds distribution — the profile
+  # page survives, but the server stops appearing in search and category listings — when the build
+  # does not start and answer an introspection exchange. That makes a rotting Dockerfile worse than
+  # no Dockerfile, so the image is built and actually spoken to on every change.
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build the image
+        run: docker build -t baron-mcp:ci .
+
+      - name: The container answers an MCP handshake
+        run: node scripts/mcp-handshake.mjs docker run -i --rm baron-mcp:ci
+
+      - name: No credentials baked into the image
+        # A layer keeps a file even when a later step deletes it, so this asserts the .dockerignore
+        # entry rather than trusting it. `credentials.example` is committed and carries only empty
+        # placeholders; a real `.baron/credentials` must never appear.
+        run: |
+          if docker run --rm --entrypoint sh baron-mcp:ci -c 'test -f /app/.baron/credentials'; then
+            echo "::error::.baron/credentials is present in the image"
+            exit 1
+          fi
+          echo "no credentials in the image"
