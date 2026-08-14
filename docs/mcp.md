@@ -115,6 +115,37 @@ so an agent can read the gap and self-correct (retry with a different role, drop
 of the failure being swallowed by the protocol channel. Calling a tool for an unconfigured port
 returns `PORT_UNBOUND`.
 
+## Running it as a container
+
+`npx` is the shortest path and the one the plugin manifest uses; a container is there for anyone who
+would rather not have Node on the host, and for the indexers that build every open-source MCP server
+in a sandbox before listing it.
+
+```bash
+docker build -t baron-mcp .
+docker run -i --rm -v "$PWD:/project" -e BARON_ROOT=/project baron-mcp
+```
+
+`-i` is not optional: the client speaks JSON-RPC over stdin/stdout, so a container without an open
+stdin has nothing to talk to. Logs go to stderr — anything on stdout corrupts the stream.
+
+The image bakes in Baron's **own** committed `.baron/policy.json` as the default root, purely so a
+bare `docker run` starts and can be introspected: the server refuses to start without a policy
+(`POLICY_NOT_FOUND`), and a container that dies immediately is indistinguishable from a broken image.
+It is policy only. No credentials are in the image — `.dockerignore` keeps `.baron/credentials` out
+and CI asserts it, because a layer keeps a file even when a later step deletes it. Mount your own
+project and every call runs against your policy and your credentials instead.
+
+To check any launch path — image, local build, or a published tarball — speak the protocol to it:
+
+```bash
+node scripts/mcp-handshake.mjs docker run -i --rm baron-mcp
+```
+
+It performs the same `initialize` → `tools/list` exchange an indexer does, and fails loudly on the
+two things that break stdio servers quietly: a process that exits before answering, and anything
+non-JSON on stdout.
+
 ## Claude Code plugin
 
 `plugins/claude-code` registers the `baron` MCP server and ships **skills** — a `baron` skill that
