@@ -8,7 +8,7 @@ all the *opinion* (which steps, in what order) lives in the recipe, editable wit
 A recipe runs as **one deterministic, rule-enforced call** — the engine enforces the step order, not
 the caller. Three surfaces, same engine:
 
-- **CLI** — [`baron run --recipe <path>`](./cli.md#baron-run). `ask` steps prompt on stdin.
+- **CLI** — [`baron run --recipe <name-or-path>`](./cli.md#baron-run). `ask` steps prompt on stdin.
 - **MCP** — [`baron_recipe_run`](./mcp.md#tools) `{ name, inputs }` runs a recipe by name
   (built-ins: `task-new`, `task-start`, `task-move`, `task-finish`, `task-land`, `ship`; project
   recipes live in `.baron/recipes/*.yaml`).
@@ -179,5 +179,6 @@ item on merge lands it in `done`; elsewhere `task-move` / `task-sync` settles it
 - `ship` — a multi-port example: draft PR (`scm`) + `in_review` (`issues`) + CI trigger (`ci`) +
   notify (`notify`) in one run.
 
-Copy any of them into `.baron/recipes/` as a starting point for your own; project recipes there are
+Built-ins run by name with no file at all; to adapt one, copy it out of the
+`@lonca/baron-recipes` package (or this repository's `packages/recipes/recipes/`) into `.baron/recipes/` as a starting point for your own; project recipes there are
 runnable by name too.

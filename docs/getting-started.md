@@ -76,7 +76,7 @@ Pick up new releases with `/plugin marketplace update baron` && `/plugin update 
 
 ```bash
 npx -y @lonca/baron-cli@latest doctor      # validate the policy against the live provider (drift → exit 1)
-npx -y @lonca/baron-cli@latest run --recipe <path-to>/task-start.yaml
+npx -y @lonca/baron-cli@latest run --recipe task-start
 ```
 
 `doctor` reports a mapped native state/type/column that no longer exists (exit `0` = no drift).
