@@ -809,3 +809,57 @@ describe('mutation channel', () => {
     expect(mutating).not.toContain(MCP_TOOL_NAMES.get);
   });
 });
+
+// Cursor caps a session at 40 tools in TOTAL. Publishing everything a policy binds spent 27 of that
+// on an issues+scm install and left Baron unable to sit next to the provider servers it is meant to
+// sit above — which is the arrangement the product exists to make possible.
+describe('tool publication', () => {
+  const bound = {
+    issues: githubPort(),
+    scm: scmPort(),
+    recipes: recipesService(),
+    knowledge: loop(),
+  };
+  const names = (extra: Partial<McpPorts> = {}) =>
+    activeToolDefinitions({ ...bound, ...extra }).map((t) => t.name);
+
+  it("'minimal' is the recipe channel plus everything that changes no provider", () => {
+    const published = names({ toolsPublish: 'minimal' });
+    expect(published).toContain(RECIPE_TOOL_NAMES.run);
+    expect(published).toContain(RECIPE_TOOL_NAMES.list);
+    expect(published).toContain(MCP_TOOL_NAMES.get);
+    expect(published).toContain(MCP_TOOL_NAMES.query);
+    expect(published).toContain(SCM_TOOL_NAMES.prStatus);
+    // The mutating primitives are what you opt into — and they are exactly what recipe-only refuses.
+    expect(published).not.toContain(MCP_TOOL_NAMES.create);
+    expect(published).not.toContain(SCM_TOOL_NAMES.prMerge);
+  });
+
+  it('cuts an issues+scm install well inside a client budget', () => {
+    expect(names({ toolsPublish: 'minimal' }).length).toBeLessThan(names().length);
+    expect(names({ toolsPublish: 'minimal' }).length).toBeLessThanOrEqual(15);
+  });
+
+  // Absent policy must keep publishing everything: the shipped skills call these primitives by
+  // name, so a smaller default would break them out of the box.
+  it('publishes every tool the bound ports offer when the policy says nothing', () => {
+    const published = names();
+    expect(published).toContain(MCP_TOOL_NAMES.create);
+    expect(published).toContain(SCM_TOOL_NAMES.prMerge);
+  });
+
+  it('an explicit list publishes exactly those toolsets, whole', () => {
+    const published = names({ toolsPublish: ['issues'] });
+    expect(published).toContain(MCP_TOOL_NAMES.create);
+    expect(published).toContain(MCP_TOOL_NAMES.get);
+    // Explicit means explicit: asking for issues does not quietly add the recipe channel back.
+    expect(published).not.toContain(RECIPE_TOOL_NAMES.run);
+    expect(published).not.toContain(SCM_TOOL_NAMES.prStatus);
+  });
+
+  it('never publishes a toolset whose port is unbound, whatever the rule says', () => {
+    expect(
+      activeToolDefinitions({ issues: githubPort(), toolsPublish: ['scm', 'ci'] }),
+    ).toHaveLength(0);
+  });
+});
