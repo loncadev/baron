@@ -1,9 +1,14 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Stub octokit so we can assert the real transport's @me handling without a network — the conformance
 // suite runs on the in-memory transport and so cannot catch a bug in the live octokit path (this one:
 // GitHub's assignIssue used to send the literal '@me' as a login, which GitHub rejects).
-const mocks = vi.hoisted(() => ({ update: vi.fn(), getAuthenticated: vi.fn(), get: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  addLabels: vi.fn(),
+  update: vi.fn(),
+  getAuthenticated: vi.fn(),
+  get: vi.fn(),
+}));
 
 vi.mock('octokit', () => ({
   Octokit: vi.fn(() => ({
@@ -11,7 +16,7 @@ vi.mock('octokit', () => ({
     // a permission-error hook on it.
     hook: { before: vi.fn(), error: vi.fn() },
     rest: {
-      issues: { update: mocks.update, get: mocks.get },
+      issues: { update: mocks.update, get: mocks.get, addLabels: mocks.addLabels },
       users: { getAuthenticated: mocks.getAuthenticated },
     },
   })),
@@ -72,5 +77,60 @@ describe('github transport native type', () => {
 
       expect((await transport.getIssue('7')).nativeType).toBe('issue');
     }
+  });
+});
+
+// A role that pins no native state must not leave a terminal one in place. Only `done` pins 'closed'
+// on GitHub, so moving a closed item anywhere else IS a reopen — and without it the label said
+// in_progress while GitHub said closed, which is the exact drift `reconcile` treats as authoritative:
+// it would clear the new label and put `done` back, undoing the move. The conformance suite cannot
+// see this — the memory transport has no separate closed concept.
+describe('github applyTarget reopening', () => {
+  beforeEach(() => {
+    for (const m of Object.values(mocks)) m.mockReset();
+  });
+
+  const issue = (state: string) => ({
+    data: { number: 7, title: 't', state, labels: [], body: null, assignee: null },
+  });
+
+  it('reopens a closed item when the target pins no state', async () => {
+    mocks.get.mockResolvedValue(issue('closed'));
+    mocks.addLabels.mockResolvedValue({ data: {} });
+    mocks.update.mockResolvedValue({ data: {} });
+
+    await createGithubTransport({ owner: 'o', repo: 'r', token: 'x' }).applyTarget('7', {
+      label: 'in-progress',
+    });
+
+    expect(mocks.update).toHaveBeenCalledWith(
+      expect.objectContaining({ issue_number: 7, state: 'open', state_reason: 'reopened' }),
+    );
+  });
+
+  it('leaves an already-open item alone — a move between open roles costs no state write', async () => {
+    mocks.get.mockResolvedValue(issue('open'));
+    mocks.addLabels.mockResolvedValue({ data: {} });
+
+    await createGithubTransport({ owner: 'o', repo: 'r', token: 'x' }).applyTarget('7', {
+      label: 'in-review',
+    });
+
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
+  it('still closes when the target pins closed', async () => {
+    mocks.get.mockResolvedValue(issue('open'));
+    mocks.addLabels.mockResolvedValue({ data: {} });
+    mocks.update.mockResolvedValue({ data: {} });
+
+    await createGithubTransport({ owner: 'o', repo: 'r', token: 'x' }).applyTarget('7', {
+      label: 'done',
+      state: 'closed',
+    });
+
+    expect(mocks.update).toHaveBeenCalledWith(
+      expect.objectContaining({ state: 'closed', state_reason: 'completed' }),
+    );
   });
 });

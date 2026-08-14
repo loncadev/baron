@@ -119,6 +119,24 @@ export function createGithubTransport(options: GithubTransportOptions): IssuesTr
       if (roleLabel !== undefined) {
         await octokit.rest.issues.addLabels({ owner, repo, issue_number, labels: [roleLabel] });
       }
+      // A role that pins no native state must not leave a terminal one in place. Only `done` pins
+      // 'closed' here, so moving a closed item anywhere else IS a reopen — and without this the
+      // label said in_progress while GitHub said closed, which is precisely the drift `reconcile`
+      // treats as authoritative: it would clear the new label and put `done` back, undoing the move.
+      // Read first rather than always writing 'open': a transition between two open roles is the
+      // common case and should not cost a state write.
+      if (state === undefined && roleLabel !== undefined) {
+        const { data: before } = await octokit.rest.issues.get({ owner, repo, issue_number });
+        if (before.state === GH_STATE.CLOSED) {
+          await octokit.rest.issues.update({
+            owner,
+            repo,
+            issue_number,
+            state: GH_STATE.OPEN,
+            state_reason: 'reopened',
+          });
+        }
+      }
       if (state === GH_STATE.CLOSED) {
         await octokit.rest.issues.update({
           owner,
