@@ -149,6 +149,8 @@ async function ensureCredentials(
   root: string,
   descriptor: ProviderDescriptor,
   env: Env,
+  /** `--force` means "do not ask me"; a browser sign-in is nothing but asking. */
+  nonInteractive: boolean,
 ): Promise<Env> {
   const required = [
     ...new Set([
@@ -185,7 +187,9 @@ async function ensureCredentials(
   // The provider can hand a token over directly where it supports it. Offered rather than forced:
   // a fine-grained PAT is narrower than any scope an OAuth app can request, so someone who wants
   // the tighter credential should not have to fight the friendlier path to get it.
-  const deviceAuth = descriptor.createDeviceAuth?.(env);
+  // Never on a non-interactive run. The flow waits up to fifteen minutes for a human to approve a
+  // code in a browser, so offering it where nobody can answer does not degrade — it hangs.
+  const deviceAuth = nonInteractive ? undefined : descriptor.createDeviceAuth?.(env);
   let authorized: string | undefined;
   const tokenKey = missing.find((key) => SECRET_KEY.test(key) && detected[key] === undefined);
   if (deviceAuth !== undefined && tokenKey !== undefined) {
@@ -453,6 +457,7 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
     options.root,
     descriptor,
     options.env ?? {},
+    options.force === true,
   );
 
   const introspector = options.introspector ?? createIntrospector(effectiveEnv);

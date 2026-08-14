@@ -14,6 +14,7 @@ import {
   exampleAzureDevOpsLinkMap,
 } from '@lonca/baron-adapter-azure-devops';
 import {
+  BARON_GITHUB_CLIENT_ID,
   type DeviceAuth,
   GITHUB_PROVIDER,
   createGithubCiTransport,
@@ -254,10 +255,11 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
       });
     },
     createDeviceAuth(env) {
-      // Public by design (the device flow has no secret), but still an app SOMEBODY registered — so
-      // it is configuration, not a constant baked in here. Absent means the flow is not offered.
-      const clientId = env.BARON_GITHUB_CLIENT_ID;
-      if (clientId === undefined || clientId.length === 0) return undefined;
+      // Defaults to Baron's own app so the flow is offered out of the box — an id nobody ships is a
+      // feature nobody gets. Set BARON_GITHUB_CLIENT_ID to use a different app, or to empty to opt
+      // out of the offer entirely and go back to pasting a token.
+      const clientId = env.BARON_GITHUB_CLIENT_ID ?? BARON_GITHUB_CLIENT_ID;
+      if (clientId.length === 0) return undefined;
       return createGithubDeviceAuth({
         clientId,
         ...(env.BARON_GITHUB_SCOPE !== undefined ? { scope: env.BARON_GITHUB_SCOPE } : {}),

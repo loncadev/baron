@@ -100,6 +100,7 @@ export { createGithubTransport, type GithubTransportOptions } from './transport.
 export { createGithubIntrospector } from './introspector.js';
 export { createGithubCredentialProbe } from './credential.js';
 export {
+  BARON_GITHUB_CLIENT_ID,
   type DeviceAuth,
   type DeviceCodePrompt,
   createGithubDeviceAuth,

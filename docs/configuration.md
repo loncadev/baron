@@ -112,15 +112,28 @@ fine-grained token by hand: it prints a short code, you approve it in a browser,
 back with the permissions the app was granted. No client secret is involved, which is precisely why a
 local CLI can do it — the same mechanism `gh` uses.
 
-It is offered when an app id is configured:
+**It is on by default.** Baron ships the client id of its own GitHub App, registered under the
+`loncadev` organisation that owns this repository, so an interactive `baron init` offers the browser
+sign-in without anyone registering anything first. A client id is public by design — it is not a
+secret, and it grants nothing on its own. What it identifies is the consent screen you approve, and
+shipping one means that screen names Baron rather than whichever stranger's app a copy-pasted id
+happened to belong to.
+
+The id is shared; the tokens are not. Every install completes its own flow and receives its own
+token, scoped to the repositories that install approves, revocable at any time from GitHub's
+*Applications* settings without affecting anyone else.
+
+To point the flow at your own app instead — an organisation that would rather approve its own — set:
 
 ```
 BARON_GITHUB_CLIENT_ID=Ov23li...      # an OAuth App or GitHub App client id — public by design
 BARON_GITHUB_SCOPE=repo               # optional; OAuth Apps only, GitHub Apps ignore it
 ```
 
-Someone has to register that app once — Baron ships no client id of its own, because an id baked
-into an open-source CLI is an id anyone can put their own name behind.
+Setting `BARON_GITHUB_CLIENT_ID` to an empty value turns the offer off entirely, leaving the
+paste-a-token path. `baron init --force` never offers it either: the flow waits up to fifteen
+minutes for a human to approve a code in a browser, so a run that was told not to ask cannot start
+one.
 
 **It is offered, not forced.** A fine-grained PAT is narrower than any scope an OAuth App can
 request (`repo` is the smallest single scope covering issues, contents and pull requests), so an
