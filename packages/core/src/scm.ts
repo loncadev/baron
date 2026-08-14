@@ -76,6 +76,24 @@ export interface BranchDraft {
 }
 
 /** Input to `scm.pr.create`. */
+/**
+ * What a pull request says about the work item it links.
+ *
+ *  - `closes`  : finishing it. The provider's closing keyword, where it has one.
+ *  - `relates` : referencing it and nothing more.
+ *
+ * Providers differ in how much of this they can express: GitHub distinguishes them (`Closes #N` vs
+ * `Refs #N`), Azure's `AB#N` links either way without closing. That is the provider being less
+ * expressive, not a gap Baron hides.
+ */
+export const PR_ISSUE_RELATIONS = ['closes', 'relates'] as const;
+
+export type PrIssueRelation = (typeof PR_ISSUE_RELATIONS)[number];
+
+export function isPrIssueRelation(value: string): value is PrIssueRelation {
+  return (PR_ISSUE_RELATIONS as readonly string[]).includes(value);
+}
+
 export interface PullRequestDraft {
   readonly title: string;
   readonly body?: string | undefined;
@@ -89,6 +107,13 @@ export interface PullRequestDraft {
    * carrying a URL is not a link. Abstract here on purpose: recipes never spell a vendor's keyword.
    */
   readonly linkedIssueKey?: string | undefined;
+  /**
+   * What the PR claims about that item. Defaults to `closes`, which is what every caller got before
+   * this existed — and the reason it needed to exist: closing is the strongest statement a PR can
+   * make, and Baron was making it on the caller's behalf every time. A spike, a partial change, or
+   * the first of several PRs serving one item all want `relates`.
+   */
+  readonly linkedIssueRelation?: PrIssueRelation | undefined;
   /**
    * Who owns this PR. Accepts the '@me' sentinel like the issues port, so a recipe can say "assign it
    * to whoever ran this" without knowing a handle. Negotiated where PRs have no assignees (Azure).
@@ -107,6 +132,8 @@ export interface NativePullRequestInput {
   readonly draft: boolean;
   /** Work item to link natively; the transport renders its provider's keyword into the body. */
   readonly linkedIssueKey?: string | undefined;
+  /** Whether that link should close the item on merge, where the provider distinguishes the two. */
+  readonly linkedIssueRelation?: PrIssueRelation | undefined;
   /** Resolved assignees (the port already turned '@me' into a handle); empty when unsupported. */
   readonly assignees?: readonly string[] | undefined;
   /** Enable the provider's auto-complete / auto-merge; only set when the manifest declares it. */
@@ -379,6 +406,8 @@ export class BaseScmAdapter implements ScmPort {
       targetBranch,
       draft: draftState,
       linkedIssueKey: draft.linkedIssueKey,
+      // Default here rather than in each adapter, so every provider is asked the same question.
+      linkedIssueRelation: draft.linkedIssueRelation ?? PR_ISSUE_RELATIONS[0],
       assignees,
       autoComplete,
     });
