@@ -677,3 +677,75 @@ steps:
     );
   });
 });
+
+// A guard that cannot express a count is a real limit on decision #19: the rules are supposed to
+// live in the engine, and "refuse when the query found nothing" is the first one anyone would write.
+describe('guarding on a count', () => {
+  it('a require can refuse on an empty result', async () => {
+    const recipe = loadRecipe(`
+name: needs-a-match
+steps:
+  - do: issue.query
+    as: found
+    with: { role: in_review }
+  - require:
+      truthy: "\${found.length}"
+      message: "nothing in review — found \${found.length}."
+  - message: "reviewing \${found.length}"
+`);
+    await expect(runRecipe(recipe, { ports: allPorts(), asker: scriptedAsker() })).rejects.toThrow(
+      /nothing in review/,
+    );
+  });
+
+  it('and passes once there is one, reporting the count', async () => {
+    const recipe = loadRecipe(`
+name: has-a-match
+steps:
+  - do: issue.create
+    as: issue
+    with: { title: "one", typeRole: task }
+  - do: issue.transition
+    with: { id: "\${issue.id}", role: in_review }
+  - do: issue.query
+    as: found
+    with: { role: in_review }
+  - require:
+      truthy: "\${found.length}"
+      message: "nothing in review"
+  - message: "reviewing \${found.length}"
+`);
+    const asker = scriptedAsker();
+    await runRecipe(recipe, { ports: allPorts(), asker });
+    expect(asker.notes.some((n) => n === 'reviewing 1')).toBe(true);
+  });
+});
+
+// The number zero is a count here, never an identity. A work item whose id is the STRING '0' is
+// present; a list whose length is the NUMBER 0 is empty. Guards have to tell those apart.
+describe('zero in a guard', () => {
+  it("treats a count of zero as absent but an id of '0' as present", async () => {
+    const refusesOnZero = loadRecipe(`
+name: zero-count
+steps:
+  - require:
+      truthy: "\${count}"
+      message: "count was \${count}"
+`);
+    await expect(
+      runRecipe(refusesOnZero, { ports: allPorts(), asker: scriptedAsker(), inputs: { count: 0 } }),
+    ).rejects.toThrow(/count was 0/);
+
+    const passesOnZeroId = loadRecipe(`
+name: zero-id
+steps:
+  - require:
+      truthy: "\${id}"
+      message: "no id"
+  - message: "id is \${id}"
+`);
+    const asker = scriptedAsker();
+    await runRecipe(passesOnZeroId, { ports: allPorts(), asker, inputs: { id: '0' } });
+    expect(asker.notes.some((n) => n === 'id is 0')).toBe(true);
+  });
+});
