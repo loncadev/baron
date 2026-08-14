@@ -1,0 +1,56 @@
+name: task-move
+description: Move a work item to a workflow role, refusing a backward or reopening move that has no recorded reason. Blocking is NOT a move — it is orthogonal (issue.block / issue.unblock) and leaves the role alone.
+steps:
+  - ask: { as: issueId, type: text, message: "Work item id?" }
+  - ask: { as: role, type: text, message: "Target role? (backlog, ready, in_progress, in_review, done)" }
+  # Optional here, REQUIRED by the guards below for the moves that need it — so the caller is only
+  # asked to justify what actually warrants it.
+  - ask:
+      as: reason
+      type: text
+      message: "Why? (required when moving backwards or reopening; empty otherwise)"
+      optional: true
+  - do: issue.get
+    as: issue
+    with:
+      id: ${issueId}
+  # What the move IS, from the core lifecycle order — a fact, not a judgement.
+  - do: issue.classify
+    as: move
+    with:
+      id: ${issueId}
+      role: ${role}
+  - message: "${issue.key} is already ${move.from} — nothing to do."
+    when:
+      equals: ["${move.kind}", "noop"]
+  # The governance, and the reason it lives here rather than in the primitive: WHICH moves need
+  # justifying is workflow opinion (invariant #3), while the order they are judged against is not.
+  # Two guards rather than one because a condition holds exactly one comparator — there is no `or`.
+  - require:
+      truthy: "${reason}"
+      message: "${issue.key} would move backwards (${move.from} → ${move.to}). That needs a reason on the record — re-run with one."
+    when:
+      equals: ["${move.kind}", "regress"]
+  - require:
+      truthy: "${reason}"
+      message: "${issue.key} is ${move.from}; reopening it needs a reason on the record — re-run with one."
+    when:
+      equals: ["${move.kind}", "reopen"]
+  # The reason lands BEFORE the move, so the item's history explains the change rather than trailing
+  # it — and an interrupted run leaves an explanation, never a silent jump.
+  - do: issue.comment
+    when:
+      truthy: "${reason}"
+    with:
+      id: ${issueId}
+      body: "${move.kind}: ${reason}"
+  - do: issue.transition
+    as: moved
+    when:
+      notEquals: ["${move.kind}", "noop"]
+    with:
+      id: ${issueId}
+      role: ${role}
+  - message: "${issue.key}  ${move.from} → ${moved.role} (${move.kind})."
+    when:
+      notEquals: ["${move.kind}", "noop"]

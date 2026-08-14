@@ -9,6 +9,7 @@ export const MCP_TOOL_NAMES = {
   update: 'baron_issue_update',
   transition: 'baron_issue_transition',
   reconcile: 'baron_issue_reconcile',
+  classify: 'baron_issue_classify',
   block: 'baron_issue_block',
   unblock: 'baron_issue_unblock',
   comment: 'baron_issue_comment',

@@ -43,14 +43,23 @@ nothing to "move back to" on unblock.
    move. Otherwise the target `role` from the argument (must be one of the five workflow roles —
    reject anything else, listing the valid ones). The `id`: from the argument, else derive it from the
    current branch (`<prefix>/<id>-<slug>`); if neither, ask.
-2. **Load** the item: `baron_issue_read { op: "get", id }` → its current `role`.
-3. **Classify** the move (table above). If **noop**, report "already <role>" and stop.
-4. **Reason gate.** For **regress / reopen**, ask the user for a one-line reason (plain text —
-   this is open-ended, so ask directly, don't use a menu). Do not proceed without it. Then post it:
-   `baron_issue_write { op: "comment", id, body: "<move>: <reason>" }` — *before* the transition, so the card's
-   history explains the change.
-5. **Move:** `baron_issue_move { op: "transition", id, role }`.
-6. **Report:** `<key>  <oldRole> → <newRole>` (+ the reason when one was given).
+2. **Reason.** Look up what the move would be — `baron_issue_read { op: "classify", id, role }`
+   answers `advance` / `regress` / `reopen` / `noop` without moving anything. For **regress** and
+   **reopen**, ask the user for a one-line reason (open-ended, so ask directly rather than with a
+   menu). Asking first is better UX than handing them a refusal — but it is not what makes the rule
+   hold.
+3. **Run the recipe** — call `baron_recipe_run` exactly once:
+
+   ```json
+   { "name": "task-move", "inputs": { "issueId": "<id>", "role": "in_progress", "reason": "<why>" } }
+   ```
+
+   **The engine enforces step 2, it does not trust you to have done it.** The recipe classifies the
+   move itself and REFUSES a regress or a reopen with no reason, before anything is written. The
+   reason is posted on the item *before* the transition, so an interrupted run leaves an explanation
+   rather than a silent jump, and a `noop` reports "already <role>" and writes nothing.
+4. **Report:** `<key>  <oldRole> → <newRole>` (+ the reason when one was given). The recipe's own
+   message says exactly this — quote it rather than reconstructing it.
 
 ## Blocking
 
@@ -65,7 +74,10 @@ idempotent, so re-running either is safe.
 
 ## Rules
 
-- Never skip the reason gate for a backward or reopen move — that governance is the whole point.
+- The reason gate is the recipe's, not yours: it holds whether or not you asked first. Do not try to
+  route around it by calling `baron_issue_move { op: "transition" }` directly — that is the same
+  hand-composition recipes exist to replace, and it is what `policy.mutations.channel: recipe-only`
+  refuses outright.
 - Never transition an item to represent blocking. Blocking is orthogonal; folding it into the role is
   the defect this contract was changed to remove.
 - Post the reason as a **comment** (`baron_issue_write op=comment`), never bury it in an ad-hoc field.

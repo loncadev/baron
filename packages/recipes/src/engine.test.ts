@@ -749,3 +749,57 @@ steps:
     expect(asker.notes.some((n) => n === 'id is 0')).toBe(true);
   });
 });
+
+// The governance the task-move skill described in prose, now enforced by the engine: which moves
+// need justifying is the recipe's opinion, the order they are judged against is core's.
+describe('task-move', () => {
+  const taskMove = loadRecipe(
+    readFileSync(fileURLToPath(new URL('../recipes/task-move.yaml', import.meta.url)), 'utf8'),
+  );
+
+  async function anItemIn(role: string) {
+    const ports = allPorts();
+    const issue = await (ports.issues as IssuesPort).create({ title: 'movable', typeRole: 'task' });
+    if (role !== 'backlog') {
+      await (ports.issues as IssuesPort).transition(issue.id, role as 'in_review');
+    }
+    return { ports, id: issue.id };
+  }
+
+  it('advances without demanding a reason', async () => {
+    const { ports, id } = await anItemIn('backlog');
+    const asker = scriptedAsker([id, 'in_review', undefined]);
+    await runRecipe(taskMove, { ports, asker });
+    expect((await (ports.issues as IssuesPort).get(id)).role).toBe('in_review');
+  });
+
+  it('refuses a backward move with no reason on the record', async () => {
+    const { ports, id } = await anItemIn('in_review');
+    await expect(
+      runRecipe(taskMove, { ports, asker: scriptedAsker([id, 'in_progress', undefined]) }),
+    ).rejects.toThrow(/moves? backwards/i);
+    // and it stopped BEFORE the move
+    expect((await (ports.issues as IssuesPort).get(id)).role).toBe('in_review');
+  });
+
+  it('allows the same backward move once a reason is given', async () => {
+    const { ports, id } = await anItemIn('in_review');
+    const asker = scriptedAsker([id, 'in_progress', 'review found a broken migration']);
+    await runRecipe(taskMove, { ports, asker });
+    expect((await (ports.issues as IssuesPort).get(id)).role).toBe('in_progress');
+  });
+
+  it('refuses to reopen finished work without one', async () => {
+    const { ports, id } = await anItemIn('done');
+    await expect(
+      runRecipe(taskMove, { ports, asker: scriptedAsker([id, 'in_progress', undefined]) }),
+    ).rejects.toThrow(/reopening/i);
+  });
+
+  it('reports a no-op instead of writing anything', async () => {
+    const { ports, id } = await anItemIn('in_review');
+    const asker = scriptedAsker([id, 'in_review', undefined]);
+    await runRecipe(taskMove, { ports, asker });
+    expect(asker.notes.some((n) => n.includes('already in_review'))).toBe(true);
+  });
+});
