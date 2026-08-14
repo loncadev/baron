@@ -17,6 +17,10 @@ import {
   type RunQuery,
   type RunStatus,
   type ScmPort,
+  TOOLSETS,
+  TOOL_PUBLICATION_PRESETS,
+  type ToolPublication,
+  type Toolset,
   WORKFLOW_ROLES,
   WORK_ITEM_TYPE_ROLES,
   type WorkItemTypeRole,
@@ -57,6 +61,11 @@ export interface McpPorts {
    * `open`, which is what every install did before this existed.
    */
   readonly mutationChannel?: MutationChannel;
+  /**
+   * Which toolsets to publish, from `policy.tools.publish`. Absent means `all`; `minimal` is the
+   * recipe channel plus every tool that changes no provider.
+   */
+  readonly toolsPublish?: ToolPublication;
 }
 
 /** Tool names: snake_case, `baron_` (product) namespace, singular noun to mirror the primitives. */
@@ -165,6 +174,13 @@ const DEFAULT_QUERY_LIMIT = 50;
 
 /** What an install gets when policy.mutations is absent: today's behaviour, unchanged. */
 const DEFAULT_MUTATION_CHANNEL = MUTATION_CHANNELS[0];
+
+/**
+ * What an install publishes when `policy.tools` is absent. `all`, not `minimal`: the shipped Claude
+ * Code skills call mutating primitives by name, so a smaller default would hide the tools they call
+ * and break them out of the box. The mechanism lands now; the switch waits on those skills.
+ */
+const DEFAULT_TOOL_PUBLICATION = TOOL_PUBLICATION_PRESETS[0];
 
 export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   {
@@ -1457,17 +1473,47 @@ export function callNativeTool(
 }
 
 /** The tool definitions advertised for the currently-bound ports. */
+/** Each toolset's definitions and the port that has to be bound for it to mean anything. */
+const TOOLSET_DEFINITIONS: Record<
+  Toolset,
+  { readonly bound: (ports: McpPorts) => boolean; readonly tools: readonly ToolDefinition[] }
+> = {
+  issues: { bound: (p) => p.issues !== undefined, tools: TOOL_DEFINITIONS },
+  scm: { bound: (p) => p.scm !== undefined, tools: SCM_TOOL_DEFINITIONS },
+  ci: { bound: (p) => p.ci !== undefined, tools: CI_TOOL_DEFINITIONS },
+  notify: { bound: (p) => p.notify !== undefined, tools: NOTIFY_TOOL_DEFINITIONS },
+  deploy: { bound: (p) => p.deploy !== undefined, tools: DEPLOY_TOOL_DEFINITIONS },
+  recipes: { bound: (p) => p.recipes !== undefined, tools: RECIPE_TOOL_DEFINITIONS },
+  native: { bound: (p) => p.nativeAccess !== undefined, tools: NATIVE_TOOL_DEFINITIONS },
+  knowledge: { bound: (p) => p.knowledge !== undefined, tools: LOOP_TOOL_DEFINITIONS },
+};
+
+/**
+ * The tools this install publishes: bound ports first, then the publication rule.
+ *
+ * Publishing everything a policy binds spends 27 of Cursor's 40-tool session budget on an issues+scm
+ * install, which is the arrangement Baron is supposed to make possible rather than crowd out. The
+ * `minimal` rule follows the product's own argument — work goes through recipes, so the recipe
+ * channel and everything that does not change a provider are published, and the mutating primitives
+ * are what you opt into. On issues+scm that is 11 tools instead of 27. It is not yet the default:
+ * the shipped skills call those primitives by name.
+ */
 export function activeToolDefinitions(ports: McpPorts): ToolDefinition[] {
-  return [
-    ...(ports.issues ? TOOL_DEFINITIONS : []),
-    ...(ports.scm ? SCM_TOOL_DEFINITIONS : []),
-    ...(ports.ci ? CI_TOOL_DEFINITIONS : []),
-    ...(ports.notify ? NOTIFY_TOOL_DEFINITIONS : []),
-    ...(ports.deploy ? DEPLOY_TOOL_DEFINITIONS : []),
-    ...(ports.recipes ? RECIPE_TOOL_DEFINITIONS : []),
-    ...(ports.nativeAccess ? NATIVE_TOOL_DEFINITIONS : []),
-    ...(ports.knowledge ? LOOP_TOOL_DEFINITIONS : []),
-  ];
+  const publish = ports.toolsPublish ?? DEFAULT_TOOL_PUBLICATION;
+  const out: ToolDefinition[] = [];
+  for (const name of TOOLSETS) {
+    const set = TOOLSET_DEFINITIONS[name];
+    if (set === undefined || !set.bound(ports)) continue;
+    if (publish === 'all') {
+      out.push(...set.tools);
+    } else if (publish === 'minimal') {
+      // The recipe channel whole, and everything that only reads.
+      out.push(...set.tools.filter((tool) => name === 'recipes' || !tool.mutatesProvider));
+    } else if (publish.includes(name)) {
+      out.push(...set.tools);
+    }
+  }
+  return out;
 }
 
 /** Route a tool call to the right port by its name prefix; unbound ports / unknown names error. */

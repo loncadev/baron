@@ -38,6 +38,49 @@ export function isMutationChannel(value: string): value is MutationChannel {
 }
 
 /**
+ * Named groups of MCP tools, one per port area, so an install can publish a subset.
+ *
+ * Cursor caps a session at 40 tools in TOTAL. Publishing everything a policy binds means a typical
+ * issues+scm install spends 27 of that budget and cannot sit next to the provider MCP servers Baron
+ * is meant to sit above — the opposite of the point.
+ */
+export const TOOLSETS = [
+  'issues',
+  'scm',
+  'ci',
+  'deploy',
+  'notify',
+  'recipes',
+  'knowledge',
+  'native',
+] as const;
+
+export type Toolset = (typeof TOOLSETS)[number];
+
+export function isToolset(value: string): value is Toolset {
+  return (TOOLSETS as readonly string[]).includes(value);
+}
+
+/**
+ * Which tools an install publishes.
+ *
+ *  - `all`     : everything the bound ports offer. The default, because the shipped Claude Code
+ *                skills call mutating primitives directly — `minimal` would hide the tools they
+ *                name and break them out of the box. Flipping this waits on those skills going
+ *                through recipes.
+ *  - `minimal` : the recipe channel whole, plus every tool that does not change a provider. Baron's
+ *                own argument is that work goes through recipes, so the primitives that mutate are
+ *                the ones you opt into. On an issues+scm install this is 11 tools rather than 27 —
+ *                including the knowledge loop, which writes Baron's own store and no provider's.
+ *  - a list    : exactly these toolsets, and nothing else.
+ */
+export const TOOL_PUBLICATION_PRESETS = ['all', 'minimal'] as const;
+
+export type ToolPublicationPreset = (typeof TOOL_PUBLICATION_PRESETS)[number];
+
+export type ToolPublication = ToolPublicationPreset | readonly Toolset[];
+
+/**
  * Parse the on-disk string form into a GapBehavior.
  *   'error' | 'degrade' | 'emulate:labels' | 'emulate:sub-issues'
  */

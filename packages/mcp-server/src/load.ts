@@ -60,5 +60,6 @@ export function loadPorts(root: string, env: Env): McpPorts {
     recipes,
     // Absent in policy means `open` — dispatch applies the default, so nothing is asserted here.
     ...(policy.mutations !== undefined ? { mutationChannel: policy.mutations.channel } : {}),
+    ...(policy.tools !== undefined ? { toolsPublish: policy.tools.publish } : {}),
   };
 }

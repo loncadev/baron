@@ -3,7 +3,13 @@ import { BaronError } from './errors.js';
 import {
   MUTATION_CHANNELS,
   type MutationChannel,
+  TOOLSETS,
+  TOOL_PUBLICATION_PRESETS,
+  type ToolPublication,
+  type ToolPublicationPreset,
+  type Toolset,
   isMutationChannel,
+  isToolset,
   parseGapPolicy,
 } from './policy.js';
 import { BLOCKED_LABEL, WORKFLOW_ROLES, isWorkItemTypeRole, isWorkflowRole } from './roles.js';
@@ -40,6 +46,11 @@ export interface BaronPolicyFile {
    * `open` — so every policy written before this behaves exactly as it did.
    */
   readonly mutations?: { readonly channel: MutationChannel };
+  /**
+   * Which MCP toolsets to publish. Absent means `default` — the recipe channel plus every read tool
+   * of every bound port, which is what keeps Baron inside a client's tool budget.
+   */
+  readonly tools?: { readonly publish: ToolPublication };
   /**
    * What loading this file had to change to make it valid under the current contract. Empty for a
    * policy already in the current shape. Carried on the parsed value rather than logged, so `doctor`
@@ -240,6 +251,32 @@ export function parsePolicy(raw: unknown): BaronPolicyFile {
     mutations = { channel };
   }
 
+  let tools: BaronPolicyFile['tools'];
+  if (root.tools !== undefined) {
+    const { publish } = requireRecord(root.tools, 'tools');
+    if (Array.isArray(publish)) {
+      for (const set of publish) {
+        if (typeof set !== 'string' || !isToolset(set)) {
+          fail(
+            `policy.tools.publish lists unknown toolset ${JSON.stringify(set)}. ` +
+              `Toolsets are: ${TOOLSETS.join(', ')}.`,
+          );
+        }
+      }
+      tools = { publish: publish as Toolset[] };
+    } else if (
+      typeof publish === 'string' &&
+      (TOOL_PUBLICATION_PRESETS as readonly string[]).includes(publish)
+    ) {
+      tools = { publish: publish as ToolPublicationPreset };
+    } else {
+      fail(
+        `policy.tools.publish must be ${TOOL_PUBLICATION_PRESETS.join(' or ')}, or a list of ` +
+          `toolsets (${TOOLSETS.join(', ')}).`,
+      );
+    }
+  }
+
   return {
     version: 1,
     providers,
@@ -248,6 +285,7 @@ export function parsePolicy(raw: unknown): BaronPolicyFile {
     ...(gapPolicy !== undefined ? { gapPolicy } : {}),
     ...(language !== undefined ? { language } : {}),
     ...(mutations !== undefined ? { mutations } : {}),
+    ...(tools !== undefined ? { tools } : {}),
     // Present only when something actually changed, so a current policy round-trips unchanged.
     ...(migrations.length > 0 ? { migrations } : {}),
   };

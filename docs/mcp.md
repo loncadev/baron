@@ -60,6 +60,30 @@ policy.
 Tool inputs are plain JSON Schema; the `role` / `typeRole` / link-type / status fields are enums
 sourced from the core's abstract vocabulary, so they never expose provider-native states.
 
+## Toolsets: what an install publishes
+
+Cursor caps a session at **40 tools in total**. Publishing everything a policy binds spends 27 of
+that on an issues+scm install, so Baron cannot sit next to the provider MCP servers it is meant to
+sit above — the opposite of the point.
+
+`minimal` publishes the **recipe channel plus every tool that changes no provider**: 11 on an
+issues+scm install instead of 27. That follows the product's own argument — work goes through
+recipes, so the mutating primitives are the ones you opt into, and they are exactly the ones
+`recipe-only` would refuse anyway.
+
+```json
+{ "tools": { "publish": "minimal" } }
+```
+
+- `all` (absent) — everything the bound ports offer. Still the default, because the shipped Claude
+  Code skills call mutating primitives **by name**: `minimal` hides the tools they call and breaks
+  them out of the box. Flipping the default waits on those skills going through recipes.
+- `minimal` — the recipe channel whole, plus every tool that does not change a provider.
+- a list of toolsets — `issues`, `scm`, `ci`, `deploy`, `notify`, `recipes`, `knowledge`, `native`.
+  Explicit means explicit: asking for `["issues"]` does not quietly add the recipe channel back.
+
+A toolset whose port is unbound is never published, whatever the rule says.
+
 ## Enforcing the recipe channel
 
 Decision #19 says a recipe runs as one deterministic call and the **engine** enforces the step order.
