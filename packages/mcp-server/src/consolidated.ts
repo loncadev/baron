@@ -241,8 +241,9 @@ export const CONSOLIDATED_SCM_DEFINITIONS: readonly ToolDefinition[] = [
     mutatesProvider: true,
     description:
       'Change source-control state. ops: `branch_create` (name, optional fromBranch — idempotent); ' +
-      '`pr_create` (title, sourceBranch, optional targetBranch/body/draft/linkedIssueKey/assignees/' +
-      'autoComplete); `pr_thread` (pullRequestId, body); `pr_ready` (pullRequestId) — take it out of ' +
+      '`pr_create` (title, sourceBranch, optional targetBranch/body/draft/assignees/autoComplete, ' +
+      'plus linkedIssueKey and linkedIssueRelation — `closes` finishes the item on merge, `relates` ' +
+      'only references it); `pr_thread` (pullRequestId, body); `pr_ready` (pullRequestId) — take it out of ' +
       'draft; `pr_merge` (pullRequestId, optional strategy/deleteSourceBranch). A provider that ' +
       'declines a merge surfaces as MERGE_FAILED rather than a false success.',
     inputSchema: schemaOf(TOOL_NAMES.scmWrite, {
@@ -254,6 +255,7 @@ export const CONSOLIDATED_SCM_DEFINITIONS: readonly ToolDefinition[] = [
       targetBranch: { type: 'string' },
       draft: { type: 'boolean' },
       linkedIssueKey: { type: 'string' },
+      linkedIssueRelation: { type: 'string' },
       assignees: { type: 'array', items: { type: 'string' } },
       autoComplete: { type: 'boolean' },
       pullRequestId: ID,

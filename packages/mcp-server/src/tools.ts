@@ -11,7 +11,9 @@ import {
   MUTATION_CHANNELS,
   type MutationChannel,
   type NotifyPort,
+  PR_ISSUE_RELATIONS,
   PR_STATE_FILTERS,
+  type PrIssueRelation,
   type PrStateFilter,
   RUN_STATUSES,
   type RunQuery,
@@ -27,6 +29,7 @@ import {
   type WorkflowRole,
   isIssueLinkType,
   isMergeStrategy,
+  isPrIssueRelation,
   isPrStateFilter,
   isRunStatus,
   isWorkItemTypeRole,
@@ -822,6 +825,20 @@ function requireString(args: Record<string, unknown> | undefined, key: string): 
   const value = args?.[key];
   if (typeof value !== 'string' || value.length === 0) {
     throw new BaronError(`Missing or empty required string argument '${key}'.`, INVALID_ARGS);
+  }
+  return value;
+}
+
+function optionalPrIssueRelation(
+  args: Record<string, unknown> | undefined,
+): PrIssueRelation | undefined {
+  const value = optionalString(args, 'linkedIssueRelation');
+  if (value === undefined) return undefined;
+  if (!isPrIssueRelation(value)) {
+    throw new BaronError(
+      `Argument 'linkedIssueRelation' must be one of ${PR_ISSUE_RELATIONS.join(', ')}.`,
+      INVALID_ARGS,
+    );
   }
   return value;
 }

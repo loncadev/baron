@@ -8,7 +8,9 @@ import {
   type IssuesPort,
   MERGE_STRATEGIES,
   type NotifyPort,
+  PR_ISSUE_RELATIONS,
   PR_STATE_FILTERS,
+  type PrIssueRelation,
   type PrStateFilter,
   type ScmPort,
   WORKFLOW_ROLES,
@@ -17,6 +19,7 @@ import {
   type WorkflowRole,
   isIssueLinkType,
   isMergeStrategy,
+  isPrIssueRelation,
   isPrStateFilter,
   isWorkItemTypeRole,
   isWorkflowRole,
@@ -165,6 +168,18 @@ function optStrArray(params: Params, key: string, op: string): string[] | undefi
     throw new BaronError(`Step '${op}' '${key}' must be an array of strings.`, ARGS);
   }
   return value as string[];
+}
+
+function optRelation(params: Params, key: string, op: string): PrIssueRelation | undefined {
+  const value = optStr(params, key, op);
+  if (value === undefined) return undefined;
+  if (!isPrIssueRelation(value)) {
+    throw new BaronError(
+      `Step '${op}' '${key}'='${value}' must be one of ${PR_ISSUE_RELATIONS.join(', ')}.`,
+      ARGS,
+    );
+  }
+  return value;
 }
 
 function optStatus(params: Params, op: string): FollowupStatus | undefined {

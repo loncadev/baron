@@ -13,6 +13,7 @@ import {
   type NativePullRequest,
   type NativePullRequestInput,
   type NativeThread,
+  type PrIssueRelation,
   type PrState,
   type PrStateFilter,
   type PullRequestStatus,
@@ -44,13 +45,23 @@ export const githubScmManifest: ScmManifest = {
  * thread would need a diff location, which the abstract primitive does not carry).
  */
 /**
- * Append GitHub's native issue-closing keyword so the PR is genuinely LINKED to the work item —
- * it appears in the issue's Development panel and closes it on merge. A comment carrying the PR URL
- * (which the recipe also posts) is not a link; this is.
+ * Append GitHub's native linking keyword so the PR is genuinely LINKED to the work item — it appears
+ * in the issue's Development panel. A comment carrying the PR URL (which the recipe also posts) is
+ * not a link; this is.
+ *
+ * `Closes` also closes the item on merge, and rendering it unconditionally made every PR claim to
+ * finish the item it mentioned — a spike or the first of several PRs included. `Refs` references
+ * without closing.
  */
-function withIssueLink(body: string | undefined, issueKey: string | undefined): string | undefined {
+const GITHUB_LINK_KEYWORD: Record<PrIssueRelation, string> = { closes: 'Closes', relates: 'Refs' };
+
+function withIssueLink(
+  body: string | undefined,
+  issueKey: string | undefined,
+  relation: PrIssueRelation = 'closes',
+): string | undefined {
   if (issueKey === undefined || issueKey.length === 0) return body;
-  const link = `Closes #${issueKey.replace(/^#/, '')}`;
+  const link = `${GITHUB_LINK_KEYWORD[relation]} #${issueKey.replace(/^#/, '')}`;
   return body === undefined || body.length === 0 ? link : `${body}\n\n${link}`;
 }
 
@@ -223,7 +234,7 @@ export function createGithubScmTransport(options: GithubTransportOptions): ScmTr
     },
 
     async createPullRequest(input: NativePullRequestInput): Promise<NativePullRequest> {
-      const body = withIssueLink(input.body, input.linkedIssueKey);
+      const body = withIssueLink(input.body, input.linkedIssueKey, input.linkedIssueRelation);
       const { data } = await octokit.rest.pulls.create({
         owner,
         repo,

@@ -195,3 +195,51 @@ describe('github scm prStatus when the credential cannot read checks', () => {
     await expect(transport().getPullRequestStatus('7')).rejects.toThrow('server error');
   });
 });
+
+// Closing is the strongest thing a PR can say about an item, and it was said unconditionally — so a
+// spike, a partial change, or the first of several PRs serving one item all closed it on merge.
+describe('github PR issue link relation', () => {
+  beforeEach(() => {
+    mocks.create.mockReset();
+    mocks.create.mockResolvedValue(CREATED_PR);
+  });
+
+  const bodyOf = () => (mocks.create.mock.calls[0]?.[0] as { body?: string }).body ?? '';
+
+  it('closes by default, which is what every caller got before', async () => {
+    await transport().createPullRequest({
+      title: 't',
+      sourceBranch: 'feature/x',
+      targetBranch: 'main',
+      draft: false,
+      linkedIssueKey: '12',
+    });
+    expect(bodyOf()).toContain('Closes #12');
+  });
+
+  it('references without closing when the caller says relates', async () => {
+    await transport().createPullRequest({
+      title: 't',
+      sourceBranch: 'feature/x',
+      targetBranch: 'main',
+      draft: false,
+      linkedIssueKey: '12',
+      linkedIssueRelation: 'relates',
+    });
+    const body = bodyOf();
+    expect(body).toContain('Refs #12');
+    // The distinction is the whole point: GitHub only auto-closes on a closing keyword.
+    expect(body).not.toContain('Closes');
+  });
+
+  it('links nothing when there is no key, whatever the relation says', async () => {
+    await transport().createPullRequest({
+      title: 't',
+      sourceBranch: 'feature/x',
+      targetBranch: 'main',
+      draft: false,
+      linkedIssueRelation: 'relates',
+    });
+    expect(bodyOf()).not.toContain('#');
+  });
+});
