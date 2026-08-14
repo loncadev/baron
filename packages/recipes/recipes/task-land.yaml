@@ -89,4 +89,14 @@ steps:
     as: reconciled
     with:
       id: ${issueId}
-  - message: "Landed ${issue.key}: ${pr.url} merged (${merged.sha}). Item now reads '${reconciled.role}' (${reconciled.nativeState}). If your provider does not close items on merge, run task-move to put ${issue.key} in its final role."
+  # Two messages rather than one hedged sentence. Reconcile reads the item moments after the merge,
+  # and a provider that closes on merge does it asynchronously — so the unsettled reading is the
+  # COMMON case on GitHub, not the exceptional one. The old single message asserted the role it had
+  # just read and then prescribed task-move, which for an item that closed a second later is both a
+  # stale fact and an instruction to hand-move something already done.
+  - message: "Landed ${issue.key}: ${pr.url} merged (${merged.sha}). Item now reads '${reconciled.role}' (${reconciled.nativeState})."
+    when:
+      equals: ["${reconciled.role}", "done"]
+  - message: "Landed ${issue.key}: ${pr.url} merged (${merged.sha}). The item still read '${reconciled.role}' (${reconciled.nativeState}) immediately after the merge. Providers that close on merge do so asynchronously, so this has very likely settled already — task-sync confirms it. Only if your provider does not close items on merge at all does ${issue.key} need task-move."
+    when:
+      notEquals: ["${reconciled.role}", "done"]
