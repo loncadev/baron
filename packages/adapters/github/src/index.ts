@@ -99,6 +99,11 @@ export function defineGithubIssuesAdapter(
 export { createGithubTransport, type GithubTransportOptions } from './transport.js';
 export { createGithubIntrospector } from './introspector.js';
 export { createGithubCredentialProbe } from './credential.js';
+export {
+  type DeviceAuth,
+  type DeviceCodePrompt,
+  createGithubDeviceAuth,
+} from './device-auth.js';
 export { GITHUB_API_VERSION, acceptedPermission, createGithubOctokit } from './octokit.js';
 export {
   createGithubScmTransport,

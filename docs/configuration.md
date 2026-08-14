@@ -104,3 +104,25 @@ is workspace-scoped, so this just works.
 native state / type / board column that no longer exists). Run it after a provider's process
 template changes. Label-discriminated providers (GitHub) skip native-state checks (labels are
 Baron-managed).
+
+## Signing in instead of pasting a token (GitHub)
+
+`baron init` can take you through GitHub's **device flow** rather than asking you to assemble a
+fine-grained token by hand: it prints a short code, you approve it in a browser, and the token comes
+back with the permissions the app was granted. No client secret is involved, which is precisely why a
+local CLI can do it — the same mechanism `gh` uses.
+
+It is offered when an app id is configured:
+
+```
+BARON_GITHUB_CLIENT_ID=Ov23li...      # an OAuth App or GitHub App client id — public by design
+BARON_GITHUB_SCOPE=repo               # optional; OAuth Apps only, GitHub Apps ignore it
+```
+
+Someone has to register that app once — Baron ships no client id of its own, because an id baked
+into an open-source CLI is an id anyone can put their own name behind.
+
+**It is offered, not forced.** A fine-grained PAT is narrower than any scope an OAuth App can
+request (`repo` is the smallest single scope covering issues, contents and pull requests), so an
+install that wants the tighter credential should not have to fight the friendlier path to get it.
+Either way `baron doctor` verifies what the credential can actually do before you start work.
