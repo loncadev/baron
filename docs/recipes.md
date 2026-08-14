@@ -10,7 +10,8 @@ the caller. Three surfaces, same engine:
 
 - **CLI** — [`baron run --recipe <path>`](./cli.md#baron-run). `ask` steps prompt on stdin.
 - **MCP** — [`baron_recipe_run`](./mcp.md#tools) `{ name, inputs }` runs a recipe by name
-  (built-ins: `task-start`, `task-finish`, `task-land`, `ship`; project recipes live in `.baron/recipes/*.yaml`).
+  (built-ins: `task-new`, `task-start`, `task-move`, `task-finish`, `task-land`, `ship`; project
+  recipes live in `.baron/recipes/*.yaml`).
   Inputs are supplied **up front** in `inputs`; a missing required input fails with
   `RECIPE_INPUT_MISSING` rather than prompting. `baron_recipe_list` reports each recipe's `inputs`.
 - **Claude Code skills** — `/baron:task-start`, `/baron:task-finish`, `/baron:task-land`, `/baron:ship`, and

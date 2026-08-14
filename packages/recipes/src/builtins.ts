@@ -10,6 +10,7 @@ const RECIPES_DIR = fileURLToPath(new URL('../recipes/', import.meta.url));
 export const BUILTIN_RECIPE_NAMES = [
   'task-new',
   'task-start',
+  'task-move',
   'task-finish',
   'task-land',
   'ship',
