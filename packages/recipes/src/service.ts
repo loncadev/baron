@@ -56,7 +56,15 @@ function projectRecipePath(root: string, name: string): string {
   return `${root}/${RECIPE_DIR_REL}/${name}${YAML_EXT}`;
 }
 
-function resolveRecipe(name: string, root: string): Recipe {
+/**
+ * Resolve a recipe BY NAME: a built-in, else a project recipe under `.baron/recipes/`.
+ *
+ * Exported so the CLI and the MCP server resolve identically. They used not to — only the MCP path
+ * could resolve a name, so a name that worked for an agent was `RECIPE_NOT_FOUND` on the command
+ * line, and the README's quick start told people to run one. Two resolvers is one more than the
+ * number of ways a name should mean something.
+ */
+export function resolveRecipeByName(name: string, root: string): Recipe {
   if (isBuiltinRecipe(name)) return loadBuiltinRecipe(name);
   const path = projectRecipePath(root, name);
   if (!existsSync(path)) {
@@ -94,7 +102,7 @@ export function createRecipeService(ports: RecipePorts, root: string): RecipeSer
     },
 
     async run(name, inputs) {
-      const recipe = resolveRecipe(name, root);
+      const recipe = resolveRecipeByName(name, root);
       // Pre-validate every non-optional ask is supplied — clearer than failing partway through a run.
       const missing = recipeInputs(recipe)
         .filter((i) => !(i.type === 'text' && i.optional))

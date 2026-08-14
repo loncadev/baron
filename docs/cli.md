@@ -7,7 +7,7 @@ or from a clone of this repo with `pnpm baron …` (a `tsx` runner is wired up).
 ```
 baron init --provider <id> [--root <dir>] [--force]
 baron doctor [--root <dir>]
-baron run --recipe <path> [--root <dir>]
+baron run --recipe <name-or-path> [--root <dir>]
 baron help
 ```
 
@@ -56,7 +56,7 @@ recipe, and execute it. `ask` steps prompt on stdin; `message` steps print to st
 
 | Flag | Meaning |
 | --- | --- |
-| `--recipe <path>` | **Required.** Path to the recipe YAML file. |
+| `--recipe <name-or-path>` | **Required.** A built-in or project recipe **name** (`task-start`), or a **path** to a YAML file. A value containing a separator or ending in `.yaml`/`.yml` is treated as a path, so a mistyped path is reported as a missing file rather than an unknown recipe. Names resolve exactly as they do over MCP. |
 | `--root <dir>` | Project root (default `.`). |
 
 Missing `--recipe` exits `2`. See [Recipes](./recipes.md).

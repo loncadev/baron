@@ -76,7 +76,7 @@ npx -y @lonca/baron-cli@latest init --provider github      # or: --provider azur
 npx -y @lonca/baron-cli@latest doctor
 
 # 3. Run a workflow recipe
-npx -y @lonca/baron-cli@latest run --recipe <path-to>/task-start.yaml
+npx -y @lonca/baron-cli@latest run --recipe task-start          # by name; or pass a path
 ```
 
 On GitHub, step 1 opens the approval page and you confirm a short code — no permission list to read,
