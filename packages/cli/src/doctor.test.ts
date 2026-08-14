@@ -124,7 +124,10 @@ describe('runDoctor', () => {
     expect(report.drift.some((d) => d.includes('Test'))).toBe(true);
   });
 
-  it('skips native-state checks for a label-discriminated provider', async () => {
+  // A label-keyed provider still PINS a native state where it has one: GitHub's
+  // `done: { state: 'closed', label: 'done' }` is a real state its introspector reports. Gating the
+  // check on the map's discriminator left that unchecked on every label-keyed install.
+  it('checks a native state a label-discriminated provider still pins', async () => {
     const fs = await seededFs('github', githubIntrospectionFixture);
     const report = await runDoctor({
       root: ROOT,
@@ -133,9 +136,24 @@ describe('runDoctor', () => {
       probeFor: NO_PROBE,
     });
     expect(report.ok).toBe(true);
-    // Only the type map is checkable on a flat provider; no native states or columns. One check
-    // per abstract type role (all collapse onto GitHub's single 'issue' type).
-    expect(report.checks).toBe(WORK_ITEM_TYPE_ROLES.length);
+    // One check per abstract type role (all collapse onto GitHub's single 'issue' type), plus the
+    // one role whose target pins a native state. Labels themselves are Baron-managed and check nothing.
+    expect(report.checks).toBe(WORK_ITEM_TYPE_ROLES.length + 1);
+  });
+
+  it('flags that pinned native state when the provider drops it', async () => {
+    const fs = await seededFs('github', githubIntrospectionFixture);
+    const report = await runDoctor({
+      root: ROOT,
+      fs,
+      introspector: createMemoryIntrospector({
+        ...githubIntrospectionFixture,
+        states: githubIntrospectionFixture.states.filter((s) => s.name !== 'closed'),
+      }),
+      probeFor: NO_PROBE,
+    });
+    expect(report.ok).toBe(false);
+    expect(report.drift.some((d) => d.includes('closed'))).toBe(true);
   });
 
   // The bug this suite exists to prevent: a policy that matches the provider perfectly, reported as

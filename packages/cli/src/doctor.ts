@@ -150,21 +150,19 @@ export async function runDoctor(options: DoctorOptions): Promise<DoctorReport> {
     }
   }
 
-  const stateKey = config.roleMap.stateKey;
   for (const [role, target] of Object.entries(config.roleMap.states)) {
     if (target === undefined) continue;
 
-    // Only native-state discriminators can drift against introspection; emulated label states
-    // are Baron-managed and have nothing to validate against.
-    if (stateKey === 'state') {
-      const stateValue = target.state;
-      if (stateValue !== undefined) {
-        checks += 1;
-        if (!stateNames.has(stateValue)) {
-          drift.push(
-            `role '${role}' maps to native state '${stateValue}', which no longer exists.`,
-          );
-        }
+    // A native state can drift whether or not it is the map's discriminator. This used to be gated
+    // on `stateKey === 'state'`, and the reason given — emulated states are Baron-managed and have
+    // nothing to validate against — is true of `target.label` and false of `target.state`. GitHub's
+    // `done: { state: 'closed', label: 'done' }` pins a real state its introspector reports, and it
+    // went unchecked on every label-keyed install. A target with no `state` key still checks nothing.
+    const stateValue = target.state;
+    if (stateValue !== undefined) {
+      checks += 1;
+      if (!stateNames.has(stateValue)) {
+        drift.push(`role '${role}' maps to native state '${stateValue}', which no longer exists.`);
       }
     }
 

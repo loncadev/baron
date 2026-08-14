@@ -190,3 +190,37 @@ describe('legacy blocked role migration', () => {
     ).toThrow(/unknown workflow role/);
   });
 });
+
+// Every sibling level rejects a key it does not know; this one destructured what it wanted and
+// dropped the rest, so a hand-written `scope` — the thing #16 is about — parsed cleanly and vanished.
+describe('unknown key on a role-map entry', () => {
+  const withScope = {
+    version: 1,
+    providers: { issues: 'linear' },
+    roleMap: {
+      linear: {
+        stateKey: 'stateId',
+        states: { in_progress: { stateId: 'uuid-abc' } },
+        scope: 'ENG-team',
+      },
+    },
+    typeMap: { linear: { task: 'Issue' } },
+  };
+
+  it('fails loudly instead of silently discarding it', () => {
+    expect(() => parsePolicy(withScope)).toThrow(/roleMap\.linear has unknown key 'scope'/);
+  });
+
+  it('names the keys that ARE allowed, so the message is actionable', () => {
+    expect(() => parsePolicy(withScope)).toThrow(/stateKey, states/);
+  });
+
+  // The half of #16 that needs no core change: NativeTarget is an open record and stateKey names
+  // whichever key discriminates, so a map keyed on opaque state IDs already round-trips.
+  it('still accepts a role map keyed on opaque state ids rather than names', () => {
+    const { scope: _rejected, ...entry } = withScope.roleMap.linear;
+    const parsed = parsePolicy({ ...withScope, roleMap: { linear: entry } });
+    expect(parsed.roleMap.linear?.stateKey).toBe('stateId');
+    expect(parsed.roleMap.linear?.states.in_progress).toEqual({ stateId: 'uuid-abc' });
+  });
+});
