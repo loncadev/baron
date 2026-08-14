@@ -7,14 +7,17 @@ guide takes you from nothing to a working setup in one command, then either driv
 ## Prerequisites
 
 - **Node.js ≥ 20**.
-- A cloned repo you want to track work for, and a provider token:
-  - **GitHub** — a fine-grained PAT with **Contents**, **Issues**, and **Pull requests** = Read and
-    write, plus **Actions: Read** and **Commit statuses: Read** (Metadata read is automatic).
-    Those last two are how PR status sees CI. A fine-grained token **cannot** be granted the
-    **Checks** permission — it is not in the list, because it exists only for GitHub Apps — so
-    without Actions + Commit statuses, `task-land` and `ship` report the checks rollup as
-    `unknown` and will not tell you a red build is green. (A classic token's `repo` scope covers
-    all of this already.)
+- A cloned repo you want to track work for, and provider credentials:
+  - **GitHub** — nothing to prepare: `init` offers to sign you in through your browser and the token
+    comes back with the permissions Baron's app was granted. Read on only if you would rather supply
+    a **fine-grained PAT**, which is the narrower credential and is why the option stays.
+    Such a PAT needs **Contents**, **Issues**, and **Pull requests** = Read and write, plus
+    **Actions: Read** and **Commit statuses: Read** (Metadata read is automatic). Those last two
+    are how PR status sees CI. A fine-grained token **cannot** be granted the **Checks**
+    permission — it is not in the list, because it exists only for GitHub Apps — so without
+    Actions + Commit statuses, `task-land` and `ship` report the checks rollup as `unknown` and
+    will not tell you a red build is green. (A classic token's `repo` scope covers all of this
+    already.)
   - **Azure DevOps** — an org + project + repo and a Personal Access Token.
 
 You do **not** clone Baron or run a build — everything is published to npm and runs via `npx`.
@@ -30,8 +33,10 @@ npx -y @lonca/baron-cli@latest init --provider github     # or: --provider azure
 `init` does the whole setup:
 
 - **Gathers credentials.** GitHub owner/repo are auto-detected from your `origin` remote; the token
-  is prompted (entered hidden). It writes `.baron/credentials` and **gitignores it** — secrets never
-  land in a commit. Keys already set in your environment are kept (CI wins), and a key left blank
+  comes from a browser sign-in (offered first, and the approval page is opened for you) or, if you
+  decline, from a hidden prompt. It writes `.baron/credentials` and **gitignores it** — secrets never
+  land in a commit. `--force` never offers the sign-in: it means "do not ask me", and the flow waits
+  up to fifteen minutes for a human to approve a code. Keys already set in your environment are kept (CI wins), and a key left blank
   fails loudly instead of continuing with an empty token.
 - **Introspects the provider** (work-item types, states, board columns), **proposes** a role/type
   mapping, and asks you to confirm before writing anything.
