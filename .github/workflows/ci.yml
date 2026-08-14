@@ -41,6 +41,12 @@ jobs:
       - name: Build (publish artifacts)
         run: pnpm build
 
+      # server.json is what the MCP Registry ingests, and it agrees with package.json only by hand.
+      # The version drifted a release behind once; the mcpName is worse, because a mismatch there is
+      # a rejected submission rather than a stale number.
+      - name: server.json in sync
+        run: pnpm sync:server-json --check
+
       # Dependency-license hygiene (ARCHITECTURE #20): fail on a redistributed copyleft/
       # non-commercial/proprietary dep before it can poison the permissive/commercial distribution.
       - name: License check

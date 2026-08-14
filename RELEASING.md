@@ -66,7 +66,7 @@ until step 2 is done.
 
 ```bash
 # Bump the ten package.json versions first, then:
-pnpm sync:server-json                 # server.json carries the version twice; it is what the MCP Registry ingests
+pnpm sync:server-json                 # reconciles server.json's two version fields and the package's mcpName
 pnpm install && pnpm build            # publishConfig flips main/types/exports to dist; bins already point there
 pnpm test && pnpm licenses:check      # never publish red
 
@@ -76,6 +76,11 @@ pnpm -r --filter "./packages/**" publish --access public --no-git-checks
 ```
 
 Notes:
+- **`mcpName` must ship in the tarball.** The MCP Registry will not list a server whose npm package
+  cannot be proven to belong to the same publisher; for npm the proof is `mcpName` in the *published*
+  `package.json`, matching `server.json`'s `name`. `pnpm sync:server-json` keeps them equal and CI
+  fails on drift (`pnpm sync:server-json --check`) — a mismatch is a rejected submission, not a stale
+  number. v0.32.0 shipped without it, which is why 0.32.1 exists.
 - pnpm publishes in **dependency order** and rewrites `workspace:*` deps to the real version — no manual
   ordering needed.
 - Only the built `dist` + declared `files` ship; `src` is included per each package's `files` (kept so
@@ -94,6 +99,21 @@ npx -y @lonca/baron-cli@latest --help     # should print the CLI usage
 
 Consumers launching via `@latest` (the plugin manifest and the documented `.mcp.json` shape do) pick
 up the new release on their next MCP restart automatically.
+
+## 3. MCP Registry listing
+
+The official registry (`registry.modelcontextprotocol.io`) is the surface several others mirror, so
+it goes first and in the same week as a release — that ranking weights recency.
+
+```bash
+curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_windows_amd64.tar.gz" | tar xz mcp-publisher
+mcp-publisher login github            # device flow; approve in a browser as a loncadev member
+mcp-publisher publish                 # reads ./server.json
+```
+
+The namespace `io.github.loncadev/baron` is authenticated by the GitHub login, so whoever publishes
+must have access to the `loncadev` org. Publish **after** the npm release, not before: the registry
+validates that the referenced npm version exists and carries the matching `mcpName`.
 
 ## Commercial tier (later)
 

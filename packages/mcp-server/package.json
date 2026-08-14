@@ -1,6 +1,6 @@
 {
   "name": "@lonca/baron-mcp-server",
-  "version": "0.32.0",
+  "version": "0.32.1",
   "type": "module",
   "license": "Apache-2.0",
   "main": "./src/index.ts",
@@ -58,5 +58,6 @@
     "type": "git",
     "url": "git+https://github.com/loncadev/baron.git",
     "directory": "packages/mcp-server"
-  }
+  },
+  "mcpName": "io.github.loncadev/baron"
 }

@@ -15,7 +15,12 @@ import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const VERSION = '0.31.1';
+// Read, never restate. This was a hand-kept constant, and it went stale the moment a release bumped
+// the ten package.json files without it: re-running the codemod would have silently *downgraded*
+// every package to the last version someone remembered to type here.
+const VERSION = JSON.parse(
+  readFileSync(join(ROOT, 'packages/mcp-server/package.json'), 'utf8'),
+).version;
 const REPO = 'https://github.com/loncadev/baron';
 const BASE_KEYWORDS = ['baron', 'ai-agents', 'mcp', 'work-orchestration', 'devops'];
 
