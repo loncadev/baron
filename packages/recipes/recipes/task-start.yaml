@@ -53,4 +53,12 @@ steps:
     with:
       id: ${issue.id}
       body: "▶ Started work — moved to in_progress, assigned to ${me}, on branch `${branch.name}`."
-  - message: "${issue.key} is in progress on ${branch.name}, assigned to you."
+  # Says where the branch IS, not just what it is called. The engine drives provider ports, never the
+  # local git working copy, so `scm.branch.create` leaves the caller exactly where they were — and
+  # "#N is in progress on <branch>" read as though it had moved them. The cost of that reading is a
+  # commit that lands on the default branch, which is not discovered until task-finish fails with the
+  # provider's own "No commits between main and <branch>".
+  - message: |
+      ${issue.key} is in progress on ${branch.name} (created on the provider), assigned to you.
+      Your working copy has not moved. To get onto it:
+        git fetch && git checkout ${branch.name}

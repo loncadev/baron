@@ -167,7 +167,9 @@ item on merge lands it in `done`; elsewhere `task-move` / `task-sync` settles it
 - `task-new` — CREATE a work item (title + type role + optional parent).
 - `task-start` — start an EXISTING item: load it, branch on its core-derived canonical
   `branchName` (`<prefix>/<id>-<slug>`; fails loudly for epics), move to `in_progress`, note the
-  branch on the item.
+  branch on the item. The branch is cut **on the provider**; the engine drives ports, never your
+  local git, so your working copy does not move and you check the branch out yourself. The recipe
+  prints the command — commit before doing so and the commit lands on your default branch.
 - `task-finish` — open a draft PR + post the link on the item. Deliberately does NOT move the role.
 - `task-land` — undraft (only if it is a draft) + merge the item's PR. Refuses when there is no open
   PR; a provider that declines the merge surfaces as `MERGE_FAILED` instead of a reported success.
