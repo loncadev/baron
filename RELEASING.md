@@ -126,6 +126,27 @@ Two further conditions, both real: whoever publishes must be an **Owner** of `lo
 `mcpName` against `server.json`'s `name`. A freshly published npm version can 404 for a moment; the
 registry says so explicitly, so retry once before suspecting the marker.
 
+## 4. Discovery surfaces
+
+The official registry (step 3) is the one that feeds the others, so it goes first and the rest can
+follow at any pace. Two need a human at a browser and cannot be scripted:
+
+- **Glama** — `glama.ai/mcp/servers` → *Add Server* (a JS button; there is no deep-link form URL).
+  Baron appears there anyway, ingested from the official registry, but unclaimed. Claiming is what
+  buys control of the display metadata and build spec. Because `loncadev` is an organisation rather
+  than a personal account, signing in with GitHub is not enough on its own: the root `glama.json`
+  names the maintainer, and the claim flow must be **re-run** after that file lands. Glama builds
+  every open-source server in a sandbox — the committed `Dockerfile` keeps us off the inferred-build
+  path, whose failure withholds the listing from search and category results.
+- **Claude Code plugin marketplace** — `platform.claude.com/plugins/submit`. Not required to ship:
+  `/plugin marketplace add loncadev/baron` already works from the committed
+  `.claude-plugin/marketplace.json`. Never open a PR against `anthropics/claude-plugins-community`;
+  it closes them automatically and syncs from an internal pipeline instead.
+
+`punkpeye/awesome-mcp-servers` takes a PR, but its bot labels any entry lacking a Glama score badge,
+and that badge 404s until Glama has indexed the repo — so it waits on the claim above. PulseMCP needs
+no submission at all: it ingests the official registry.
+
 ## Commercial tier (later)
 
 Enterprise features live in a **separate private repo** under a commercial license (e.g. Elastic
