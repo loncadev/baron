@@ -470,6 +470,11 @@ const REQUIRE = 'RECIPE_REQUIRE';
 
 /** A guard/when operand is "present" unless it resolved to nothing: undefined/null/''/false. */
 function isTruthy(value: unknown): boolean {
+  // The NUMBER zero is falsy — it is always a count or a total here (`found.length`,
+  // `checks.failed`), and "none" reading as true made `truthy: ${found.length}` pass on an empty
+  // result, which is the opposite of what anyone writing that guard means. The STRING '0' stays
+  // truthy: work-item ids are strings, and an item numbered 0 is present, not absent.
+  if (value === 0) return false;
   return value !== undefined && value !== null && value !== '' && value !== false;
 }
 
