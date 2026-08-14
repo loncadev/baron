@@ -20,6 +20,24 @@ export type GapBehavior =
 export type GapPolicy = Partial<Record<string, GapBehavior>>;
 
 /**
+ * How provider mutations are allowed to reach a provider.
+ *
+ *  - `open`      : any primitive may be called directly. The default, and what every install had
+ *                  before this existed.
+ *  - `recipe-only`: only `baron_recipe_run` may mutate. Decision #19 says a recipe runs as one
+ *                  deterministic call and the ENGINE enforces the step order — which was true of the
+ *                  engine and false of the server, since every mutating primitive sat in the same
+ *                  tool list. Hiding them would not be enforcement; refusing them is.
+ */
+export const MUTATION_CHANNELS = ['open', 'recipe-only'] as const;
+
+export type MutationChannel = (typeof MUTATION_CHANNELS)[number];
+
+export function isMutationChannel(value: string): value is MutationChannel {
+  return (MUTATION_CHANNELS as readonly string[]).includes(value);
+}
+
+/**
  * Parse the on-disk string form into a GapBehavior.
  *   'error' | 'degrade' | 'emulate:labels' | 'emulate:sub-issues'
  */
