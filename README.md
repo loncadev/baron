@@ -67,8 +67,9 @@ name for the same item instead of inventing one.
 Published to npm — no clone, no build. From inside your project:
 
 ```bash
-# 1. Configure — one command. Auto-detects owner/repo from your git remote, prompts for the token
-#    (hidden), writes .baron/credentials (gitignored) + .baron/policy.json (issues + scm bound).
+# 1. Configure — one command. Auto-detects owner/repo from your git remote, offers to sign you in
+#    through your browser (or paste a token instead), writes .baron/credentials (gitignored) +
+#    .baron/policy.json (issues + scm bound).
 npx -y @lonca/baron-cli@latest init --provider github      # or: --provider azure-devops
 
 # 2. Check the policy against the live provider (drift → exit 1)
@@ -77,6 +78,12 @@ npx -y @lonca/baron-cli@latest doctor
 # 3. Run a workflow recipe
 npx -y @lonca/baron-cli@latest run --recipe <path-to>/task-start.yaml
 ```
+
+On GitHub, step 1 opens the approval page and you confirm a short code — no permission list to read,
+no boxes to tick, no token to paste. Pasting a fine-grained token is still offered, because it is a
+narrower credential than any OAuth scope and an install that wants the tighter one should not have to
+fight the friendlier path to get it. Either way `baron doctor` verifies what the credential can
+actually do before you start work.
 
 Or drive it from an agent — install the Claude Code plugin (MCP server + workflow skills in one):
 
@@ -92,6 +99,10 @@ Or wire the **MCP server** into your agent and call the tools directly across ev
 `baron_issue_write op=create`, `baron_scm_write op=pr_create`, `baron_ci_read op=runs`, `baron_deploy_read op=deployments`,
 `baron_notify_send`, plus `baron_recipe_run` for whole workflows. In Claude Code, the plugin also
 ships per-recipe **skills** (`/baron:task-start`, `/baron:ship`). See [docs/mcp.md](./docs/mcp.md).
+
+The server is listed in the official **MCP Registry** as `io.github.loncadev/baron`, and runs as a
+container for anyone who would rather not have Node on the host — see
+[docs/mcp.md](./docs/mcp.md#running-it-as-a-container).
 
 New to it? The [Azure DevOps setup walkthrough](./docs/setup-azure-devops.md) is copy-paste from
 scratch (PAT scopes, `init → doctor → MCP`, troubleshooting).
