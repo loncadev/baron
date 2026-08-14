@@ -25,6 +25,10 @@ policy.
 | `baron_issue_create` | issues | Create an issue from abstract terms (`typeRole`, optional `initialRole`). |
 | `baron_issue_get` | issues | Fetch a normalized issue by id. |
 | `baron_issue_transition` | issues | Move an issue to a workflow `role`. |
+| `baron_issue_reconcile` | issues | Clear a role label the provider's own state contradicts. Commands no role. |
+| `baron_issue_block` | issues | Set the orthogonal blocked flag with a required `reason`. Does **not** change the role — the item keeps the role it is blocked in. |
+| `baron_issue_unblock` | issues | Clear the blocked flag, optionally recording why. The role is untouched. |
+| `baron_issue_update` | issues | Patch an issue's `title` and/or `body`. |
 | `baron_issue_comment` | issues | Comment on an issue. |
 | `baron_issue_link` | issues | Link two issues (`relates` / `blocks` / `blocked_by` / `duplicates`). |
 | `baron_issue_assign` | issues | Assign an issue to a provider-native user handle (Azure: email; GitHub: login). |
@@ -55,6 +59,29 @@ policy.
 
 Tool inputs are plain JSON Schema; the `role` / `typeRole` / link-type / status fields are enums
 sourced from the core's abstract vocabulary, so they never expose provider-native states.
+
+## Enforcing the recipe channel
+
+Decision #19 says a recipe runs as one deterministic call and the **engine** enforces the step order.
+That was true of the engine and false of this server: every mutating primitive sat in the same tool
+list as `baron_recipe_run`, so the guarantee was a sentence in a skill prompt that anyone reading the
+tool list could disprove.
+
+Set it in `.baron/policy.json`:
+
+```json
+{ "mutations": { "channel": "recipe-only" } }
+```
+
+- `open` (the default, and what every install did before this existed) — any primitive may be called
+  directly.
+- `recipe-only` — a tool that changes a provider is **refused** with `MUTATION_OUTSIDE_RECIPE`, naming
+  `baron_recipe_run` and pointing at `baron_recipe_list` to find the recipe that covers it.
+
+The refused tools stay **listed**. Hiding them would trade an enforceable rule for an obscured one,
+and an agent that cannot see a tool cannot be told why it may not use it. Reads are unaffected, and so
+are the knowledge loop's own writes — refusing those would cost the record of a decision without
+preventing a single provider write.
 
 ## Update notice
 

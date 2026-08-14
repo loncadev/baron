@@ -53,5 +53,12 @@ export function loadPorts(root: string, env: Env): McpPorts {
   // The recipe runner drives the SAME bound ports the agent uses, deterministically (the engine
   // enforces order/rules); built-ins resolve by name, project recipes from <root>/.baron/recipes.
   const recipes = createRecipeService({ ...bound, knowledge }, root);
-  return { ...bound, knowledge, nativeAccess, recipes };
+  return {
+    ...bound,
+    knowledge,
+    nativeAccess,
+    recipes,
+    // Absent in policy means `open` — dispatch applies the default, so nothing is asserted here.
+    ...(policy.mutations !== undefined ? { mutationChannel: policy.mutations.channel } : {}),
+  };
 }

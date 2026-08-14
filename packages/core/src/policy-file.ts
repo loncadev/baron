@@ -1,6 +1,11 @@
 import type { IssuesProviderConfig, NativeTarget, ProviderRoleMap, TypeMap } from './config.js';
 import { BaronError } from './errors.js';
-import { parseGapPolicy } from './policy.js';
+import {
+  MUTATION_CHANNELS,
+  type MutationChannel,
+  isMutationChannel,
+  parseGapPolicy,
+} from './policy.js';
 import { BLOCKED_LABEL, WORKFLOW_ROLES, isWorkItemTypeRole, isWorkflowRole } from './roles.js';
 
 /**
@@ -30,6 +35,11 @@ export interface BaronPolicyFile {
   /** provider id -> capability name -> on-disk gap behavior string ('error' | 'degrade' | 'emulate:<s>'). */
   readonly gapPolicy?: Record<string, Record<string, string>>;
   readonly language?: { readonly interaction?: string; readonly artifacts?: string };
+  /**
+   * How provider mutations may reach a provider. Absent means {@link MUTATION_CHANNELS}[0] —
+   * `open` — so every policy written before this behaves exactly as it did.
+   */
+  readonly mutations?: { readonly channel: MutationChannel };
   /**
    * What loading this file had to change to make it valid under the current contract. Empty for a
    * policy already in the current shape. Carried on the parsed value rather than logged, so `doctor`
@@ -203,6 +213,18 @@ export function parsePolicy(raw: unknown): BaronPolicyFile {
     };
   }
 
+  let mutations: BaronPolicyFile['mutations'];
+  if (root.mutations !== undefined) {
+    const { channel } = requireRecord(root.mutations, 'mutations');
+    if (typeof channel !== 'string' || !isMutationChannel(channel)) {
+      fail(
+        `policy.mutations.channel must be one of: ${MUTATION_CHANNELS.join(', ')} ` +
+          `(got ${JSON.stringify(channel)}).`,
+      );
+    }
+    mutations = { channel };
+  }
+
   return {
     version: 1,
     providers,
@@ -210,6 +232,7 @@ export function parsePolicy(raw: unknown): BaronPolicyFile {
     typeMap,
     ...(gapPolicy !== undefined ? { gapPolicy } : {}),
     ...(language !== undefined ? { language } : {}),
+    ...(mutations !== undefined ? { mutations } : {}),
     // Present only when something actually changed, so a current policy round-trips unchanged.
     ...(migrations.length > 0 ? { migrations } : {}),
   };

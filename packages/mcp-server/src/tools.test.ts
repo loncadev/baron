@@ -37,6 +37,7 @@ import {
   DEPLOY_TOOL_NAMES,
   LOOP_TOOL_NAMES,
   MCP_TOOL_NAMES,
+  type McpPorts,
   NATIVE_TOOL_NAMES,
   NOTIFY_TOOL_NAMES,
   type NativeAccess,
@@ -335,7 +336,7 @@ describe('TOOL_DEFINITIONS', () => {
   });
 
   it('locks every input schema to additionalProperties:false', () => {
-    for (const tool of TOOL_DEFINITIONS) {
+    for (const tool of ALL_PUBLISHED) {
       expect(tool.inputSchema.additionalProperties).toBe(false);
     }
   });
@@ -716,5 +717,95 @@ describe('callRecipeTool', () => {
     expect(ok.isError).toBeUndefined();
     const unbound = await dispatchTool({}, RECIPE_TOOL_NAMES.run, { name: 'task-start' });
     expect(unbound.structuredContent?.code).toBe('PORT_UNBOUND');
+  });
+});
+
+// Decision #19 says a recipe runs as one deterministic call and the ENGINE enforces the step order.
+// That was true of the engine and false of the server: every mutating primitive sat in the same
+// tool list as baron_recipe_run, so the guarantee was a sentence in a skill prompt that anyone
+// reading the tool list could disprove.
+const ALL_PUBLISHED = activeToolDefinitions({
+  issues: githubPort(),
+  scm: scmPort(),
+  ci: ciPort(),
+  notify: notifyPort(),
+  deploy: deployPort(),
+  knowledge: loop(),
+  recipes: recipesService(),
+  nativeAccess: async () => ({ status: 200, ok: true, body: {}, truncated: false }),
+});
+
+const DEFAULT_OPEN = 'open' as const;
+
+describe('mutation channel', () => {
+  const recipeOnly = (extra: Partial<McpPorts> = {}) => ({
+    issues: githubPort(),
+    scm: scmPort(),
+    recipes: recipesService(),
+    mutationChannel: 'recipe-only' as const,
+    ...extra,
+  });
+
+  it('refuses a direct provider mutation, naming the channel and how to proceed', async () => {
+    const result = await dispatchTool(recipeOnly(), SCM_TOOL_NAMES.prMerge, {
+      pullRequestId: '1',
+    });
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent?.code).toBe('MUTATION_OUTSIDE_RECIPE');
+    expect(result.content[0]?.text).toContain(RECIPE_TOOL_NAMES.run);
+    expect(result.content[0]?.text).toContain(RECIPE_TOOL_NAMES.list);
+  });
+
+  it('still allows reads', async () => {
+    const ports = recipeOnly();
+    const created = await dispatchTool(
+      { ...ports, mutationChannel: DEFAULT_OPEN },
+      MCP_TOOL_NAMES.create,
+      { title: 'readable', typeRole: 'task' },
+    );
+    const id = (parse(created.content[0]?.text ?? '{}').id as string) ?? '1';
+    const read = await dispatchTool(ports, MCP_TOOL_NAMES.get, { id });
+    expect(read.isError).toBeUndefined();
+  });
+
+  // The channel is the point: the recipe runner must keep working, or the mode is unusable.
+  it('still allows the recipe runner itself', async () => {
+    const result = await dispatchTool(recipeOnly(), RECIPE_TOOL_NAMES.run, {
+      name: 'task-new',
+      inputs: { title: 'through the channel', typeRole: 'task' },
+    });
+    expect(result.isError).toBeUndefined();
+  });
+
+  // Blocking these would cost the record of a decision without preventing one provider write.
+  it("still allows the knowledge loop's own writes", async () => {
+    const result = await dispatchTool(
+      { ...recipeOnly(), knowledge: loop() },
+      LOOP_TOOL_NAMES.learningAppend,
+      { title: 'decided X', body: 'because Y', tags: ['design'] },
+    );
+    expect(result.isError).toBeUndefined();
+  });
+
+  it('is open unless the policy says otherwise', async () => {
+    const result = await dispatchTool(
+      { issues: githubPort(), scm: scmPort() },
+      MCP_TOOL_NAMES.create,
+      { title: 'open by default', typeRole: 'task' },
+    );
+    expect(result.isError).toBeUndefined();
+  });
+
+  // A tool added without a decision would silently be treated as a read.
+  it('classifies every published tool', () => {
+    for (const tool of TOOL_DEFINITIONS) {
+      expect(typeof tool.mutatesProvider, tool.name).toBe('boolean');
+    }
+    const mutating = ALL_PUBLISHED.filter((t) => t.mutatesProvider).map((t) => t.name);
+    expect(mutating).toContain(SCM_TOOL_NAMES.prMerge);
+    expect(mutating).toContain(MCP_TOOL_NAMES.transition);
+    expect(mutating).toContain(NATIVE_TOOL_NAMES.request);
+    expect(mutating).not.toContain(RECIPE_TOOL_NAMES.run);
+    expect(mutating).not.toContain(MCP_TOOL_NAMES.get);
   });
 });

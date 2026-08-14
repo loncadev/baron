@@ -8,6 +8,8 @@ import {
   type IssueQuery,
   type IssuesPort,
   MERGE_STRATEGIES,
+  MUTATION_CHANNELS,
+  type MutationChannel,
   type NotifyPort,
   PR_STATE_FILTERS,
   type PrStateFilter,
@@ -50,6 +52,11 @@ export interface McpPorts {
   readonly nativeAccess?: NativeAccess;
   /** Deterministic recipe runner (built-ins + project recipes) over the bound ports. */
   readonly recipes?: RecipeService;
+  /**
+   * How provider mutations may reach a provider, from `policy.mutations.channel`. Absent means
+   * `open`, which is what every install did before this existed.
+   */
+  readonly mutationChannel?: MutationChannel;
 }
 
 /** Tool names: snake_case, `baron_` (product) namespace, singular noun to mirror the primitives. */
@@ -116,6 +123,17 @@ export const LOOP_TOOL_NAMES = {
 /** A tool definition shaped for the MCP ListTools response (plain JSON Schema, no zod). */
 export interface ToolDefinition {
   readonly name: string;
+  /**
+   * Whether calling this changes something in a PROVIDER — a work item, a branch, a PR, a pipeline.
+   * Required, so a new tool cannot be added without someone deciding; a hand-kept list elsewhere
+   * would drift the first time one was.
+   *
+   * False for the knowledge loop's appends: they write Baron's own store, and refusing them would
+   * cost the record of a decision without preventing a single provider write. False for
+   * `baron_recipe_run`, which IS the sanctioned channel — it mutates only by running primitives the
+   * engine ordered, which is the entire point of {@link MUTATION_CHANNELS}.
+   */
+  readonly mutatesProvider: boolean;
   readonly description: string;
   readonly inputSchema: {
     readonly type: 'object';
@@ -145,9 +163,13 @@ const PR_STATE_FILTER_ENUM = [...PR_STATE_FILTERS];
 /** Default cap for `baron_issue_query` so an unbounded listing can't overflow the agent's context. */
 const DEFAULT_QUERY_LIMIT = 50;
 
+/** What an install gets when policy.mutations is absent: today's behaviour, unchanged. */
+const DEFAULT_MUTATION_CHANNEL = MUTATION_CHANNELS[0];
+
 export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   {
     name: MCP_TOOL_NAMES.create,
+    mutatesProvider: true,
     description:
       'Create an issue from abstract terms. typeRole -> native work-item type and initialRole -> ' +
       'native state are translated automatically per the active policy; capability gaps (e.g. no ' +
@@ -181,6 +203,7 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   },
   {
     name: MCP_TOOL_NAMES.get,
+    mutatesProvider: false,
     description: 'Fetch a normalized issue by id.',
     inputSchema: {
       type: 'object',
@@ -191,6 +214,7 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   },
   {
     name: MCP_TOOL_NAMES.update,
+    mutatesProvider: true,
     description:
       "Edit an existing issue's title and/or body. A patch: whatever you omit is left untouched. " +
       "The body goes to the field the item's type uses — a bug's body is its repro steps. Use this " +
@@ -209,6 +233,7 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   },
   {
     name: MCP_TOOL_NAMES.transition,
+    mutatesProvider: true,
     description:
       'Transition an issue to a target workflow role (idempotent). The adapter resolves the role ' +
       'to the provider-native state/column/label.',
@@ -228,6 +253,7 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   },
   {
     name: MCP_TOOL_NAMES.reconcile,
+    mutatesProvider: true,
     description:
       "Make an item's emulated role labels agree with the state the provider itself reports. " +
       "Commands no role — it only clears a role label the provider's own state contradicts, which " +
@@ -241,6 +267,7 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   },
   {
     name: MCP_TOOL_NAMES.block,
+    mutatesProvider: true,
     description:
       'Mark an item blocked, WITHOUT changing its workflow role — blocking answers "can this move?", ' +
       'not "where is it?". The item keeps the role it is blocked in, so unblocking returns it to ' +
@@ -263,6 +290,7 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   },
   {
     name: MCP_TOOL_NAMES.unblock,
+    mutatesProvider: true,
     description:
       "Clear an item's blocked flag. The workflow role is untouched. Optionally records why it was " +
       'unblocked. Idempotent.',
@@ -281,6 +309,7 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   },
   {
     name: MCP_TOOL_NAMES.comment,
+    mutatesProvider: true,
     description: 'Add a comment to an issue.',
     inputSchema: {
       type: 'object',
@@ -294,6 +323,7 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   },
   {
     name: MCP_TOOL_NAMES.link,
+    mutatesProvider: true,
     description:
       'Link two issues with an abstract relationship. On providers without native typed links the ' +
       'link is emulated or degraded per the gap policy.',
@@ -314,6 +344,7 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   },
   {
     name: MCP_TOOL_NAMES.assign,
+    mutatesProvider: true,
     description:
       'Assign an issue to a user by their provider-native handle (Azure DevOps: email; GitHub: ' +
       'login). Providers without assignment negotiate the gap per policy.',
@@ -333,6 +364,7 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   },
   {
     name: MCP_TOOL_NAMES.iterations,
+    mutatesProvider: false,
     description:
       "List the provider's iterations/sprints (each with a `current` flag). Empty when the provider " +
       'has no sprints. Use it to find the active sprint or a target for set_iteration.',
@@ -340,6 +372,7 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   },
   {
     name: MCP_TOOL_NAMES.setIteration,
+    mutatesProvider: true,
     description:
       "Move a work item to an iteration/sprint by path, or '@current' for the active sprint. " +
       'Providers without sprints negotiate the gap per policy.',
@@ -359,6 +392,7 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   },
   {
     name: MCP_TOOL_NAMES.query,
+    mutatesProvider: false,
     description:
       'List issues filtered by workflow role and/or type role (filters are AND-combined). Returns a ' +
       'lightweight projection (no body); fetch an issue with get for full detail.',
@@ -393,6 +427,7 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
 export const SCM_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   {
     name: SCM_TOOL_NAMES.branchCreate,
+    mutatesProvider: true,
     description: 'Create a branch from a base branch (defaults to the repository default branch).',
     inputSchema: {
       type: 'object',
@@ -414,6 +449,7 @@ export const SCM_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   },
   {
     name: SCM_TOOL_NAMES.prCreate,
+    mutatesProvider: true,
     description:
       'Open a pull request. A requested draft may be degraded to a ready PR if the provider lacks ' +
       'draft support (per the gap policy); the returned `draft` reflects what was actually opened.',
@@ -436,6 +472,7 @@ export const SCM_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   },
   {
     name: SCM_TOOL_NAMES.prThread,
+    mutatesProvider: true,
     description: 'Add a discussion thread/comment to a pull request.',
     inputSchema: {
       type: 'object',
@@ -449,6 +486,7 @@ export const SCM_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   },
   {
     name: SCM_TOOL_NAMES.prReady,
+    mutatesProvider: true,
     description:
       'Take a draft pull request out of draft ("ready for review"). task-finish opens drafts on ' +
       'purpose; this is how you signal it is ready to land.',
@@ -461,6 +499,7 @@ export const SCM_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   },
   {
     name: SCM_TOOL_NAMES.prMerge,
+    mutatesProvider: true,
     description:
       'Merge (land) a pull request — the last mile of the flow. Fails loudly (MERGE_FAILED) when ' +
       'the provider refuses: conflicts, unmet branch policies, or a PR that is still a draft. ' +
@@ -482,6 +521,7 @@ export const SCM_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   },
   {
     name: SCM_TOOL_NAMES.prStatus,
+    mutatesProvider: false,
     description:
       "Read a pull request's normalized status: state, review decision, mergeability, and a checks " +
       'rollup — the "is it ready to merge?" view.',
@@ -494,6 +534,7 @@ export const SCM_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   },
   {
     name: SCM_TOOL_NAMES.prForBranch,
+    mutatesProvider: false,
     description:
       'Find the most recent pull request for a branch matching `state` (null when none), with its ' +
       "normalized `state`. `open` (default) = the finish-flow idempotency probe (don't duplicate an " +
@@ -521,6 +562,7 @@ export const SCM_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
 export const CI_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   {
     name: CI_TOOL_NAMES.pipelines,
+    mutatesProvider: false,
     description: 'List pipeline definitions.',
     inputSchema: {
       type: 'object',
@@ -536,6 +578,7 @@ export const CI_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   },
   {
     name: CI_TOOL_NAMES.runs,
+    mutatesProvider: false,
     description:
       'List CI runs (filter by pipeline / branch / normalized status). Returns a lightweight ' +
       'projection; status is the provider-agnostic run status.',
@@ -560,6 +603,7 @@ export const CI_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   },
   {
     name: CI_TOOL_NAMES.runGet,
+    mutatesProvider: false,
     description: 'Get one run, including its stages when the provider surfaces them.',
     inputSchema: {
       type: 'object',
@@ -570,6 +614,7 @@ export const CI_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   },
   {
     name: CI_TOOL_NAMES.runLogs,
+    mutatesProvider: false,
     description:
       "Fetch a run's logs. Size-aware: returns a lean tail by default (`truncated` flags omitted " +
       'content); raise `tailLines` for more.',
@@ -589,6 +634,7 @@ export const CI_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   },
   {
     name: CI_TOOL_NAMES.runTrigger,
+    mutatesProvider: true,
     description:
       'Queue a new run of a pipeline. Returns { accepted, run? } — `run` is present only when the ' +
       'provider returns it synchronously (some providers dispatch asynchronously with no run id).',
@@ -613,6 +659,7 @@ export const CI_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   },
   {
     name: CI_TOOL_NAMES.runCancel,
+    mutatesProvider: true,
     description: 'Cancel a run; returns the run with its updated status.',
     inputSchema: {
       type: 'object',
@@ -626,6 +673,7 @@ export const CI_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
 export const NOTIFY_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   {
     name: NOTIFY_TOOL_NAMES.send,
+    mutatesProvider: true,
     description:
       'Send a notification. Targeting a channel or threading a reply may be degraded/errored per the ' +
       'gap policy on providers that lack those capabilities.',
@@ -653,6 +701,7 @@ export const NOTIFY_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
 export const DEPLOY_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   {
     name: DEPLOY_TOOL_NAMES.environments,
+    mutatesProvider: false,
     description: 'List deployment environments (e.g. dev / staging / prod).',
     inputSchema: {
       type: 'object',
@@ -664,6 +713,7 @@ export const DEPLOY_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   },
   {
     name: DEPLOY_TOOL_NAMES.deployments,
+    mutatesProvider: false,
     description:
       'List recent deployments with a normalized status (optionally filtered to one environment).',
     inputSchema: {
@@ -680,6 +730,7 @@ export const DEPLOY_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
 export const NATIVE_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   {
     name: NATIVE_TOOL_NAMES.request,
+    mutatesProvider: true,
     description:
       'ESCAPE HATCH — a raw, authenticated, NON-PORTABLE provider REST call. Last resort for when no ' +
       'normalized tool (issue/scm/ci/notify) covers the need. You supply the provider-native ' +
@@ -708,6 +759,7 @@ export const NATIVE_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
 export const RECIPE_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   {
     name: RECIPE_TOOL_NAMES.list,
+    mutatesProvider: false,
     description:
       'List the runnable recipes (built-ins + project recipes) with their declared inputs. Call this ' +
       'to discover what `baron_recipe_run` accepts before running a workflow.',
@@ -715,6 +767,7 @@ export const RECIPE_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   },
   {
     name: RECIPE_TOOL_NAMES.run,
+    mutatesProvider: false,
     description:
       'Run a named recipe end-to-end as ONE deterministic, rule-enforced workflow (the engine — not ' +
       'you — enforces the step order). Supply all required inputs (from baron_recipe_list) in ' +
@@ -741,6 +794,7 @@ export const RECIPE_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
 export const LOOP_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   {
     name: LOOP_TOOL_NAMES.learningAppend,
+    mutatesProvider: false,
     description: 'Record a durable learning (knowledge that should survive across runs).',
     inputSchema: {
       type: 'object',
@@ -755,6 +809,7 @@ export const LOOP_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   },
   {
     name: LOOP_TOOL_NAMES.learningQuery,
+    mutatesProvider: false,
     description: 'Query recorded learnings by tag and/or free text (newest first).',
     inputSchema: {
       type: 'object',
@@ -768,6 +823,7 @@ export const LOOP_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   },
   {
     name: LOOP_TOOL_NAMES.followupAppend,
+    mutatesProvider: false,
     description: 'Record an open follow-up (deferred work to revisit later).',
     inputSchema: {
       type: 'object',
@@ -782,6 +838,7 @@ export const LOOP_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   },
   {
     name: LOOP_TOOL_NAMES.followupList,
+    mutatesProvider: false,
     description: 'List follow-ups by status and/or tag (newest first).',
     inputSchema: {
       type: 'object',
@@ -1414,11 +1471,64 @@ export function activeToolDefinitions(ports: McpPorts): ToolDefinition[] {
 }
 
 /** Route a tool call to the right port by its name prefix; unbound ports / unknown names error. */
+/** Every tool this server publishes, across all ports. */
+const ALL_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
+  ...TOOL_DEFINITIONS,
+  ...SCM_TOOL_DEFINITIONS,
+  ...CI_TOOL_DEFINITIONS,
+  ...NOTIFY_TOOL_DEFINITIONS,
+  ...DEPLOY_TOOL_DEFINITIONS,
+  ...NATIVE_TOOL_DEFINITIONS,
+  ...RECIPE_TOOL_DEFINITIONS,
+  ...LOOP_TOOL_DEFINITIONS,
+];
+
+/** Tools that change a provider, by name — derived from the definitions so it cannot drift. */
+const MUTATING_TOOL_NAMES: ReadonlySet<string> = new Set(
+  ALL_TOOL_DEFINITIONS.filter((tool) => tool.mutatesProvider).map((tool) => tool.name),
+);
+
+/** The code an agent branches on when a mutation was refused for coming outside a recipe. */
+const MUTATION_OUTSIDE_RECIPE = 'MUTATION_OUTSIDE_RECIPE';
+
+/**
+ * Refuse a provider mutation that did not come through a recipe, when the policy says so.
+ *
+ * Decision #19 is that a recipe runs as one deterministic call and the ENGINE enforces the step
+ * order. That was true of the engine and false of the server: every mutating primitive sat in the
+ * same tool list as `baron_recipe_run`, so the guarantee was a sentence in a skill prompt that
+ * anyone reading the tool list could disprove.
+ *
+ * The tools stay LISTED. Hiding them would trade an enforceable rule for an obscured one, and an
+ * agent that cannot see a tool cannot be told why it may not use it.
+ */
+function refuseIfOutsideRecipe(ports: McpPorts, name: string): ToolResult | undefined {
+  if ((ports.mutationChannel ?? DEFAULT_MUTATION_CHANNEL) !== 'recipe-only') return undefined;
+  if (!MUTATING_TOOL_NAMES.has(name)) return undefined;
+  return {
+    isError: true,
+    structuredContent: { code: MUTATION_OUTSIDE_RECIPE },
+    content: [
+      {
+        type: 'text',
+        text:
+          `'${name}' changes a provider, and this installation sets policy.mutations.channel to ` +
+          `'recipe-only': mutations go through '${RECIPE_TOOL_NAMES.run}', so the engine enforces ` +
+          `the step order rather than trusting the caller to. Call '${RECIPE_TOOL_NAMES.list}' to ` +
+          `find the recipe that covers this, or set the channel to '${DEFAULT_MUTATION_CHANNEL}' ` +
+          'if this installation does not want that guarantee.',
+      },
+    ],
+  };
+}
+
 export function dispatchTool(
   ports: McpPorts,
   name: string,
   args: Record<string, unknown> | undefined,
 ): Promise<ToolResult> {
+  const refusal = refuseIfOutsideRecipe(ports, name);
+  if (refusal !== undefined) return Promise.resolve(refusal);
   if (name.startsWith('baron_issue_')) {
     if (ports.issues === undefined) {
       return run(() => {

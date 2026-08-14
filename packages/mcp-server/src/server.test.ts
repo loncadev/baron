@@ -166,3 +166,18 @@ describe('server instructions', () => {
     expect(SERVER_INSTRUCTIONS).toContain('baron_recipe_run');
   });
 });
+
+// The guarantee has to hold over the wire, not just in dispatch: an agent talks to the protocol.
+describe('mutation channel over the MCP protocol', () => {
+  it('lists the mutating tool but refuses to run it in recipe-only mode', async () => {
+    const client = await connectClient({ issues: githubPort(), mutationChannel: 'recipe-only' });
+    const { tools } = await client.listTools();
+    // Still listed: hiding it would trade an enforceable rule for an obscured one, and an agent
+    // that cannot see a tool cannot be told why it may not use it.
+    expect(tools.map((t) => t.name)).toContain(MCP_TOOL_NAMES.transition);
+
+    const result = await call(client, MCP_TOOL_NAMES.transition, { id: '1', role: 'in_review' });
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent?.code).toBe('MUTATION_OUTSIDE_RECIPE');
+  });
+});
