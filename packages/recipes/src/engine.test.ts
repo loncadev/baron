@@ -803,3 +803,48 @@ describe('task-move', () => {
     expect(asker.notes.some((n) => n.includes('already in_review'))).toBe(true);
   });
 });
+
+// The relation reached the port through core and the adapter, and stopped at the engine — so the
+// recipe asked for `relates` and the PR still said Closes. A layer that silently drops an argument
+// is worse than one that rejects it.
+describe('scm.pr.create carries the issue relation', () => {
+  const recipe = (relation: string) =>
+    loadRecipe(`
+name: link-it
+steps:
+  - do: scm.pr.create
+    as: pr
+    with:
+      title: t
+      sourceBranch: feature/x
+      targetBranch: main
+      linkedIssueKey: "12"
+      linkedIssueRelation: ${relation}
+`);
+
+  it('passes it down rather than dropping it', async () => {
+    const seen: unknown[] = [];
+    const ports: RecipePorts = {
+      scm: {
+        createPullRequest: async (draft: unknown) => {
+          seen.push(draft);
+          return {
+            id: '1',
+            title: 't',
+            sourceBranch: 'feature/x',
+            targetBranch: 'main',
+            draft: false,
+          };
+        },
+      } as unknown as ScmPort,
+    };
+    await runRecipe(recipe('relates'), { ports, asker: scriptedAsker() });
+    expect((seen[0] as { linkedIssueRelation?: string }).linkedIssueRelation).toBe('relates');
+  });
+
+  it('rejects a relation the union does not have, naming the ones it does', async () => {
+    await expect(
+      runRecipe(recipe('mentions'), { ports: allPorts(), asker: scriptedAsker() }),
+    ).rejects.toThrow(/closes, relates/);
+  });
+});

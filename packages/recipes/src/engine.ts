@@ -362,6 +362,9 @@ async function dispatchOp(ports: RecipePorts, op: RecipeOp, params: Params): Pro
         ...(optStr(params, 'linkedIssueKey', op) !== undefined
           ? { linkedIssueKey: optStr(params, 'linkedIssueKey', op) }
           : {}),
+        ...(optRelation(params, 'linkedIssueRelation', op) !== undefined
+          ? { linkedIssueRelation: optRelation(params, 'linkedIssueRelation', op) }
+          : {}),
         ...(optStrArray(params, 'assignees', op) !== undefined
           ? { assignees: optStrArray(params, 'assignees', op) }
           : {}),
