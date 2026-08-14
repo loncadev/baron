@@ -117,14 +117,25 @@ mcp-publisher login github --token "$(gh auth token)"   # see below — plain `l
 mcp-publisher publish                                   # reads ./server.json from the cwd
 ```
 
-> **The org namespace needs a `read:org` token, and `mcp-publisher login github` does not mint one.**
-> The registry grants `io.github.<org>/*` only after calling `GET /user/memberships/orgs`, which
-> requires the `read:org` scope. A token without it gets a 403 that the registry **deliberately
-> swallows** as "no admin orgs" so personal publishing keeps working — so the device flow succeeds,
-> reports nothing wrong, and silently leaves you with `io.github.keparlak/*` only. The 403 from
-> `publish` then blames private org membership, which is about an older code path and is *not* the
-> gate. Passing a token that carries `read:org` (the `gh` CLI's does) is what actually works. This
-> cost three rounds of browser sign-in on the first submission.
+> **Try plain `mcp-publisher login github` first — the `--token` above is a workaround for a bug
+> that upstream is fixing.** If publishing still reports `You have permission to publish:
+> io.github.<your-username>/*`, the workaround is still needed.
+>
+> The cause, per [modelcontextprotocol/registry#1468][reg-1468]: since registry v1.8.0 only
+> organisation *Owners* may publish under an organisation namespace, and that is checked with
+> `GET /user/memberships/orgs`, which requires the `read:org` scope — a scope the GitHub App token
+> minted by `mcp-publisher login github` does not carry. The registry **deliberately swallows** the
+> resulting 403 as "no admin orgs" so personal publishing keeps working, so the device flow succeeds,
+> reports nothing wrong, and silently leaves you with your personal namespace. A maintainer confirmed
+> this on 2026-07-27 and a proper fix is in progress.
+>
+> Two traps worth knowing before you spend an afternoon on it, as v0.32.1 did. The 403 blames private
+> organisation membership; that belongs to an older code path and is **not** the gate — making a
+> membership public is a visible change to a personal profile made for no reason. And the binary
+> version matters: a user on that thread reports the workaround failing on `1.8.0` (built
+> 2026-07-13), while ours succeeded on `1.8.1` (built 2026-08-06).
+
+[reg-1468]: https://github.com/modelcontextprotocol/registry/issues/1468
 
 Two further conditions, both real: whoever publishes must be an **Owner** of `loncadev` (membership
 `role: admin`, `state: active` — an unaccepted invitation does not count), and the publish must come
