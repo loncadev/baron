@@ -4,9 +4,14 @@ A complete, copy-paste walkthrough to wire Baron to an **Azure DevOps** project 
 **Claude Code**, as a first-time user. End state: you ask Claude things like *"list my backlog"* or
 *"start a task and open a PR"* and it does them through Baron's normalized tools.
 
-> Baron is on npm: the CLI runs via `npx -y @lonca/baron-cli@latest`, and the MCP server via the
-> Claude Code plugin (`/plugin marketplace add loncadev/baron`) or `npx @lonca/baron-mcp-server@latest`.
-> No clone or build needed. (To develop Baron itself, run from a clone with `pnpm baron …`.)
+> **This walkthrough runs Baron from a clone** (`pnpm baron …`) and says so in its prerequisites —
+> it was written and verified that way against a real Azure DevOps project.
+>
+> You do not have to: Baron is on npm, so the CLI runs via `npx -y @lonca/baron-cli@latest` and the
+> MCP server via the Claude Code plugin (`/plugin marketplace add loncadev/baron`) or
+> `npx @lonca/baron-mcp-server@latest`. Every `pnpm baron <cmd>` below has an
+> `npx -y @lonca/baron-cli@latest <cmd>` equivalent, and recipes now run by name
+> (`--recipe task-start`), so nothing here needs the repository except the clone itself.
 
 ---
 

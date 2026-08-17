@@ -7,9 +7,14 @@ one pane of glass (issues, scm, ci, deploy, notify) across providers, via MCP + 
 
 ## Install
 
-```bash
-npm install @lonca/baron-conformance
-```
+**Not published.** This package is `private: true`: it is a devDependency of the adapters and the
+CLI, never a runtime dependency of anything shipped, so publishing it would add a package nobody
+installs. Third parties conformance-testing their own adapter today do it from a checkout of this
+repository.
+
+Publishing it is a real option — it needs its entry points split (the pure in-memory transports
+apart from the vitest-coupled suites), a `build`, `files` and `publishConfig`, and `private`
+dropped. Worth doing when someone outside this repo actually writes an adapter; see RELEASING.md.
 
 ## Documentation
 
