@@ -17,17 +17,15 @@ RUN corepack enable
 WORKDIR /src
 
 # Manifests first so a source-only edit does not invalidate the install layer.
+#
+# Globbed rather than enumerated. The list used to name every package by hand and broke the moment
+# one was added: adding the Linear adapter left it out, pnpm never linked the workspace for it, and
+# the image failed to build with "Cannot find module '@lonca/baron-core'" — a hand-kept list with
+# nothing tying it to the packages that actually exist, which is the exact defect this repository
+# has spent its time removing everywhere else. `--parents` keeps the directory structure that a
+# plain glob would flatten.
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
-COPY packages/core/package.json packages/core/
-COPY packages/providers/package.json packages/providers/
-COPY packages/recipes/package.json packages/recipes/
-COPY packages/knowledge-loop/package.json packages/knowledge-loop/
-COPY packages/mcp-server/package.json packages/mcp-server/
-COPY packages/cli/package.json packages/cli/
-COPY packages/conformance/package.json packages/conformance/
-COPY packages/adapters/azure-devops/package.json packages/adapters/azure-devops/
-COPY packages/adapters/github/package.json packages/adapters/github/
-COPY packages/adapters/slack/package.json packages/adapters/slack/
+COPY --parents packages/*/package.json packages/adapters/*/package.json ./
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
 COPY . .
