@@ -133,9 +133,15 @@ to text.
 | `issue.create` | `title`, `typeRole`, `body?`, `parentId?`, `labels?`, `initialRole?` | the issue |
 | `issue.get` | `id` | the issue (incl. `branchName`, the canonical `<prefix>/<id>-<slug>`) |
 | `issue.transition` | `id`, `role` | the issue |
+| `issue.classify` | `id`, `role` | `{ kind: advance \| regress \| reopen \| noop, from, to }` — judge a move BEFORE making it |
+| `issue.reconcile` | `id` | the issue, with any role label Baron itself wrote cleared once the provider's own state contradicts it |
+| `issue.update` | `id`, `title?`, `body?` | the issue |
 | `issue.comment` | `id`, `body` | the comment |
 | `issue.link` | `fromId`, `toId`, `type` | — |
 | `issue.assign` | `id`, `assignee` (provider-native handle) | the issue |
+| `issue.block` | `id`, `reason` | the issue — sets the orthogonal blocked flag; the role is untouched. A reason is required |
+| `issue.unblock` | `id`, `reason?` | the issue — clears the flag, leaving the role where the work actually was |
+| `issue.whoami` | — | the authenticated user's provider-native handle |
 | `issue.iterations` | — | iteration list (each with a `current` flag) |
 | `issue.set-iteration` | `id`, `iteration` (path or `@current`) | the issue |
 | `issue.query` | `role?`, `typeRole?`, `assignee?` (handle or `@me`), `iteration?` (path or `@current`), `limit?` | issue list |
@@ -144,6 +150,8 @@ to text.
 | `scm.pr.thread` | `pullRequestId`, `body` | the thread |
 | `scm.pr.status` | `pullRequestId` | normalized PR status (state, reviewDecision, mergeable, checks) |
 | `scm.pr.find` | `sourceBranch`, `state?` (`open` default / `merged` / `closed` / `all`) | the most recent matching PR (with `state`), or `null` |
+| `scm.pr.ready` | `pullRequestId` | the PR, taken out of draft |
+| `scm.pr.merge` | `pullRequestId`, `strategy?`, `deleteSourceBranch?` | `{ merged, sha }` — throws if the provider refuses |
 | `ci.run.trigger` | `pipelineId`, `ref?`, `variables?` | the triggered run |
 | `ci.run.cancel` | `runId` | the canceled run |
 | `deploy.deployments` | `environment?`, `limit?` | deployment list |
@@ -159,8 +167,8 @@ isn't configured fails with `PORT_UNBOUND`.
 
 ## Built-in recipes
 
-`packages/recipes/recipes/` ships four recipes, all runnable **by name** (`baron_recipe_run`, the
-recipe skills) as well as by path (`baron run --recipe`). They mirror the reference flow Baron was
+The recipes in `packages/recipes/recipes/` all run **by name** — over MCP (`baron_recipe_run`, the
+recipe skills) and on the command line (`baron run --recipe task-start`) alike — as well as by path. They mirror the reference flow Baron was
 abstracted from (ARCHITECTURE #21): creating and starting are separate acts, and opening a PR does
 NOT move the role — what happens at merge belongs to the provider (a provider that closes the linked
 item on merge lands it in `done`; elsewhere `task-move` / `task-sync` settles it).
