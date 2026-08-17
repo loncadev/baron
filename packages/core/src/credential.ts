@@ -20,7 +20,15 @@ export type CredentialCapability = (typeof CREDENTIAL_CAPABILITIES)[number];
  * credential may do has to say so, because the alternative — assuming yes — is what let `doctor`
  * report a sound installation right before the first write failed.
  */
-export const CREDENTIAL_STATUSES = ['granted', 'denied', 'unknown'] as const;
+/**
+ * What a probe concluded about one capability.
+ *
+ * `unknown` and `error` are deliberately separate. `unknown` is a known limitation — this provider
+ * cannot report what a credential may do — and must not turn a correctly configured install red.
+ * `error` is the probe running and failing, which means something IS wrong; collapsing the two let
+ * `baron doctor` lead with OK and exit 0 while it had in fact verified nothing.
+ */
+export const CREDENTIAL_STATUSES = ['granted', 'denied', 'unknown', 'error'] as const;
 
 export type CredentialStatus = (typeof CREDENTIAL_STATUSES)[number];
 

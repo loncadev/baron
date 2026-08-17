@@ -156,10 +156,11 @@ async function cmdDoctor(flags: Record<string, string>, ports: CliPorts): Promis
 
   const denied = report.credentials.filter((f) => f.status === 'denied');
   const unknown = report.credentials.filter((f) => f.status === 'unknown');
+  const errored = report.credentials.filter((f) => f.status === 'error');
 
   if (report.ok) {
     ports.out(`OK — ${report.checks} reference(s) checked for '${report.provider}', no drift.`);
-    const granted = report.credentials.length - unknown.length;
+    const granted = report.credentials.filter((f) => f.status === 'granted').length;
     ports.out(`OK — ${granted} credential capability/capabilities confirmed.`);
   } else {
     if (report.drift.length > 0) {
@@ -173,6 +174,17 @@ async function cmdDoctor(flags: Record<string, string>, ports: CliPorts): Promis
         ports.err(`  - ${f.provider} '${f.capability}' denied — grant ${permission}.`);
       }
       ports.err('  Grant these, then re-run `baron doctor` before starting work.');
+    }
+    if (errored.length > 0) {
+      // Its own block, and it fails the report. "The probe threw" is not "we could not check": the
+      // asking happened and it broke, so nothing below is verified and saying OK would be a lie.
+      ports.err(`Could not verify the credential (${errored.length}) — the check itself failed:`);
+      for (const f of errored) {
+        ports.err(`  - ${f.provider} '${f.capability}': ${f.detail ?? 'no detail'}`);
+      }
+      ports.err(
+        '  Nothing here was verified. Fix the cause and re-run — a green run is the point.',
+      );
     }
   }
 

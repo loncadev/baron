@@ -88,11 +88,14 @@ async function checkCredentials(
         findings.push({ provider, ...finding });
       }
     } catch (error) {
+      // Not `unknown`. A probe that throws is not "this provider cannot tell us" — it is "we asked
+      // and something broke", and reporting that as merely unchecked is how a green doctor came to
+      // mean nothing. Every other unverifiable state in this command already fails loudly.
       for (const capability of capabilities) {
         findings.push({
           provider,
           capability,
-          status: 'unknown',
+          status: 'error',
           detail: `probe failed: ${error instanceof Error ? error.message : String(error)}`,
         });
       }
@@ -191,7 +194,8 @@ export async function runDoctor(options: DoctorOptions): Promise<DoctorReport> {
     ((provider: string) => getProviderDescriptor(provider).createCredentialProbe?.(env));
   const credentials = await checkCredentials(policy, probeFor);
 
-  const ok = drift.length === 0 && !credentials.some((f) => f.status === 'denied');
+  const ok =
+    drift.length === 0 && !credentials.some((f) => f.status === 'denied' || f.status === 'error');
   return {
     ok,
     policyPath: path,
