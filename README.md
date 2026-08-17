@@ -63,6 +63,13 @@ name for the same item instead of inventing one.
   `ship`) are declarative YAML executed as a single call, with guards that stop a run *before* it
   mutates anything. The order lives in the recipe rather than being improvised per run.
 
+The first of those is the one worth reading about rather than being told:
+**[You can't set a status in Jira](https://dev.to/keparlak/you-cant-set-a-status-in-jira-4d7p)**
+walks through why a work tracker cannot be normalized by mapping four states onto everything — Jira
+refuses to set a status at all and makes you discover the permitted transitions first, Linear's
+workflow states belong to a team rather than the workspace, GitHub has no hierarchy to map. It is
+the argument this design answers.
+
 ## Quick start
 
 Published to npm — no clone, no build. From inside your project:
