@@ -56,6 +56,19 @@ importers:
         specifier: ^22.0.0
         version: 22.20.0
 
+  packages/adapters/linear:
+    dependencies:
+      '@lonca/baron-core':
+        specifier: workspace:*
+        version: link:../../core
+    devDependencies:
+      '@lonca/baron-conformance':
+        specifier: workspace:*
+        version: link:../../conformance
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.0
+
   packages/adapters/slack:
     dependencies:
       '@lonca/baron-core':
@@ -151,6 +164,9 @@ importers:
       '@lonca/baron-adapter-github':
         specifier: workspace:*
         version: link:../adapters/github
+      '@lonca/baron-adapter-linear':
+        specifier: workspace:*
+        version: link:../adapters/linear
       '@lonca/baron-adapter-slack':
         specifier: workspace:*
         version: link:../adapters/slack
