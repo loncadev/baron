@@ -1,10 +1,10 @@
 # Releasing Baron
 
-Two independent milestones: **(1) push the source to a public GitHub repo**, and later **(2) publish
-the packages to npm** (so `npx @lonca/baron-mcp-server` and the Claude Code plugin work for others). You can
-do (1) now; (2) only when you want others to install without cloning.
+Both milestones below are **done** — the repo is public at `github.com/loncadev/baron` and the
+packages are on npm. Section 1 is kept as the record of what the first push required; the live
+procedure starts at [section 2](#2-npm-publish).
 
-## 1. First public GitHub push
+## 1. First public GitHub push — done
 
 **Pre-flight (safety + hygiene):**
 
@@ -20,7 +20,7 @@ do (1) now; (2) only when you want others to install without cloning.
 - [ ] `pnpm install && pnpm typecheck && pnpm lint && pnpm test && pnpm build && pnpm licenses:check`
       all green (this is exactly what CI runs).
 
-**Create the repo and push** (the repo currently has no remote):
+**Create the repo and push** — how it was done, for the record:
 
 ```bash
 gh repo create baron --public --source=. --remote=origin --description "Platform-agnostic work-orchestration for AI coding agents"
@@ -52,12 +52,13 @@ until step 2 is done.
       > expiring token. Around **January 2027** these tokens lose direct publish entirely — the
       > release process moves to trusted publishing (OIDC from CI) or staged publishing with a human
       > approval. Publishing still works today; v0.32.0 shipped this way.
-- [x] **`@lonca/baron-conformance` is `private: true` for now** (marked in v0.1.0) — it's only ever a
+- [x] **`@lonca/baron-conformance` is `private: true`** — it's only ever a
       *devDependency* of the adapters/cli/mcp-server, so no published package needs it at runtime. To
       publish it later (so third parties can conformance-test their own adapters), split its entry
       points (pure in-memory transports vs. the vitest-coupled suites), add a `build`/`files`/
       `publishConfig`, drop `private`, then republish.
-- [x] **Versioning:** packages are at **`0.1.0`** (set by `scripts/prep-publish.mjs`, which also applies
+- [x] **Versioning:** every package shares one version, read by `scripts/prep-publish.mjs` from
+      `packages/mcp-server/package.json` rather than restated (it also applies
       per-package `repository`/`homepage`/`bugs`/`keywords`/`description`, `files: ["dist"]`, and copies
       `LICENSE`/`README` into each). For future releases, consider adopting
       [Changesets](https://github.com/changesets/changesets) to automate bumps + changelogs.
@@ -83,8 +84,9 @@ Notes:
   number. v0.32.0 shipped without it, which is why 0.32.1 exists.
 - pnpm publishes in **dependency order** and rewrites `workspace:*` deps to the real version — no manual
   ordering needed.
-- Only the built `dist` + declared `files` ship; `src` is included per each package's `files` (kept so
-  recipes/`import.meta.url` assets and source maps resolve). Tests, `scripts/`, and dev config never ship.
+- Only what each package's `files` declares ships — `["dist"]` everywhere except
+  `@lonca/baron-recipes`, which adds `recipes` so the built-in YAML resolves by name at runtime.
+  Tests, `src`, `scripts/`, and dev config never ship.
 - `@lonca/baron-mcp-server` exposes bin `baron-mcp`; `@lonca/baron-cli` exposes bin `baron`. Both target `dist/bin.js`,
   so `pnpm build` must run first.
 
