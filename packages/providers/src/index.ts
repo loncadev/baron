@@ -33,6 +33,12 @@ import {
   githubScmManifest,
 } from '@lonca/baron-adapter-github';
 import {
+  LINEAR_PROVIDER,
+  createLinearTransport,
+  exampleLinearLinkMap,
+  linearManifest,
+} from '@lonca/baron-adapter-linear';
+import {
   SLACK_PROVIDER,
   createSlackNotifyTransport,
   slackNotifyManifest,
@@ -146,6 +152,27 @@ export interface ProviderDescriptor {
 }
 
 const DESCRIPTORS: Record<string, ProviderDescriptor> = {
+  [LINEAR_PROVIDER]: {
+    id: LINEAR_PROVIDER,
+    credentialsHelp: [
+      'Linear needs a personal API key and the team new issues are created in.',
+      '  1. Create the key at: Settings -> Security & access -> Personal API keys',
+      '  2. LINEAR_TEAM is the team KEY, the prefix on its issue ids (ENG in ENG-123).',
+      '',
+      'Note the header, because the failure is misleading: a personal API key is sent as a bare',
+      '`Authorization: <key>`. `Bearer` is for OAuth access tokens only, and using it with a',
+      'personal key fails as "authentication required", which reads like a bad key.',
+    ],
+    manifest: linearManifest,
+    credentialEnvKeys: ['LINEAR_API_KEY', 'LINEAR_TEAM'],
+    linkMap: exampleLinearLinkMap,
+    createTransport(env) {
+      return createLinearTransport({
+        apiKey: env.LINEAR_API_KEY ?? '',
+        team: env.LINEAR_TEAM ?? '',
+      });
+    },
+  },
   [AZURE_DEVOPS_PROVIDER]: {
     id: AZURE_DEVOPS_PROVIDER,
     credentialsHelp: [
