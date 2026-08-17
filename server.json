@@ -8,13 +8,13 @@
     "source": "github",
     "subfolder": "packages/mcp-server"
   },
-  "version": "0.32.1",
+  "version": "0.33.0",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@lonca/baron-mcp-server",
-      "version": "0.32.1",
+      "version": "0.33.0",
       "transport": {
         "type": "stdio"
       }
