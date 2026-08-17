@@ -74,9 +74,20 @@ pnpm test && pnpm licenses:check      # never publish red
 # Scoped packages default to RESTRICTED (private) — OSS must publish public.
 pnpm -r --filter "./packages/**" publish --access public --no-git-checks
 # (or `pnpm changeset publish` if using Changesets)
+
+# Tag it, and say so publicly. Skipping this is invisible until you need it.
+git tag -a "v$VERSION" -m "v$VERSION" && git push origin "v$VERSION"
+gh release create "v$VERSION" --title "v$VERSION — <what changed>" --notes "..."
 ```
 
 Notes:
+- **Tagging is a step, not an afterthought.** It was forgotten for 0.32.0, 0.32.1 and 0.33.0 —
+  three consecutive releases with no git ref — and nothing noticed, because nothing asks for it.
+  The cost is not cosmetic: `git log v0.32.1..HEAD` returns empty, so there is no way to diff a
+  release against the one before it, and that is exactly when you want one. Publishing the GitHub
+  release matters for a different reason: without it the repository's own Releases page keeps
+  advertising whatever version was last released there — it said `v0.1.0` for six weeks and
+  thirty-two versions, on the page a stranger arriving from the MCP Registry lands on.
 - **`mcpName` must ship in the tarball.** The MCP Registry will not list a server whose npm package
   cannot be proven to belong to the same publisher; for npm the proof is `mcpName` in the *published*
   `package.json`, matching `server.json`'s `name`. `pnpm sync:server-json` keeps them equal and CI
