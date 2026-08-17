@@ -224,3 +224,39 @@ describe('unknown key on a role-map entry', () => {
     expect(parsed.roleMap.linear?.states.in_progress).toEqual({ stateId: 'uuid-abc' });
   });
 });
+
+describe('scoped role maps', () => {
+  const scoped = (scopes: unknown) => ({
+    version: 1,
+    providers: { issues: 'linear' },
+    roleMap: { linear: { stateKey: 'stateId', states: {}, scopes } },
+    typeMap: { linear: { task: 'Task' } },
+  });
+
+  it('parses a per-scope map, which a flat map cannot express', () => {
+    // Linear's WorkflowState.team is non-null, so the same role is a different state id per team.
+    const policy = parsePolicy(
+      scoped({
+        KSP: { in_progress: { stateId: 'ksp-1' } },
+        BAR: { in_progress: { stateId: 'bar-1' }, in_review: { stateId: 'bar-2' } },
+      }),
+    );
+    const map = policy.roleMap.linear;
+    expect(map?.scopes?.KSP?.in_progress).toEqual({ stateId: 'ksp-1' });
+    expect(map?.scopes?.BAR?.in_review).toEqual({ stateId: 'bar-2' });
+    // A role present in one scope and absent in another is legitimate, not an error.
+    expect(map?.scopes?.KSP?.in_review).toBeUndefined();
+  });
+
+  it('holds a scope to the same rules as the default map', () => {
+    // The unknown-key guard on roleMap existed precisely so a hand-written scope could not parse
+    // cleanly and vanish. Reusing one validator means a bad role inside a scope cannot either.
+    expect(() => parsePolicy(scoped({ KSP: { nonsense: { stateId: 'x' } } }))).toThrow(
+      /unknown workflow role 'nonsense'/,
+    );
+  });
+
+  it('refuses a scope that maps nothing, rather than reporting every role unmapped later', () => {
+    expect(() => parsePolicy(scoped({ KSP: {} }))).toThrow(/maps no roles/);
+  });
+});

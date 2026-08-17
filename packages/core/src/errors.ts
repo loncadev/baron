@@ -60,11 +60,45 @@ export class RoleMappingError extends BaronError {
   constructor(
     readonly role: string,
     readonly provider: string,
+    /**
+     * The scope the lookup was made in, on a provider whose states are scoped (a Linear team owns
+     * its own workflow states). Named in the message because "in_review is unmapped" and "in_review
+     * is unmapped *for this team*" send you to different places in the policy.
+     */
+    readonly scope?: string,
   ) {
     super(
-      `Role '${role}' has no native mapping for provider '${provider}'. Run \`baron init\` to ` +
-        `(re)build the role map, or add it to policy.roleMap.${provider}.states.`,
+      scope === undefined
+        ? `Role '${role}' has no native mapping for provider '${provider}'. Run \`baron init\` to ` +
+            `(re)build the role map, or add it to policy.roleMap.${provider}.states.`
+        : `Role '${role}' has no native mapping for provider '${provider}' in scope '${scope}'. ` +
+            'Run `baron init` to (re)build the role map, or add it to ' +
+            `policy.roleMap.${provider}.scopes.${scope}.`,
       'ROLE_MAPPING',
+    );
+  }
+}
+
+/**
+ * An item lives in a scope the role map says nothing about — a Linear team added after `baron init`
+ * ran, most likely.
+ *
+ * Deliberately an error rather than a fall back to the unscoped `states`. On a scoped provider the
+ * default map belongs to no team, so falling back would send another team's state id to the
+ * provider: a write that fails somewhere far from its cause, or worse, one that succeeds against
+ * the wrong thing. A gap that is neither errored nor logged is a bug (ARCHITECTURE invariant 5).
+ */
+export class RoleScopeUnknownError extends BaronError {
+  constructor(
+    readonly scope: string,
+    readonly provider: string,
+    readonly known: readonly string[],
+  ) {
+    super(
+      `Scope '${scope}' is not in the role map for provider '${provider}' (it knows: ` +
+        `${known.length > 0 ? known.join(', ') : 'none'}). Run \`baron init\` to pick up new ` +
+        `scopes, or add policy.roleMap.${provider}.scopes.${scope}.`,
+      'ROLE_SCOPE_UNKNOWN',
     );
   }
 }

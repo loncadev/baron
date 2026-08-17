@@ -17,6 +17,21 @@ export interface ProviderRoleMap {
   readonly stateKey: string;
   /** Forward map: workflow role -> provider-native target. */
   readonly states: Partial<Record<WorkflowRole, NativeTarget>>;
+  /**
+   * Per-scope maps, for a provider whose states do not belong to the workspace but to something
+   * inside it. Linear is the case that forces this: `WorkflowState.team` is non-null, so two teams
+   * legitimately hold different states for the same role — `in_progress` is one id in one team and
+   * a different id in another, even when both are named "In Progress".
+   *
+   * A scope's map REPLACES {@link states} for items in that scope; it does not merge over it. On a
+   * provider where every role differs per scope, merging saves nothing and buys a silent failure: a
+   * role omitted from a scope would resolve to some other scope's target and be rejected by the
+   * provider far from the cause. Replacing turns the same mistake into a RoleMappingError that names
+   * the role and the scope.
+   *
+   * Absent on Azure DevOps and GitHub, whose states belong to the whole project or repository.
+   */
+  readonly scopes?: Readonly<Record<string, Partial<Record<WorkflowRole, NativeTarget>>>>;
 }
 
 /** The NativeTarget key that carries a role's label (GitHub). Centralized so it isn't a raw literal. */

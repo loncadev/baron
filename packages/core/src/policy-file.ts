@@ -25,6 +25,8 @@ export type PortName = (typeof PORT_NAMES)[number];
 export interface PolicyRoleMapEntry {
   readonly stateKey: string;
   readonly states: Partial<Record<string, NativeTarget>>;
+  /** Per-scope maps for a provider whose states belong to a team rather than the workspace. */
+  readonly scopes?: Readonly<Record<string, Partial<Record<string, NativeTarget>>>>;
 }
 
 /**
@@ -96,7 +98,7 @@ function parseNativeTarget(value: unknown, path: string): NativeTarget {
 const LEGACY_BLOCKED_ROLE = 'blocked';
 
 /** Everything a role-map entry may carry. Anything else is a typo or a key Baron does not have yet. */
-const ROLE_MAP_ENTRY_KEYS = ['stateKey', 'states'] as const;
+const ROLE_MAP_ENTRY_KEYS = ['stateKey', 'states', 'scopes'] as const;
 
 function parseRoleMapEntry(
   value: unknown,
@@ -119,7 +121,38 @@ function parseRoleMapEntry(
       );
     }
   }
-  const statesRecord = requireRecord(states, `roleMap.${provider}.states`);
+  const { states: out, migrations } = parseStates(states, provider, `roleMap.${provider}.states`);
+
+  // Scopes are validated by the SAME function, so a role that is rejected in the default map cannot
+  // slip through inside a scope — including the legacy `blocked` migration.
+  let scopes: Record<string, Partial<Record<string, NativeTarget>>> | undefined;
+  if (record.scopes !== undefined) {
+    const scopesRecord = requireRecord(record.scopes, `roleMap.${provider}.scopes`);
+    scopes = {};
+    for (const [scope, value] of Object.entries(scopesRecord)) {
+      if (scope.length === 0) fail(`policy.roleMap.${provider}.scopes has an empty scope name.`);
+      const parsed = parseStates(value, provider, `roleMap.${provider}.scopes.${scope}`);
+      if (Object.keys(parsed.states).length === 0) {
+        // An empty scope resolves nothing and would report every role as unmapped there. Rejecting
+        // it names the mistake now instead of at the first transition.
+        fail(`policy.roleMap.${provider}.scopes.${scope} maps no roles.`);
+      }
+      scopes[scope] = parsed.states;
+      migrations.push(...parsed.migrations);
+    }
+  }
+  return {
+    entry: { stateKey, states: out, ...(scopes !== undefined ? { scopes } : {}) },
+    migrations,
+  };
+}
+
+function parseStates(
+  value: unknown,
+  provider: string,
+  path: string,
+): { states: Record<string, NativeTarget>; migrations: string[] } {
+  const statesRecord = requireRecord(value, path);
   const out: Record<string, NativeTarget> = {};
   const migrations: string[] = [];
   for (const [role, target] of Object.entries(statesRecord)) {
@@ -128,10 +161,10 @@ function parseRoleMapEntry(
     // rather than rejected — the entry is dropped and the fact is reported, so a working install
     // keeps working and its owner still finds out.
     if (role === LEGACY_BLOCKED_ROLE) {
-      const parsed = parseNativeTarget(target, `roleMap.${provider}.states.${role}`);
+      const parsed = parseNativeTarget(target, `${path}.${role}`);
       const was = Object.values(parsed).join('/');
       migrations.push(
-        `roleMap.${provider}.states.blocked (was '${was}') was dropped: blocked is no longer a ` +
+        `${path}.blocked (was '${was}') was dropped: blocked is no longer a ` +
           `workflow role but an orthogonal flag on a '${BLOCKED_LABEL}' label. Re-run \`baron init\` ` +
           'to make this permanent, and retire the old value in your provider if nothing else uses it.',
       );
@@ -139,14 +172,14 @@ function parseRoleMapEntry(
     }
     if (!isWorkflowRole(role)) {
       fail(
-        `policy.roleMap.${provider}.states has unknown workflow role '${role}'. ` +
+        `policy.${path} has unknown workflow role '${role}'. ` +
           `Roles are: ${WORKFLOW_ROLES.join(', ')}. (blocked is not a role — it is an orthogonal ` +
           'flag; see issue.block / issue.unblock.)',
       );
     }
-    out[role] = parseNativeTarget(target, `roleMap.${provider}.states.${role}`);
+    out[role] = parseNativeTarget(target, `${path}.${role}`);
   }
-  return { entry: { stateKey, states: out }, migrations };
+  return { states: out, migrations };
 }
 
 function parseTypeMapEntry(value: unknown, provider: string): TypeMap {
