@@ -47,7 +47,18 @@ type / board column that no longer exists).
 | --- | --- |
 | `--root <dir>` | Project root (default `.`). |
 
-Exit `0` = no drift; exit `1` = drift found (each item is listed) or an error.
+Also asks each bound provider's credential what it can actually do, because a policy that maps
+cleanly onto a provider says nothing about whether your token may write to it.
+
+Exit `0` = nothing wrong: no drift, nothing the credential is refused, and any capability that could
+not be checked is printed rather than assumed. Exit `1` = drift, a **denied** capability (the
+provider refused — the message names the permission to grant), or a probe that **broke** (the check
+itself failed, so nothing was verified).
+
+The last two are separated on purpose. A provider with no probe at all is a limitation, prints under
+*Unconfirmed*, and stays green — an Azure install is correctly configured and must not be called
+broken. A probe that ran and threw is different: something is wrong, and leading with OK would hand
+CI a green light for a credential nobody checked.
 
 ## `baron run`
 

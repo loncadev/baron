@@ -205,7 +205,13 @@ describe('runDoctor', () => {
     expect(report.credentials.every((f) => (f.detail ?? '').length > 0)).toBe(true);
   });
 
-  it('treats a probe that throws as unconfirmed, not as failure', async () => {
+  it('fails when the probe itself breaks, rather than reporting OK on an unverified credential', async () => {
+    // This used to pass as `unknown` with ok: true, on the reasoning that a transient failure should
+    // not turn doctor red. Reversed deliberately. For the probe to throw while introspection
+    // succeeded, the failure is specific to the probe — a revoked token, a changed permissions
+    // endpoint, a rate limit on that path — and in every one of those "OK" is false. The costs are
+    // asymmetric: a spurious red is annoying and visible, a false green is silent and lands halfway
+    // through the work, which is the exact failure `baron doctor` was built to prevent.
     const fs = await seededFs('github', githubIntrospectionFixture);
     const report = await runDoctor({
       root: ROOT,
@@ -217,9 +223,25 @@ describe('runDoctor', () => {
         },
       }),
     });
+    expect(report.ok).toBe(false);
+    // Its own status, not `denied`: nothing was refused, and telling someone to grant a permission
+    // they already have is a worse answer than saying the check broke.
+    expect(report.credentials.every((f) => f.status === 'error')).toBe(true);
+    expect(report.credentials[0]?.detail).toContain('network down');
+  });
+
+  it('still passes when a provider simply has no probe, which is a limitation and not a fault', async () => {
+    // The distinction the old behaviour collapsed. An Azure install with no probe is correct and
+    // must stay green; it just prints what it could not check.
+    const fs = await seededFs('github', githubIntrospectionFixture);
+    const report = await runDoctor({
+      root: ROOT,
+      fs,
+      introspector: createMemoryIntrospector(githubIntrospectionFixture),
+      probeFor: NO_PROBE,
+    });
     expect(report.ok).toBe(true);
     expect(report.credentials.every((f) => f.status === 'unknown')).toBe(true);
-    expect(report.credentials[0]?.detail).toContain('network down');
   });
 
   // Coverage is the question drift never asks: not "does what is mapped still exist?" but "is
