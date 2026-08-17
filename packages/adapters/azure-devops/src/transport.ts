@@ -408,9 +408,12 @@ export function createAzureDevOpsTransport(options: AzureDevOpsTransportOptions)
 
     async queryIssues(query: NativeQuery): Promise<readonly NativeIssue[]> {
       const witApi = await api();
+      // Azure states belong to the project, so a role never expands past one target here and the
+      // core passes exactly one. Reading only the first is correct rather than lossy — but it is
+      // stated, so that a future scoped Azure concept does not inherit the assumption silently.
       const wiql = buildWorkItemsWiql(
         project,
-        query.target?.[TARGET.STATE],
+        query.targets?.[0]?.[TARGET.STATE],
         query.nativeType,
         query.assignee,
         query.iterationPath,

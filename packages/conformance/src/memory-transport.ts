@@ -63,6 +63,18 @@ export interface MemoryTransportOptions {
    * real adapter lacked.
    */
   readonly canRemoveLabels?: boolean | undefined;
+  /**
+   * The scope every item created here belongs to, for a provider whose states are owned by
+   * something inside the workspace (a Linear team). Reported on every {@link NativeIssue}.
+   */
+  readonly scope?: string | undefined;
+  /**
+   * Discriminator values this scope owns. When set, `applyTarget` REFUSES anything else — which is
+   * the fidelity that matters: Linear rejects one team's state id on another team's issue, so a
+   * fake that accepted it would let a scope-blind resolver pass a suite the real provider fails.
+   * That is the same trap transport fidelity (#59) was written for.
+   */
+  readonly ownedDiscriminators?: readonly string[] | undefined;
 }
 
 /**
@@ -89,6 +101,7 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
     assignee: r.assignee,
     iteration: r.iteration,
     url: r.url,
+    ...(opts.scope !== undefined ? { scope: opts.scope } : {}),
   });
 
   const must = (id: string): Rec => {
@@ -127,6 +140,16 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
     async applyTarget(id: string, target: NativeTarget): Promise<NativeIssue> {
       const rec = must(id);
       const discriminator = target[opts.stateKey];
+      if (
+        discriminator !== undefined &&
+        opts.ownedDiscriminators !== undefined &&
+        !opts.ownedDiscriminators.includes(discriminator)
+      ) {
+        throw new Error(
+          `memory transport: '${discriminator}' does not belong to scope '${opts.scope}' ` +
+            `(it owns: ${opts.ownedDiscriminators.join(', ')})`,
+        );
+      }
       if (discriminator !== undefined) rec.discriminator = discriminator;
       const label = target.label;
       if (label !== undefined && !rec.labels.includes(label)) rec.labels.push(label);
@@ -197,10 +220,21 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
     },
 
     async queryIssues(query: NativeQuery): Promise<readonly NativeIssue[]> {
-      const discriminator = query.target?.[opts.stateKey];
+      // An OR across targets: the reference implementation handles the plural case because that is
+      // what a scoped provider produces, and a conformance fake that only ever honoured the first
+      // one would pass a suite the real thing fails.
+      const discriminators = query.targets
+        ?.map((target) => target[opts.stateKey])
+        .filter((value): value is string => value !== undefined);
       const results: NativeIssue[] = [];
       for (const rec of store.values()) {
-        if (discriminator !== undefined && rec.discriminator !== discriminator) continue;
+        if (
+          discriminators !== undefined &&
+          discriminators.length > 0 &&
+          !discriminators.includes(rec.discriminator)
+        ) {
+          continue;
+        }
         if (
           opts.filtersByType !== false &&
           query.nativeType !== undefined &&

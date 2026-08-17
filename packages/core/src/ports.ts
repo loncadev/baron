@@ -55,6 +55,12 @@ export interface NativeIssue {
   readonly nativeType: string;
   /** The value used for reverse role lookup (Azure state, GitHub label-or-'closed'). */
   readonly discriminator: string;
+  /**
+   * Which scope this item's states belong to, on a provider that scopes them (a Linear team). The
+   * adapter reports it; the core uses it to pick the right role map. Absent where states belong to
+   * the whole project or repository, which is every provider shipped today.
+   */
+  readonly scope?: string | undefined;
   readonly parentId?: string | undefined;
   readonly labels: readonly string[];
   /** Provider-native user handle of the assignee (Azure: email; GitHub: login), if any. */
@@ -102,7 +108,15 @@ export interface NativeComment {
  * the work-item type. The role→native translation happened in {@link BaseIssuesAdapter}.
  */
 export interface NativeQuery {
-  readonly target?: NativeTarget | undefined;
+  /**
+   * Native targets a matching item may be in — an OR, not an AND.
+   *
+   * Plural because a role does not resolve to one target on a provider whose states are scoped: a
+   * Linear workspace with two teams has two different `in_review` state ids, and "everything in
+   * review" means either of them. On an unscoped provider (Azure, GitHub) the core always passes
+   * exactly one, so a transport there may read `targets[0]` and say so.
+   */
+  readonly targets?: readonly NativeTarget[] | undefined;
   readonly nativeType?: string | undefined;
   /** Provider-native user handle, or the '@me' sentinel the transport resolves natively. */
   readonly assignee?: string | undefined;
@@ -350,7 +364,11 @@ export class BaseIssuesAdapter implements IssuesPort {
   }
 
   async transition(id: string, role: WorkflowRole): Promise<Issue> {
-    const target = this.resolver.toNative(role);
+    // On a provider whose states are scoped, the target is a function of the ITEM, not of the role
+    // alone — a Linear state belongs to a team — so the item has to be read before the role can be
+    // resolved. Only then: an unscoped provider pays nothing, which is every provider today.
+    const scope = this.resolver.scoped ? (await this.transport.getIssue(id)).scope : undefined;
+    const target = this.resolver.toNative(role, scope);
 
     const needsEmulatedState =
       !this.manifest.issues.arbitraryStates && role !== 'done' && role !== 'backlog';
@@ -365,7 +383,7 @@ export class BaseIssuesAdapter implements IssuesPort {
     // this was the one place in the adapter that reached into the raw role map to ask.
     const keep = target[this.resolver.discriminatorKey];
     const stale = this.resolver
-      .roleLabels()
+      .roleLabels(scope)
       .filter((label) => label !== keep && applied.labels.includes(label));
     if (stale.length > 0 && this.transport.removeLabel !== undefined) {
       for (const label of stale) await this.transport.removeLabel(id, label);
@@ -390,14 +408,14 @@ export class BaseIssuesAdapter implements IssuesPort {
    */
   async reconcile(id: string): Promise<Issue> {
     const native = await this.transport.getIssue(id);
-    const fromState = this.resolver.roleFromNativeState(native.discriminator);
+    const fromState = this.resolver.roleFromNativeState(native.discriminator, native.scope);
     // The provider's state carries no role, so the labels are the only signal there is; removing
     // them would destroy information rather than correct it.
     if (fromState === undefined) return this.toIssue(native);
 
-    const keep = this.resolver.toNative(fromState).label;
+    const keep = this.resolver.toNative(fromState, native.scope).label;
     const stale = this.resolver
-      .roleLabels()
+      .roleLabels(native.scope)
       .filter((label) => label !== keep && native.labels.includes(label));
     const missing = keep !== undefined && !native.labels.includes(keep) ? keep : undefined;
     if (stale.length === 0 && missing === undefined) return this.toIssue(native);
@@ -575,8 +593,32 @@ export class BaseIssuesAdapter implements IssuesPort {
       iterationPath = (await this.currentIteration())?.path;
       if (iterationPath === undefined) return [];
     }
+    // A role expands to one target per scope that maps it. A scope that does not map the role
+    // contributes nothing — a team with no in-review state can hold no in-review item — but the
+    // silence is reported rather than assumed (invariant 5).
+    let roleTargets: readonly NativeTarget[] | undefined;
+    if (filter.role !== undefined) {
+      const scoped = this.resolver.targetsForRole(filter.role);
+      if (scoped.length === 0) {
+        this.logger.warn(
+          `No scope maps role '${filter.role}' for provider '${this.cfg.provider}', so this query ` +
+            'can match nothing. Re-run `baron init` if that is not what you meant.',
+        );
+        return [];
+      }
+      const unmapped = this.resolver
+        .knownScopes()
+        .filter((scope) => !scoped.some((entry) => entry.scope === scope));
+      if (unmapped.length > 0) {
+        this.logger.warn(
+          `Role '${filter.role}' is unmapped in scope(s) ${unmapped.join(', ')}; items there are ` +
+            'not searched. This is a mapping gap, not an empty result.',
+        );
+      }
+      roleTargets = scoped.map((entry) => entry.target);
+    }
     const query = {
-      ...(filter.role !== undefined ? { target: this.resolver.toNative(filter.role) } : {}),
+      ...(roleTargets !== undefined ? { targets: roleTargets } : {}),
       ...(nativeType !== undefined ? { nativeType } : {}),
       ...(filter.assignee !== undefined ? { assignee: filter.assignee } : {}),
       ...(iterationPath !== undefined ? { iterationPath } : {}),
@@ -633,12 +675,14 @@ export class BaseIssuesAdapter implements IssuesPort {
    */
   private resolveRole(native: NativeIssue): WorkflowRole | undefined {
     const fromState =
-      this.resolver.roleFromNativeState(native.discriminator) ??
-      this.resolver.toRole(native.discriminator);
+      this.resolver.roleFromNativeState(native.discriminator, native.scope) ??
+      this.resolver.toRole(native.discriminator, native.scope);
     if (fromState !== undefined) return fromState;
-    const fromLabel = this.resolver.roleFromLabels(native.labels);
+    const fromLabel = this.resolver.roleFromLabels(native.labels, native.scope);
     if (fromLabel === undefined) return undefined;
-    return this.resolver.toNative(fromLabel).state === undefined ? fromLabel : undefined;
+    return this.resolver.toNative(fromLabel, native.scope).state === undefined
+      ? fromLabel
+      : undefined;
   }
 
   /** True when several type roles share one native type, making the reverse lookup ambiguous. */

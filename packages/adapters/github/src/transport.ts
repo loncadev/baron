@@ -280,8 +280,11 @@ export function createGithubTransport(options: GithubTransportOptions): IssuesTr
     },
 
     async queryIssues(query: NativeQuery): Promise<readonly NativeIssue[]> {
-      const stateValue = query.target?.[TARGET.STATE];
-      const label = query.target?.[TARGET.LABEL];
+      // GitHub's labels and open/closed state belong to the repository, so a role never expands
+      // past one target here and the core passes exactly one. Stated rather than assumed.
+      const target = query.targets?.[0];
+      const stateValue = target?.[TARGET.STATE];
+      const label = target?.[TARGET.LABEL];
       // A label-only filter should still match closed issues; default to 'all' unless the target
       // pins a state. GitHub's union enum is open | closed | all.
       const state =
