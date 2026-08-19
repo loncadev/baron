@@ -103,7 +103,7 @@ for one-off actions, and never hand-compose the primitives to emulate a recipe.
 
 Dedicated skills wrap the built-ins — `/baron:task-new`, `/baron:task-start`, `/baron:task-finish`,
 `/baron:ship` (and `/baron:run-recipe` for anything else): each gathers the inputs and makes the
-single `baron_recipe_run` call. (`baron run --recipe <path>` runs the same recipes from the CLI.)
+single `baron_recipe_run` call. (`baron run --recipe <name-or-path>` runs the same recipes from the CLI.)
 
 Two more skills complete the task-* family (also *not* recipes — interactive, over the primitives):
 - `/baron:task-move <id> <role>` — move an item to a role, guarding backward/reopen/block moves
