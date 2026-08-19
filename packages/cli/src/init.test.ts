@@ -278,3 +278,37 @@ describe('runInit', () => {
     expect(occurrences).toBe(1);
   });
 });
+
+describe('the order init reports what it did', () => {
+  it("finishes the caller's post-write work before printing the closing advice", async () => {
+    // The CLI provisions the provider's workflow labels after the policy exists, and used to do it
+    // AFTER runInit had already said "Next steps" — so the first thing a new user ever sees ended
+    // with the closing advice and then carried on working. A callback rather than a second block of
+    // output in the caller: the ordering is then guaranteed by construction, not by remembering.
+    const prompter = scriptedPrompter([true]);
+    let notesWhenCalled = -1;
+    const result = await runInit({
+      root: ROOT,
+      issuesProvider: 'github',
+      fs: memoryFileSystem(),
+      env: GH_ENV,
+      prompter,
+      introspector: createMemoryIntrospector(githubIntrospectionFixture),
+      afterWrite: async () => {
+        notesWhenCalled = prompter.notes.length;
+      },
+    });
+
+    const closing = prompter.notes.findIndex((note) => note.startsWith('Next steps'));
+    expect(closing, 'no closing advice was printed at all').toBeGreaterThan(-1);
+    expect(notesWhenCalled, 'the closing advice went out first').toBeGreaterThan(-1);
+    expect(notesWhenCalled, "the closing advice preceded the caller's work").toBeLessThanOrEqual(
+      closing,
+    );
+    // One announcement of one fact. It used to be said twice, in two wordings and two path styles,
+    // because the caller repeated it with an absolute path.
+    const wrote = prompter.notes.filter((note) => note.includes('Wrote '));
+    expect(wrote).toHaveLength(1);
+    expect(wrote[0]).toContain(result.policyPath);
+  });
+});
