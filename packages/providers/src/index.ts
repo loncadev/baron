@@ -34,6 +34,7 @@ import {
 } from '@lonca/baron-adapter-github';
 import {
   LINEAR_PROVIDER,
+  createLinearCredentialProbe,
   createLinearIntrospector,
   createLinearTransport,
   exampleLinearLinkMap,
@@ -175,6 +176,12 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
     },
     createIntrospector(env) {
       return createLinearIntrospector({ apiKey: env.LINEAR_API_KEY ?? '' });
+    },
+    createCredentialProbe(env) {
+      return createLinearCredentialProbe({
+        apiKey: env.LINEAR_API_KEY ?? '',
+        team: env.LINEAR_TEAM ?? '',
+      });
     },
   },
   [AZURE_DEVOPS_PROVIDER]: {
