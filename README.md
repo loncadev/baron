@@ -121,9 +121,10 @@ scratch (PAT scopes, `init → doctor → MCP`, troubleshooting).
 | --- | --- |
 | **Azure DevOps** | `issues` · `scm` · `ci` · `deploy` |
 | **GitHub** | `issues` · `scm` · `ci` · `deploy` |
+| **Linear** | `issues` |
 | **Slack** | `notify` |
 
-GitLab, Jira, and Linear are on the [roadmap](./ROADMAP.md) — adding one never changes how the agent
+GitLab and Jira are on the [roadmap](./ROADMAP.md) — adding one never changes how the agent
 talks to Baron, which is the whole point. Until they land, those names describe intent, not support.
 
 ## Documentation

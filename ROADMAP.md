@@ -56,12 +56,18 @@ registration on the surfaces where MCP servers are actually discovered.
 
 Defects in the role contract are fixed here while the cost of changing them is still near zero.
 
-Two have shipped:
+Three have shipped:
 
 - `blocked` was a member of `WORKFLOW_ROLES`, so transitioning to it destroyed the previous role and
   unblocking had nowhere to return to. It is now an orthogonal flag (`issue.block` / `issue.unblock`)
   that coexists with whatever role an item holds, the way Jira, Linear and GitLab all model it. A
   policy that still maps it is migrated on load and told so.
+- The role map keyed on state *names*, which Linear cannot honour: it scopes workflow states per
+  team, so two teams each own an "In Progress" that are different rows, and its `type` vocabulary is
+  open — the live API returns values no published list contains. The map now keys on whatever a
+  provider says identifies its states, and carries scope: one target per team, resolved against the
+  team the item is actually in. A scope the map does not know is an error, never a fall back to the
+  unscoped default, because that default belongs to no team.
 - Baron's central promise moved from convention into code. Recipes are meant to be enforced by the
   engine rather than by the agent's good behaviour, but the MCP server exposed every mutating
   primitive alongside `baron_recipe_run` — a claim anyone reading the tool list could disprove.
@@ -69,12 +75,10 @@ Two have shipped:
   `MUTATION_OUTSIDE_RECIPE` and names the recipe to use instead. The tools stay listed: hiding them
   would trade an enforceable rule for an obscured one.
 
-Two remain, and both are shaped by providers Baron has no adapter for yet:
+One remains, shaped by a provider Baron has no adapter for yet:
 
 - `applyTarget` assumes a state can be set directly. Jira requires discovering the available
   transitions first, then supplying any fields its transition screen demands.
-- The role map keys on state *names*. Linear scopes workflow states per team and does not guarantee
-  a stable `type` vocabulary, so the map has to key on state IDs and carry scope.
 
 ## What Baron will not do
 
