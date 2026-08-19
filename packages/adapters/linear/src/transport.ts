@@ -141,15 +141,24 @@ export function createLinearTransport(opts: LinearTransportOptions): IssuesTrans
    * the missing one rather than failing is what makes the role/type-role label emulation work at
    * all — the first `in-review` in a fresh workspace has no label to attach.
    */
-  async function labelId(team: string, name: string): Promise<string> {
-    const data = await gql<{ issueLabels: { nodes: Array<{ id: string; name: string }> } }>(
-      '{ issueLabels { nodes { id name } } }',
-    );
-    const existing = data.issueLabels.nodes.find((label) => label.name === name);
-    if (existing !== undefined) return existing.id;
+  async function labelId(name: string): Promise<string> {
+    const data = await gql<{
+      issueLabels: { nodes: Array<{ id: string; name: string; team: { key: string } | null }> };
+    }>('{ issueLabels { nodes { id name team { key } } } }');
+    const named = data.issueLabels.nodes.filter((label) => label.name === name);
+    // Prefer the workspace-wide one. `issueLabels` spans the whole workspace and `IssueLabel.team`
+    // is nullable, so a bare name match can be another team's label — and handing its id to an
+    // issue in this team is the same mistake the scoped role map exists to prevent for states.
+    const shared = named.find((label) => label.team === null);
+    if (shared !== undefined) return shared.id;
+    const owned = named.find((label) => label.team?.key === opts.team);
+    if (owned !== undefined) return owned.id;
+    // Created WITHOUT a teamId, so it belongs to the workspace. Baron's role and type-role labels
+    // are Baron's vocabulary rather than any team's: one `type:bug` should serve every team, which
+    // removes the ambiguity above instead of leaving it to be managed.
     const created = await gql<{ issueLabelCreate: { issueLabel: { id: string } } }>(
       'mutation($input: IssueLabelCreateInput!) { issueLabelCreate(input: $input) { issueLabel { id } } }',
-      { input: { name, teamId: team } },
+      { input: { name } },
     );
     return created.issueLabelCreate.issueLabel.id;
   }
@@ -166,7 +175,7 @@ export function createLinearTransport(opts: LinearTransportOptions): IssuesTrans
             ...(input.body !== undefined ? { description: input.body } : {}),
             ...(input.parentId !== undefined ? { parentId: input.parentId } : {}),
             ...(input.labels.length > 0
-              ? { labelIds: await Promise.all(input.labels.map((l) => labelId(team, l))) }
+              ? { labelIds: await Promise.all(input.labels.map((l) => labelId(l))) }
               : {}),
           },
         },
@@ -217,12 +226,11 @@ export function createLinearTransport(opts: LinearTransportOptions): IssuesTrans
     },
 
     async addLabel(id: string, label: string): Promise<void> {
-      const issue = await fetchIssue(id);
       await gql(
         'mutation($id: String!, $labelId: String!) { issueAddLabel(id: $id, labelId: $labelId) { success } }',
         {
           id,
-          labelId: await labelId(issue.team.id, label),
+          labelId: await labelId(label),
         },
       );
     },
@@ -240,8 +248,7 @@ export function createLinearTransport(opts: LinearTransportOptions): IssuesTrans
     },
 
     async ensureLabels(labels: readonly LabelSpec[]): Promise<void> {
-      const team = await teamId();
-      for (const spec of labels) await labelId(team, spec.name);
+      for (const spec of labels) await labelId(spec.name);
     },
 
     async addComment(id: string, body: string): Promise<NativeComment> {
