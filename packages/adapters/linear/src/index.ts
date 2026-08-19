@@ -95,3 +95,4 @@ export function defineLinearIssuesAdapter(
 
 export { LINEAR_PROVIDER, LINEAR_STATE_KEY } from './provider.js';
 export { createLinearTransport, type LinearTransportOptions } from './transport.js';
+export { createLinearIntrospector, type LinearIntrospectorOptions } from './introspector.js';
