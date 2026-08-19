@@ -565,9 +565,11 @@ steps:
   - do: scm.branch.create
     with: { name: feature/x, fromBranch: main }
 `);
+    // The code alone leaves a user stuck: it says which port is missing but not where to bind it,
+    // and a provider that ships no scm adapter (Linear) makes that the first wall a new install hits.
     await expect(
       runRecipe(recipe, { ports: { issues: issuesPort() }, asker: scriptedAsker() }),
-    ).rejects.toBeInstanceOf(BaronError);
+    ).rejects.toThrow(/policy\.providers\.scm/);
   });
 
   it('rejects an out-of-enum role argument', async () => {

@@ -363,6 +363,12 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
   },
 };
 
+/**
+ * Re-exported so a consumer can name a provider without writing the literal. The CLI needs GitHub by
+ * name to offer it for the scm port when the issues provider has no source control of its own.
+ */
+export { AZURE_DEVOPS_PROVIDER, GITHUB_PROVIDER, LINEAR_PROVIDER, SLACK_PROVIDER };
+
 export const KNOWN_PROVIDERS = Object.keys(DESCRIPTORS);
 
 export function getProviderDescriptor(id: string): ProviderDescriptor {

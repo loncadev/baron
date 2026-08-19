@@ -194,7 +194,7 @@ function optStatus(params: Params, op: string): FollowupStatus | undefined {
 function issues(ports: RecipePorts, op: string): IssuesPort {
   if (ports.issues === undefined) {
     throw new BaronError(
-      `Step '${op}' needs the issues port, which is not configured.`,
+      `Step '${op}' needs the issues port, which is not configured. Set policy.providers.issues, or re-run \`baron init\`.`,
       'PORT_UNBOUND',
     );
   }
@@ -204,7 +204,7 @@ function issues(ports: RecipePorts, op: string): IssuesPort {
 function scm(ports: RecipePorts, op: string): ScmPort {
   if (ports.scm === undefined) {
     throw new BaronError(
-      `Step '${op}' needs the scm port, which is not configured.`,
+      `Step '${op}' needs the scm port, which is not configured. Set policy.providers.scm, or re-run \`baron init\`.`,
       'PORT_UNBOUND',
     );
   }
@@ -214,7 +214,7 @@ function scm(ports: RecipePorts, op: string): ScmPort {
 function knowledge(ports: RecipePorts, op: string): KnowledgeLoop {
   if (ports.knowledge === undefined) {
     throw new BaronError(
-      `Step '${op}' needs the knowledge loop, which is not configured.`,
+      `Step '${op}' needs the knowledge loop, which this installation does not have configured.`,
       'PORT_UNBOUND',
     );
   }
@@ -224,7 +224,7 @@ function knowledge(ports: RecipePorts, op: string): KnowledgeLoop {
 function ci(ports: RecipePorts, op: string): CiPort {
   if (ports.ci === undefined) {
     throw new BaronError(
-      `Step '${op}' needs the ci port, which is not configured.`,
+      `Step '${op}' needs the ci port, which is not configured. Set policy.providers.ci, or re-run \`baron init\`.`,
       'PORT_UNBOUND',
     );
   }
@@ -234,7 +234,7 @@ function ci(ports: RecipePorts, op: string): CiPort {
 function deploy(ports: RecipePorts, op: string): DeployPort {
   if (ports.deploy === undefined) {
     throw new BaronError(
-      `Step '${op}' needs the deploy port, which is not configured.`,
+      `Step '${op}' needs the deploy port, which is not configured. Set policy.providers.deploy, or re-run \`baron init\`.`,
       'PORT_UNBOUND',
     );
   }
@@ -244,7 +244,7 @@ function deploy(ports: RecipePorts, op: string): DeployPort {
 function notify(ports: RecipePorts, op: string): NotifyPort {
   if (ports.notify === undefined) {
     throw new BaronError(
-      `Step '${op}' needs the notify port, which is not configured.`,
+      `Step '${op}' needs the notify port, which is not configured. Set policy.providers.notify, or re-run \`baron init\`.`,
       'PORT_UNBOUND',
     );
   }

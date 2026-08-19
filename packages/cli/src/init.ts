@@ -10,6 +10,7 @@ import {
 } from '@lonca/baron-core';
 import {
   type Env,
+  GITHUB_PROVIDER,
   KNOWN_PROVIDERS,
   type ProviderDescriptor,
   getProviderDescriptor,
@@ -59,19 +60,25 @@ export interface InitResult {
  * Assemble a policy from a proposal. Binds the provider to `issues`, and to `scm` too when it offers
  * a source-control adapter (`bindScm`) — the task-start/finish flow needs branches + PRs, and making
  * every user hand-add `providers.scm` after init was a dead-end the from-scratch setup kept hitting.
- * A mixed setup (issues here, scm elsewhere) is still possible by editing the file. The gap policy is
+ * `scmProvider` closes the same dead-end from the other side: a provider that ships no scm adapter at
+ * all (Linear) can still take branches and PRs from somewhere else, and until this existed that was
+ * the one setup where hand-editing the file was mandatory rather than optional. The gap policy is
  * only emitted when the provider actually has gaps, so a fully-capable provider produces a clean file.
  */
 export function assemblePolicy(
   proposal: ProviderProposal,
-  opts: { bindScm?: boolean } = {},
+  opts: { bindScm?: boolean; scmProvider?: string } = {},
 ): BaronPolicyFile {
   const hasGaps = Object.keys(proposal.gapPolicy).length > 0;
   const object = {
     version: 1 as const,
     providers: {
       issues: proposal.provider,
-      ...(opts.bindScm === true ? { scm: proposal.provider } : {}),
+      ...(opts.bindScm === true
+        ? { scm: proposal.provider }
+        : opts.scmProvider !== undefined
+          ? { scm: opts.scmProvider }
+          : {}),
     },
     roleMap: { [proposal.provider]: proposal.roleMap },
     typeMap: { [proposal.provider]: proposal.typeMap },
@@ -81,7 +88,10 @@ export function assemblePolicy(
   return parsePolicy(JSON.parse(JSON.stringify(object)));
 }
 
-function credentialsTemplate(descriptor: ProviderDescriptor): string {
+function credentialsTemplate(
+  descriptor: ProviderDescriptor,
+  scmDescriptor?: ProviderDescriptor,
+): string {
   const header = `# Credentials for '${descriptor.id}'. Copy this file to '${BARON_DIR}/credentials'\n# (gitignored) or export these in your environment. Never commit real values.\n`;
   // Union of the issues + scm credential keys (deduped), so a policy that binds both ports lists
   // every variable the user must fill — e.g. Azure's scm adds AZURE_DEVOPS_REPO over the issues set.
@@ -89,6 +99,9 @@ function credentialsTemplate(descriptor: ProviderDescriptor): string {
     ...new Set([
       ...(descriptor.credentialEnvKeys ?? []),
       ...(descriptor.scmCredentialEnvKeys ?? []),
+      // A mixed setup needs the scm provider's keys listed too, or the template documents half of
+      // what the install actually reads.
+      ...(scmDescriptor?.scmCredentialEnvKeys ?? []),
     ]),
   ];
   const lines = keys.map((key) => `${key}=`).join('\n');
@@ -107,10 +120,15 @@ function ensureGitignored(fs: FileSystem, root: string): void {
 }
 
 /** Scaffold a credentials template (if absent) and ensure the real credentials file is gitignored. */
-function scaffoldCredentials(fs: FileSystem, root: string, descriptor: ProviderDescriptor): void {
+function scaffoldCredentials(
+  fs: FileSystem,
+  root: string,
+  descriptor: ProviderDescriptor,
+  scmDescriptor?: ProviderDescriptor,
+): void {
   const examplePath = credentialsExamplePath(root);
   if (!fs.exists(examplePath)) {
-    fs.write(examplePath, credentialsTemplate(descriptor));
+    fs.write(examplePath, credentialsTemplate(descriptor, scmDescriptor));
   }
   ensureGitignored(fs, root);
 }
@@ -161,13 +179,26 @@ async function ensureCredentials(
   /** `--force` means "do not ask me"; a browser sign-in is nothing but asking. */
   nonInteractive: boolean,
   openBrowser: (url: string) => boolean,
+  /**
+   * The provider filling the scm port when it is not the issues provider. Its keys are gathered in
+   * the same pass, because two credential prompts separated by an introspection is how a user ends
+   * up with half a setup.
+   */
+  scmDescriptor?: ProviderDescriptor,
 ): Promise<Env> {
-  const required = [
-    ...new Set([
-      ...(descriptor.credentialEnvKeys ?? []),
-      ...(descriptor.scmCredentialEnvKeys ?? []),
-    ]),
-  ];
+  // Which provider each key belongs to, so the guidance shown and the browser sign-in offered are
+  // the ones for the provider actually being asked about.
+  const ownerOf = new Map<string, ProviderDescriptor>();
+  for (const key of [
+    ...(descriptor.credentialEnvKeys ?? []),
+    ...(descriptor.scmCredentialEnvKeys ?? []),
+  ]) {
+    if (!ownerOf.has(key)) ownerOf.set(key, descriptor);
+  }
+  for (const key of scmDescriptor?.scmCredentialEnvKeys ?? []) {
+    if (!ownerOf.has(key)) ownerOf.set(key, scmDescriptor as ProviderDescriptor);
+  }
+  const required = [...ownerOf.keys()];
   const existing = mergeCredentials(env, fs.read(credentialsPath(root)));
   const missing = required.filter((key) => {
     const v = existing[key];
@@ -187,10 +218,11 @@ async function ensureCredentials(
   );
   // Show the provider's token guidance (where to get it, which permissions) — but only when a value
   // must actually be typed, so an all-autodetected run stays quiet.
-  const willPrompt = missing.some((key) => detected[key] === undefined);
-  if (willPrompt && descriptor.credentialsHelp !== undefined) {
+  const typed = missing.filter((key) => detected[key] === undefined);
+  for (const owner of new Set(typed.map((key) => ownerOf.get(key)))) {
+    if (owner?.credentialsHelp === undefined) continue;
     prompter.note('');
-    for (const line of descriptor.credentialsHelp) prompter.note(line);
+    for (const line of owner.credentialsHelp) prompter.note(line);
     prompter.note('');
   }
 
@@ -199,12 +231,13 @@ async function ensureCredentials(
   // the tighter credential should not have to fight the friendlier path to get it.
   // Never on a non-interactive run. The flow waits up to fifteen minutes for a human to approve a
   // code in a browser, so offering it where nobody can answer does not degrade — it hangs.
-  const deviceAuth = nonInteractive ? undefined : descriptor.createDeviceAuth?.(env);
-  let authorized: string | undefined;
   const tokenKey = missing.find((key) => SECRET_KEY.test(key) && detected[key] === undefined);
+  const tokenOwner = tokenKey === undefined ? undefined : ownerOf.get(tokenKey);
+  const deviceAuth = nonInteractive ? undefined : tokenOwner?.createDeviceAuth?.(env);
+  let authorized: string | undefined;
   if (deviceAuth !== undefined && tokenKey !== undefined) {
     const useIt = await prompter.confirm(
-      `Sign in to ${descriptor.id} in your browser instead of pasting a token?`,
+      `Sign in to ${tokenOwner?.id} in your browser instead of pasting a token?`,
       true,
     );
     if (useIt) {
@@ -267,8 +300,17 @@ async function ensureCredentials(
   return effective;
 }
 
-function summarizeProposal(prompter: Prompter, proposal: ProviderProposal, bindScm: boolean): void {
-  const ports = bindScm ? 'issues + scm (branches/PRs)' : 'issues';
+function summarizeProposal(
+  prompter: Prompter,
+  proposal: ProviderProposal,
+  bindScm: boolean,
+  scmProvider?: string,
+): void {
+  const ports = bindScm
+    ? 'issues + scm (branches/PRs)'
+    : scmProvider !== undefined
+      ? `issues, with scm (branches/PRs) on '${scmProvider}'`
+      : 'issues';
   prompter.note(`Binding provider '${proposal.provider}' to: ${ports}.`);
   prompter.note(`Proposed mapping for issues provider '${proposal.provider}':`);
   for (const [role, target] of Object.entries(proposal.roleMap.states)) {
@@ -479,6 +521,32 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
     }
   }
 
+  // Bind scm to the same provider when it ships an scm adapter — the task-start/finish flow needs it.
+  const bindScm =
+    descriptor.scmManifest !== undefined && descriptor.createScmTransport !== undefined;
+
+  // When it ships none, offer the repository git is already pointing at. Linear is the first shipped
+  // provider that is issues-only, so without this every Linear install had to hand-edit
+  // providers.scm before the first recipe would run — and the first recipe a new user runs is
+  // task-start, which needs a branch. Decided before credentials are gathered so both providers'
+  // keys are collected in one pass.
+  let scmProvider: string | undefined;
+  if (!bindScm) {
+    const remote = detectGitCoordinates(options.fs.read(gitConfigPath(options.root)));
+    const owner = remote.GITHUB_OWNER;
+    const repo = remote.GITHUB_REPO;
+    if (owner !== undefined && repo !== undefined) {
+      const take =
+        options.force === true ||
+        (await options.prompter.confirm(
+          `Provider '${issuesProvider}' has no source control. Take branches and pull requests ` +
+            `from GitHub (${owner}/${repo}, read off your git remote)?`,
+          true,
+        ));
+      if (take) scmProvider = GITHUB_PROVIDER;
+    }
+  }
+
   // Make init a single command: gather any missing credentials (auto-detecting GitHub owner/repo
   // from the git remote, prompting for the token) and write .baron/credentials, so the user need not
   // hand-create that file before running. An injected introspector (tests) still needs a complete
@@ -491,17 +559,14 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
     options.env ?? {},
     options.force === true,
     options.openBrowser ?? openInBrowser,
+    scmProvider === undefined ? undefined : getProviderDescriptor(scmProvider),
   );
 
   const introspector = options.introspector ?? createIntrospector(effectiveEnv);
   const introspection = await introspector.introspect();
   const proposal = proposePolicy(introspection, manifest);
 
-  // Bind scm to the same provider when it ships an scm adapter — the task-start/finish flow needs it.
-  const bindScm =
-    descriptor.scmManifest !== undefined && descriptor.createScmTransport !== undefined;
-
-  summarizeProposal(options.prompter, proposal, bindScm);
+  summarizeProposal(options.prompter, proposal, bindScm, scmProvider);
 
   const confirmed =
     options.force === true ||
@@ -510,10 +575,18 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
     return { written: false, policyPath: path, proposal };
   }
 
-  const policy = assemblePolicy(proposal, { bindScm });
+  const policy = assemblePolicy(proposal, {
+    bindScm,
+    ...(scmProvider !== undefined ? { scmProvider } : {}),
+  });
   options.fs.mkdirp(`${options.root}/${BARON_DIR}`);
   options.fs.write(path, serializePolicy(policy));
-  scaffoldCredentials(options.fs, options.root, descriptor);
+  scaffoldCredentials(
+    options.fs,
+    options.root,
+    descriptor,
+    scmProvider === undefined ? undefined : getProviderDescriptor(scmProvider),
+  );
 
   const steered = await ensureAgentsSteering(
     options.fs,

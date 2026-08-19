@@ -2,6 +2,7 @@ import {
   azureIntrospectionFixture,
   createMemoryIntrospector,
   githubIntrospectionFixture,
+  scopedIntrospectionFixture,
 } from '@lonca/baron-conformance';
 import { parsePolicy, resolveIssuesConfig } from '@lonca/baron-core';
 import { describe, expect, it } from 'vitest';
@@ -310,5 +311,75 @@ describe('the order init reports what it did', () => {
     const wrote = prompter.notes.filter((note) => note.includes('Wrote '));
     expect(wrote).toHaveLength(1);
     expect(wrote[0]).toContain(result.policyPath);
+  });
+});
+
+describe('an issues provider that has no source control of its own', () => {
+  /** Linear's keys plus GitHub's, so nothing is prompted and the confirms below stay in order. */
+  const MIXED_ENV = {
+    LINEAR_API_KEY: 't',
+    LINEAR_TEAM: 'ALPHA',
+    GITHUB_OWNER: 'o',
+    GITHUB_REPO: 'r',
+    GITHUB_TOKEN: 't',
+  };
+  const remote = (url: string) => `[remote "origin"]\n\turl = ${url}\n`;
+
+  it('offers to bind scm to the GitHub repo the git remote already names', async () => {
+    // Baron binds scm to the issues provider when it ships one. Linear does not, so init wrote
+    // `providers: { issues: 'linear' }` and stopped — and the first thing a new user runs,
+    // task-start, died on scm.branch.create. Hand-editing policy.json was mandatory for the one
+    // provider that can never avoid it by itself.
+    const fs = memoryFileSystem({
+      [gitConfigPath(ROOT)]: remote('https://github.com/acme/widgets.git'),
+    });
+    await runInit({
+      root: ROOT,
+      issuesProvider: 'linear',
+      fs,
+      env: MIXED_ENV,
+      prompter: scriptedPrompter([true, true]),
+      introspector: createMemoryIntrospector(scopedIntrospectionFixture),
+    });
+
+    const policy = parsePolicy(JSON.parse(fs.read(policyPath(ROOT)) as string));
+    expect(policy.providers.issues).toBe('linear');
+    expect(policy.providers.scm, 'the install still needs policy.json edited by hand').toBe(
+      'github',
+    );
+  });
+
+  it('leaves scm unbound rather than guessing at a remote it does not adapt', async () => {
+    const fs = memoryFileSystem({
+      [gitConfigPath(ROOT)]: remote('https://gitlab.com/acme/widgets.git'),
+    });
+    await runInit({
+      root: ROOT,
+      issuesProvider: 'linear',
+      fs,
+      env: MIXED_ENV,
+      prompter: scriptedPrompter([true, true]),
+      introspector: createMemoryIntrospector(scopedIntrospectionFixture),
+    });
+
+    const policy = parsePolicy(JSON.parse(fs.read(policyPath(ROOT)) as string));
+    expect(policy.providers.scm).toBeUndefined();
+  });
+
+  it('does not offer when the user declines', async () => {
+    const fs = memoryFileSystem({
+      [gitConfigPath(ROOT)]: remote('git@github.com:acme/widgets.git'),
+    });
+    await runInit({
+      root: ROOT,
+      issuesProvider: 'linear',
+      fs,
+      env: MIXED_ENV,
+      prompter: scriptedPrompter([false, true]),
+      introspector: createMemoryIntrospector(scopedIntrospectionFixture),
+    });
+
+    const policy = parsePolicy(JSON.parse(fs.read(policyPath(ROOT)) as string));
+    expect(policy.providers.scm).toBeUndefined();
   });
 });
