@@ -39,3 +39,18 @@ describe('how the docs tell a reader to name a recipe', () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe('the guides a reader can actually find', () => {
+  it('links every doc from the README index', () => {
+    // A guide nobody links is a guide nobody reads. The Linear walkthrough was written because the
+    // README had started advertising Linear with nowhere to send the reader; this is the same fault
+    // one step earlier — a page that exists on disk and appears in no index.
+    const readme = readFileSync(`${ROOT}README.md`, 'utf8');
+    const linked = new Set(
+      [...readme.matchAll(/\.\/docs\/([a-z0-9-]+\.md)/g)].map((match) => match[1] as string),
+    );
+    const guides = markdownUnder(`${ROOT}docs`).map((file) => file.slice(`${ROOT}docs/`.length));
+    expect(guides.length, 'no guides found — the layout moved').toBeGreaterThan(3);
+    expect(guides.filter((guide) => !linked.has(guide))).toEqual([]);
+  });
+});

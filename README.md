@@ -133,6 +133,7 @@ talks to Baron, which is the whole point. Until they land, those names describe 
 | --- | --- |
 | [Getting started](./docs/getting-started.md) | Install, prerequisites, first `init` → `doctor` → `run`. |
 | [Setup walkthrough — Azure DevOps](./docs/setup-azure-devops.md) | From-scratch, copy-paste setup on Azure DevOps + Claude Code. |
+| [Setup walkthrough — Linear](./docs/setup-linear.md) | From-scratch setup on Linear: per-team scoped states, branches from GitHub. |
 | [Concepts](./docs/concepts.md) | Ports, roles, capability gaps, the knowledge loop — the mental model. |
 | [Configuration](./docs/configuration.md) | `.baron/policy.json`, role/type/gap maps, credentials. |
 | [CLI](./docs/cli.md) | `baron init` / `doctor` / `run` reference. |
