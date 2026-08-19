@@ -57,7 +57,10 @@ until step 2 is done.
       publish it later (so third parties can conformance-test their own adapters), split its entry
       points (pure in-memory transports vs. the vitest-coupled suites), add a `build`/`files`/
       `publishConfig`, drop `private`, then republish.
-- [x] **Versioning:** every package shares one version, read by `scripts/prep-publish.mjs` from
+- [x] **Versioning:** every package shares one version, set by `scripts/bump-version.mjs` (the
+      packages on disk are the list — no count is written down) and held there by a test, so a
+      straggler cannot quietly republish an old version or pin a dependency to the release before.
+      It is read by `scripts/prep-publish.mjs` from
       `packages/mcp-server/package.json` rather than restated (it also applies
       per-package `repository`/`homepage`/`bugs`/`keywords`/`description`, `files: ["dist"]`, and copies
       `LICENSE`/`README` into each). For future releases, consider adopting
@@ -66,7 +69,7 @@ until step 2 is done.
 **Each release:**
 
 ```bash
-# Bump the ten package.json versions first, then:
+node scripts/bump-version.mjs 0.34.0   # sets every workspace package to one version
 pnpm sync:server-json                 # reconciles server.json's two version fields and the package's mcpName
 pnpm install && pnpm build            # publishConfig flips main/types/exports to dist; bins already point there
 pnpm test && pnpm licenses:check      # never publish red
