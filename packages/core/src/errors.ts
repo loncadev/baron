@@ -102,3 +102,25 @@ export class RoleScopeUnknownError extends BaronError {
     );
   }
 }
+
+/**
+ * The provider will not move this item to that target from where it currently is.
+ *
+ * Not a capability gap and deliberately not negotiable by policy: the mapping is right, the write is
+ * simply not permitted from this state. Emulating or degrading it would mean either moving the item
+ * somewhere it was not asked to go, or reporting success for a move that did not happen. The
+ * permitted set is named because "refused" without it leaves the caller guessing what to ask for.
+ */
+export class TransitionNotPermittedError extends BaronError {
+  constructor(
+    readonly role: string,
+    readonly provider: string,
+    readonly permitted: readonly string[],
+  ) {
+    super(
+      `Provider '${provider}' will not move this item to role '${role}' from its current state. ` +
+        `It permits: ${permitted.length > 0 ? permitted.join(', ') : '(nothing from here)'}.`,
+      'TRANSITION_NOT_PERMITTED',
+    );
+  }
+}

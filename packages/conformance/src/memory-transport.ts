@@ -75,6 +75,15 @@ export interface MemoryTransportOptions {
    * That is the same trap transport fidelity (#59) was written for.
    */
   readonly ownedDiscriminators?: readonly string[] | undefined;
+  /**
+   * Which discriminators are reachable from each one, for a provider that gates transitions the way
+   * Jira does — a workflow permits a move FROM a state, not to any state at will.
+   *
+   * When set the transport implements `availableTargets`; when absent it does not implement it at
+   * all, which is the shape of every provider that gates nothing. Both halves matter: the suite has
+   * to prove the gate refuses, and that a transport without one behaves exactly as before.
+   */
+  readonly reachableFrom?: Readonly<Record<string, readonly string[]>> | undefined;
 }
 
 /**
@@ -155,6 +164,16 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
       if (label !== undefined && !rec.labels.includes(label)) rec.labels.push(label);
       return snapshot(rec);
     },
+
+    ...(opts.reachableFrom !== undefined
+      ? {
+          async availableTargets(id: string): Promise<readonly NativeTarget[]> {
+            const rec = must(id);
+            const reachable = opts.reachableFrom?.[rec.discriminator] ?? [];
+            return reachable.map((value) => ({ [opts.stateKey]: value }));
+          },
+        }
+      : {}),
 
     async addLabel(id: string, label: string): Promise<void> {
       const rec = must(id);

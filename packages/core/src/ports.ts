@@ -1,7 +1,7 @@
 import { deriveBranchName } from './branch-name.js';
 import type { CapabilityManifest } from './capabilities.js';
 import type { IssuesProviderConfig, LabelSpec, NativeTarget } from './config.js';
-import { BaronError } from './errors.js';
+import { BaronError, TransitionNotPermittedError } from './errors.js';
 import type { Issue, IssueComment, IssueDraft, IssueQuery } from './issue.js';
 import { ITERATION_CURRENT, type Iteration } from './iteration.js';
 import type { IssueLinkType } from './links.js';
@@ -134,6 +134,20 @@ export interface IssuesTransport {
   createIssue(input: NativeCreateInput): Promise<NativeIssue>;
   getIssue(id: string): Promise<NativeIssue>;
   applyTarget(id: string, target: NativeTarget): Promise<NativeIssue>;
+  /**
+   * Which targets this item can reach right now, for a provider where that is not "all of them".
+   *
+   * Jira is why this exists: it cannot set a status at all. You read the transitions its workflow
+   * permits FROM the issue's current state, then perform one — so the reachable set is a function of
+   * the item, and `applyTarget` alone cannot express that.
+   *
+   * The core VERIFIES against this rather than choosing from it. Which target a role means is
+   * settled by the map a human confirmed (invariant 2); choosing at runtime would quietly re-derive
+   * the mapping the map exists to pin down. The transport answers only "is this reachable now".
+   *
+   * Optional, so a provider that gates nothing implements nothing and pays nothing.
+   */
+  availableTargets?(id: string): Promise<readonly NativeTarget[]>;
   /** Add a label additively WITHOUT touching the role discriminator (used by link emulation). */
   addLabel(id: string, label: string): Promise<void>;
   /**
@@ -369,6 +383,25 @@ export class BaseIssuesAdapter implements IssuesPort {
     // resolved. Only then: an unscoped provider pays nothing, which is every provider today.
     const scope = this.resolver.scoped ? (await this.transport.getIssue(id)).scope : undefined;
     const target = this.resolver.toNative(role, scope);
+
+    // Ask the provider whether this move is reachable from where the item actually is, on a
+    // provider that gates it. Verification, not selection: the map settles WHICH target a role
+    // means, and re-deriving that from whatever the provider happens to offer would undo the point
+    // of confirming a mapping once. Absent on a provider that gates nothing, which costs it nothing.
+    if (this.transport.availableTargets !== undefined) {
+      const reachable = await this.transport.availableTargets(id);
+      const key = this.resolver.discriminatorKey;
+      const wanted = target[key];
+      if (!reachable.some((candidate) => candidate[key] === wanted)) {
+        throw new TransitionNotPermittedError(
+          role,
+          this.cfg.provider,
+          reachable
+            .map((candidate) => candidate[key])
+            .filter((value): value is string => value !== undefined),
+        );
+      }
+    }
 
     const needsEmulatedState =
       !this.manifest.issues.arbitraryStates && role !== 'done' && role !== 'backlog';

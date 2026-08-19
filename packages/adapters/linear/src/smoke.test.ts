@@ -123,6 +123,33 @@ describe.skipIf(!live)('linear live smoke', () => {
     expect(created.typeRole).toBe('bug');
   }, 60_000);
 
+  it('reports the team’s own states as reachable, catching a foreign state before the write', async () => {
+    // Linear gates nothing, so this is an identity check rather than a workflow one: a map pointing
+    // at another team's state id is a real mistake, and answering with THIS team's states turns the
+    // provider's eventual rejection into a refusal that names what is actually available.
+    const roleMap = await discoverRoleMap();
+    const transport = createLinearTransport({ apiKey: apiKey as string, team: team as string });
+    const adapter = defineLinearIssuesAdapter(
+      { roleMap, typeMap: exampleLinearTypeMap, gapPolicy: {} },
+      transport,
+    );
+    const created = await adapter.create({
+      title: `baron smoke reach ${Date.now()}`,
+      typeRole: 'task',
+    });
+
+    const reachable = await transport.availableTargets?.(created.id);
+    expect(reachable?.length, 'the team must own at least one state').toBeGreaterThan(0);
+    // Every mapped role for this team has to be among them, or the map and the workspace disagree.
+    for (const target of Object.values(roleMap.scopes?.[team as string] ?? {})) {
+      const wanted = target?.[LINEAR_STATE_KEY];
+      expect(
+        reachable?.some((r) => r[LINEAR_STATE_KEY] === wanted),
+        `mapped state '${wanted}' is not one this team owns`,
+      ).toBe(true);
+    }
+  }, 60_000);
+
   it('filters server-side by a set of state ids, not by pulling everything back', async () => {
     // The plural `targets` contract exists because a role expands per scope. Linear's own filter
     // takes a set (`state: { id: { in: [...] } }`), so this proves the two shapes actually meet —

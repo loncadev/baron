@@ -197,6 +197,25 @@ export function createLinearTransport(opts: LinearTransportOptions): IssuesTrans
       return toNative(data.issueUpdate.issue);
     },
 
+    /**
+     * The states the item's own team owns.
+     *
+     * Linear does not gate transitions — any of its team's states is reachable — so this is not a
+     * workflow question here, it is an identity one. `WorkflowState.team` is non-null, so a role map
+     * pointing at another team's state id is a real and easy mistake; answering with this team's
+     * states turns the provider's eventual rejection into a refusal that names what IS available,
+     * before the write rather than after it.
+     */
+    async availableTargets(id: string): Promise<readonly NativeTarget[]> {
+      const issue = await fetchIssue(id);
+      const data = await gql<{
+        team: { states: { nodes: Array<{ id: string }> } } | null;
+      }>('query($team: String!) { team(id: $team) { states { nodes { id } } } }', {
+        team: issue.team.id,
+      });
+      return (data.team?.states.nodes ?? []).map((state) => ({ [LINEAR_STATE_KEY]: state.id }));
+    },
+
     async addLabel(id: string, label: string): Promise<void> {
       const issue = await fetchIssue(id);
       await gql(
