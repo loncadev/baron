@@ -260,3 +260,53 @@ describe('scoped role maps', () => {
     expect(() => parsePolicy(scoped({ KSP: {} }))).toThrow(/maps no roles/);
   });
 });
+
+describe('resolveIssuesConfig — the bridge from disk to code', () => {
+  const scopedPolicy = () =>
+    parsePolicy({
+      version: 1,
+      providers: { issues: 'linear', scm: 'github' },
+      roleMap: {
+        linear: {
+          stateKey: 'stateId',
+          states: {},
+          scopes: {
+            BAR: { in_progress: { stateId: 'bar-1' } },
+            KSP: { in_progress: { stateId: 'ksp-1' } },
+          },
+        },
+      },
+      typeMap: { linear: { task: 'Issue' } },
+    });
+
+  it('carries scopes through to the resolver', () => {
+    // This seam had no test of its own, and it silently dropped `scopes` — so a policy that parsed
+    // correctly, a proposal that wrote it correctly and a resolver that understood it were joined by
+    // a bridge that threw it away, and every role resolved against an empty map. Nothing else caught
+    // it because every other test builds IssuesProviderConfig by hand, and nothing COULD catch it in
+    // the type system: dropping an optional field is well-typed.
+    const config = resolveIssuesConfig(scopedPolicy());
+    expect(config.roleMap.scopes?.BAR?.in_progress).toEqual({ stateId: 'bar-1' });
+    expect(config.roleMap.scopes?.KSP?.in_progress).toEqual({ stateId: 'ksp-1' });
+  });
+
+  it('resolves the issues provider independently of the scm one', () => {
+    // The mixed policy that surfaced the bug: ports bind separately, which is the product's whole
+    // claim, so the issues config must not be influenced by scm being someone else.
+    expect(resolveIssuesConfig(scopedPolicy()).provider).toBe('linear');
+  });
+
+  it('leaves an unscoped map without a scopes key at all', () => {
+    const config = resolveIssuesConfig(
+      parsePolicy({
+        version: 1,
+        providers: { issues: 'github' },
+        roleMap: { github: { stateKey: 'label', states: { done: { label: 'done' } } } },
+        typeMap: { github: { task: 'issue' } },
+      }),
+    );
+    // Not an empty object: `scoped` is decided by whether the key exists, so inventing one would
+    // make every unscoped provider take the scoped path and demand a scope it can never supply.
+    expect(config.roleMap.scopes).toBeUndefined();
+  });
+});

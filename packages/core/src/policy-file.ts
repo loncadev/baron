@@ -383,6 +383,12 @@ export function resolveIssuesConfig(policy: BaronPolicyFile): IssuesProviderConf
   const roleMap: ProviderRoleMap = {
     stateKey: roleMapEntry.stateKey,
     states: roleMapEntry.states,
+    // Carried explicitly, and this is the line that was missing. Everything on either side of this
+    // function handled scopes correctly — the policy parses them, the proposal writes them, the
+    // resolver resolves through them — and the one bridge between disk and code dropped them, so a
+    // Linear install resolved every role against an empty map. `scopes` being optional is why the
+    // compiler had nothing to say: discarding an optional field is perfectly well-typed.
+    ...(roleMapEntry.scopes !== undefined ? { scopes: roleMapEntry.scopes } : {}),
   };
 
   return {
