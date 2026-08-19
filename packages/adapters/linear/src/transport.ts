@@ -94,6 +94,9 @@ export function createLinearTransport(opts: LinearTransportOptions): IssuesTrans
   const toNative = (issue: GqlIssue): NativeIssue => ({
     id: issue.id,
     key: issue.identifier,
+    // The identifier is what a person calls this issue and what Linear's own copy-branch-name uses;
+    // the id is a UUID and would put thirty-six characters into every branch.
+    branchRef: issue.identifier,
     title: issue.title,
     body: issue.description ?? undefined,
     // Linear has no work-item type: an issue is an issue. The abstract type role rides a label, the
