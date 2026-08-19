@@ -61,6 +61,11 @@ export interface NativeIssue {
    * the whole project or repository, which is every provider shipped today.
    */
   readonly scope?: string | undefined;
+  /**
+   * What should identify this item in a branch name, when its `id` will not do — Linear's `BAR-1`
+   * rather than its UUID. Absent where the id already reads well, which is every numeric provider.
+   */
+  readonly branchRef?: string | undefined;
   readonly parentId?: string | undefined;
   readonly labels: readonly string[];
   /** Provider-native user handle of the assignee (Azure: email; GitHub: login), if any. */
@@ -687,7 +692,12 @@ export class BaseIssuesAdapter implements IssuesPort {
       labels: native.labels,
       assignee: native.assignee,
       iteration: native.iteration,
-      branchName: deriveBranchName({ id: native.id, title: native.title, typeRole }),
+      branchName: deriveBranchName({
+        id: native.id,
+        title: native.title,
+        typeRole,
+        branchRef: native.branchRef,
+      }),
       url: native.url,
       provider: this.cfg.provider,
     };

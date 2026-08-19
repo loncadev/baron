@@ -93,6 +93,12 @@ describe.skipIf(!live)('linear live smoke', () => {
       created.key.startsWith(`${team}-`),
       `key '${created.key}' should carry the team prefix`,
     ).toBe(true);
+    // The branch must carry the human reference, not the UUID: a Linear id is 36 characters and
+    // would otherwise land in every branch, PR title and checkout.
+    expect(created.branchName, 'the branch name should not contain the UUID').not.toContain(
+      created.id,
+    );
+    expect(created.branchName).toContain(created.key.toLowerCase());
 
     const moved = await adapter.transition(created.id, 'in_progress');
     expect(moved.role).toBe('in_progress');

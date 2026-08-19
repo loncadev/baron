@@ -71,3 +71,26 @@ describe('deriveBranchName', () => {
     expect(deriveBranchName({ id: '7', title: '!!!', typeRole: 'task' })).toBe('task/7');
   });
 });
+
+describe('a provider whose id does not belong in a branch', () => {
+  it('uses the reference the adapter supplies instead', () => {
+    // Linear ids are UUIDs. Without this every branch, PR title and checkout on a Linear install
+    // carries thirty-six characters of one.
+    expect(
+      deriveBranchName({
+        id: '07d591da-beb7-4273-a53d-e371a907ab69',
+        branchRef: 'BAR-12',
+        title: 'Fix the thing',
+        typeRole: 'task',
+      }),
+    ).toBe('task/bar-12-fix-the-thing');
+  });
+
+  it('still uses the id when no reference is supplied', () => {
+    // Azure and GitHub say nothing and must be completely unaffected: their ids already read well,
+    // and changing a derived branch name for an existing install orphans the branches it already cut.
+    expect(deriveBranchName({ id: '123', title: 'Fix the thing', typeRole: 'task' })).toBe(
+      'task/123-fix-the-thing',
+    );
+  });
+});

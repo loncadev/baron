@@ -65,10 +65,24 @@ export function deriveBranchName(issue: {
   readonly id: string;
   readonly title: string;
   readonly typeRole?: WorkItemTypeRole | undefined;
+  /**
+   * What identifies this item in a branch, when its `id` will not do.
+   *
+   * `id` is a short number on Azure and GitHub and reads well; on Linear it is a UUID, and a branch
+   * carrying thirty-six characters of it is unusable. The provider's human reference is the right
+   * value there (`BAR-1`) — but `key` cannot simply be used everywhere, since it is `#123` on GitHub
+   * and `AB#4567` on Azure and neither belongs in a branch name. So the adapter says which value to
+   * use, the way it already says which value identifies a state.
+   */
+  readonly branchRef?: string | undefined;
 }): string | undefined {
   if (issue.typeRole === undefined) return undefined;
   const prefix = BRANCH_TYPE_PREFIXES[issue.typeRole];
   if (prefix === undefined) return undefined;
+  // Lower-cased for consistency with the slug beside it, and because a mapping like BAR-1 -> bar-1
+  // loses nothing: it is still exactly one item, and it matches what Linear's own copy-branch-name
+  // produces, so a branch cut by hand and one cut by Baron agree.
+  const ref = (issue.branchRef ?? issue.id).toLowerCase();
   const slug = slugifyTitle(issue.title);
-  return slug.length > 0 ? `${prefix}/${issue.id}-${slug}` : `${prefix}/${issue.id}`;
+  return slug.length > 0 ? `${prefix}/${ref}-${slug}` : `${prefix}/${ref}`;
 }
