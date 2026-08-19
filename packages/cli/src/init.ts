@@ -41,6 +41,12 @@ export interface InitOptions {
   readonly force?: boolean;
   /** Injected browser opener (tests). Returns whether an attempt was made. */
   readonly openBrowser?: (url: string) => boolean;
+  /**
+   * Work the caller must finish before init signs off — provisioning the provider's workflow labels,
+   * today. A callback rather than something the caller runs after `runInit` returns, because the
+   * closing advice has to come last and a caller cannot make that true from outside.
+   */
+  readonly afterWrite?: (policyPath: string) => Promise<void>;
 }
 
 export interface InitResult {
@@ -525,8 +531,9 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
     },
   );
 
-  options.prompter.note(`\nWrote ${BARON_DIR}/policy.json (commit it — it holds no secrets).`);
+  options.prompter.note(`\nWrote ${path} (commit it — it holds no secrets).`);
   if (steered) options.prompter.note('Added a Baron steering block to AGENTS.md.');
+  await options.afterWrite?.(path);
   options.prompter.note('Next steps:');
   options.prompter.note(
     '  • Drive it from Claude Code: `/plugin marketplace add loncadev/baron` then `/plugin install baron@baron`.',

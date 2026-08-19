@@ -107,13 +107,12 @@ async function cmdInit(flags: Record<string, string>, ports: CliPorts): Promise<
     prompter: ports.prompter,
     env: effectiveEnv(ports, root),
     force: flags.force === 'true',
+    afterWrite: () => provisionRoleLabels(ports, root),
   });
   if (!result.written) {
     ports.out('Aborted; no changes written.');
     return 0;
   }
-  ports.out(`Wrote ${result.policyPath}.`);
-  await provisionRoleLabels(ports, root);
   return 0;
 }
 
@@ -127,8 +126,6 @@ async function provisionRoleLabels(ports: CliPorts, root: string): Promise<void>
   const raw = ports.fs.read(policyPath(root));
   if (raw === undefined) return;
   const config = resolveIssuesConfig(parsePolicyJson(raw));
-  // Role labels + (on flat-type providers) the type-role labels create() writes, so neither kind is
-  // left to the provider's grey auto-create.
   // Role labels, the type-role labels create() writes, and the orthogonal blocked flag — so none of
   // them is left to the provider's grey auto-create.
   const specs = [
