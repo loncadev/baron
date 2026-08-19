@@ -2,6 +2,7 @@ import {
   azureIntrospectionFixture,
   createMemoryIntrospector,
   githubIntrospectionFixture,
+  scopedIntrospectionFixture,
 } from '@lonca/baron-conformance';
 import {
   BaronError,
@@ -26,6 +27,8 @@ const FULL_ENV = {
   AZURE_DEVOPS_PROJECT: 'p',
   AZURE_DEVOPS_REPO: 'r',
   AZURE_DEVOPS_TOKEN: 't',
+  LINEAR_API_KEY: 't',
+  LINEAR_TEAM: 'ALPHA',
 };
 
 /**
@@ -309,5 +312,57 @@ describe('runDoctor', () => {
         introspector: createMemoryIntrospector(githubIntrospectionFixture),
       }),
     ).rejects.toBeInstanceOf(BaronError);
+  });
+});
+
+describe('runDoctor on a provider whose states are scoped', () => {
+  // The unscoped `states` map is empty by design on a scoped provider — the default belongs to no
+  // team — and drift walked only that map. So doctor read seven mapped Linear states, checked none
+  // of them, and printed "no drift": a green report asserting nothing.
+  it('checks the states of every scope, not the empty default map', async () => {
+    const fs = await seededFs('linear', scopedIntrospectionFixture);
+    const typeRoles = Object.keys(
+      JSON.parse(fs.read('/repo/.baron/policy.json') as string).typeMap.linear,
+    ).length;
+    const report = await runDoctor({
+      root: ROOT,
+      fs,
+      introspector: createMemoryIntrospector(scopedIntrospectionFixture),
+      probeFor: NO_PROBE,
+    });
+    expect(report.drift).toEqual([]);
+    expect(report.checks, 'only the type roles were checked').toBeGreaterThan(typeRoles);
+  });
+
+  it('flags a state that disappeared from one scope, and names that scope', async () => {
+    const fs = await seededFs('linear', scopedIntrospectionFixture);
+    const drifted = {
+      ...scopedIntrospectionFixture,
+      states: scopedIntrospectionFixture.states.filter((s) => s.value !== 'beta-active'),
+    };
+    const report = await runDoctor({
+      root: ROOT,
+      fs,
+      introspector: createMemoryIntrospector(drifted),
+      probeFor: NO_PROBE,
+    });
+    expect(report.ok).toBe(false);
+    // Naming the scope is the difference between "in_progress is broken" and "in_progress is broken
+    // for BETA", which are two different places in the policy.
+    expect(report.drift.join(' ')).toContain('BETA');
+    expect(report.drift.join(' ')).toContain('in_progress');
+  });
+
+  it('does not read a role missing from one scope as drift', async () => {
+    // BETA has no review state at all, so the proposal leaves in_review unmapped there. Absence of a
+    // mapping is a coverage question, not a broken reference.
+    const fs = await seededFs('linear', scopedIntrospectionFixture);
+    const report = await runDoctor({
+      root: ROOT,
+      fs,
+      introspector: createMemoryIntrospector(scopedIntrospectionFixture),
+      probeFor: NO_PROBE,
+    });
+    expect(report.drift).toEqual([]);
   });
 });

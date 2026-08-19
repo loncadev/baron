@@ -3,6 +3,8 @@ import {
   type CredentialFinding,
   type CredentialProbe,
   type Introspector,
+  type NativeTarget,
+  ROLE_LABEL_KEY,
   WORK_ITEM_TYPE_ROLES,
   parsePolicyJson,
   requiredCredentialCapabilities,
@@ -137,7 +139,6 @@ export async function runDoctor(options: DoctorOptions): Promise<DoctorReport> {
   const introspector = options.introspector ?? descriptor.createIntrospector!(options.env ?? {});
   const introspection = await introspector.introspect();
 
-  const stateNames = new Set(introspection.states.map((s) => s.name));
   const typeNames = new Set(introspection.workItemTypes.map((t) => t.name));
   const columnNames = new Set(introspection.boardColumns ?? []);
 
@@ -153,28 +154,56 @@ export async function runDoctor(options: DoctorOptions): Promise<DoctorReport> {
     }
   }
 
-  for (const [role, target] of Object.entries(config.roleMap.states)) {
-    if (target === undefined) continue;
+  // What identifies a state, per scope. `value ?? name` because on a provider that scopes its
+  // states the name is not the identity: two teams each own an "In Progress" and they are different
+  // rows. A provider that does not scope states reports none, so the filter passes everything.
+  const identitiesIn = (scope: string | undefined): Set<string> =>
+    new Set(
+      introspection.states
+        .filter((state) => scope === undefined || state.scope === scope)
+        .map((state) => state.value ?? state.name),
+    );
 
-    // A native state can drift whether or not it is the map's discriminator. This used to be gated
-    // on `stateKey === 'state'`, and the reason given — emulated states are Baron-managed and have
-    // nothing to validate against — is true of `target.label` and false of `target.state`. GitHub's
-    // `done: { state: 'closed', label: 'done' }` pins a real state its introspector reports, and it
-    // went unchecked on every label-keyed install. A target with no `state` key still checks nothing.
-    const stateValue = target.state;
-    if (stateValue !== undefined) {
-      checks += 1;
-      if (!stateNames.has(stateValue)) {
-        drift.push(`role '${role}' maps to native state '${stateValue}', which no longer exists.`);
+  // The keys that name a REAL native state rather than one Baron synthesises. `state` always does —
+  // GitHub pins `done: { state: 'closed', label: 'done' }` though its discriminator is a label — and
+  // so does the map's own discriminator, unless that discriminator IS the label.
+  const nativeStateKeys = new Set<string>(['state']);
+  if (config.roleMap.stateKey !== ROLE_LABEL_KEY) nativeStateKeys.add(config.roleMap.stateKey);
+
+  // Both maps, because on a scoped provider the unscoped one is empty by design and walking it alone
+  // meant every state reference went unchecked while the report still said "no drift".
+  const maps: Array<readonly [string | undefined, Readonly<Record<string, NativeTarget>>]> = [
+    [undefined, config.roleMap.states as Readonly<Record<string, NativeTarget>>],
+    ...Object.entries(config.roleMap.scopes ?? {}).map(
+      (entry) => [entry[0], entry[1] as Readonly<Record<string, NativeTarget>>] as const,
+    ),
+  ];
+
+  for (const [scope, states] of maps) {
+    const identities = identitiesIn(scope);
+    // "in_review is broken" and "in_review is broken for BETA" send you to two different places.
+    const where = scope === undefined ? '' : ` in scope '${scope}'`;
+    for (const [role, target] of Object.entries(states)) {
+      if (target === undefined) continue;
+
+      for (const key of nativeStateKeys) {
+        const stateValue = target[key];
+        if (stateValue === undefined) continue;
+        checks += 1;
+        if (!identities.has(stateValue)) {
+          drift.push(
+            `role '${role}'${where} maps to native state '${stateValue}', which no longer exists.`,
+          );
+        }
       }
-    }
 
-    if (target.boardColumn !== undefined) {
-      checks += 1;
-      if (!columnNames.has(target.boardColumn)) {
-        drift.push(
-          `role '${role}' maps to board column '${target.boardColumn}', which no longer exists.`,
-        );
+      if (target.boardColumn !== undefined) {
+        checks += 1;
+        if (!columnNames.has(target.boardColumn)) {
+          drift.push(
+            `role '${role}'${where} maps to board column '${target.boardColumn}', which no longer exists.`,
+          );
+        }
       }
     }
   }
