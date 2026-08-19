@@ -215,7 +215,7 @@ Ask in plain language; Claude picks the tools:
 You can also run a packaged recipe directly:
 
 ```bash
-pnpm baron run --recipe <baron>/packages/recipes/recipes/task-start.yaml --root <your-project>
+pnpm baron run --recipe task-start --root <your-project>
 ```
 
 Tip: to keep Claude using Baron (rather than a raw Azure DevOps MCP) for work-tracking, drop a short

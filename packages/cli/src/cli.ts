@@ -36,13 +36,14 @@ const USAGE = `baron — platform-agnostic work-orchestration
 Usage:
   baron init [--provider <id>] [--root <dir>] [--force]
   baron doctor [--root <dir>]
-  baron run --recipe <path> [--root <dir>]
+  baron run --recipe <name-or-path> [--root <dir>]
 
 Commands:
   init     Set up Baron for a project: gather credentials, propose a role map, write .baron/policy.json
            (prompts you to pick a provider when --provider is omitted)
   doctor   Validate .baron/policy.json against the live provider and report drift
   run      Execute a YAML recipe against the policy's live ports
+           (a built-in recipe name, or a path to your own YAML)
 
 Providers: ${KNOWN_PROVIDERS.join(', ')}`;
 
@@ -253,6 +254,15 @@ export async function runCli(argv: readonly string[], ports: CliPorts): Promise<
   const { flags } = parseFlags(rest);
 
   printBanner(ports);
+
+  // Matched here rather than in the switch below, which only ever saw `--help` as a COMMAND: asking
+  // `baron init --help` fell straight through into the wizard, which then offered to overwrite
+  // policy.json and asked for a token. Reading the help is the one gesture made precisely because
+  // the user does not want to run the thing yet, so it must never be the thing that runs it.
+  if (rest.includes('--help') || rest.includes('-h')) {
+    ports.out(USAGE);
+    return 0;
+  }
 
   try {
     switch (command) {

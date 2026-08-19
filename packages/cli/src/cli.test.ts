@@ -78,3 +78,36 @@ describe('runCli', () => {
     expect(err.join('\n')).toContain('--recipe');
   });
 });
+
+describe('--help on a subcommand', () => {
+  // `--help` was matched only as a COMMAND, so it fell through the switch into the command itself.
+  // `baron init --help` therefore ran the wizard — asking which provider hosts your work items, then
+  // offering to overwrite .baron/policy.json and to hand over a token. Reading the help is the one
+  // gesture a user makes precisely because they do not want to run the thing yet.
+  for (const flag of ['--help', '-h']) {
+    it(`prints usage and changes nothing for init ${flag}`, async () => {
+      const { ports, out, err } = harness();
+      expect(await runCli(['init', flag], ports)).toBe(0);
+      expect(out.join('\n')).toContain('Usage:');
+      expect(err.join('\n'), 'the wizard announced itself').not.toContain('baron init —');
+      expect(ports.fs.exists(policyPath('.')), 'init --help wrote a policy').toBe(false);
+    });
+  }
+
+  it('prints usage for run --help without reporting a missing recipe', async () => {
+    const { ports, out, err } = harness();
+    // It used to "work" by accident: no --recipe, so it failed, and the failure path prints usage.
+    // Exit 2 for asking a question is the tell.
+    expect(await runCli(['run', '--help'], ports)).toBe(0);
+    expect(out.join('\n')).toContain('Usage:');
+    expect(err.join('\n')).not.toContain('requires --recipe');
+  });
+
+  it('says a recipe may be named, not only pathed', async () => {
+    // `--recipe <path>` outlived the truth: built-in recipes have been accepted by NAME since #95,
+    // so the usage sent a user hunting for a YAML file that ships inside the package.
+    const { ports, out } = harness();
+    await runCli(['--help'], ports);
+    expect(out.join('\n')).toContain('--recipe <name-or-path>');
+  });
+});
