@@ -161,7 +161,7 @@ most useful thing you could send. What is planned next, and what is deliberately
 
 ## License
 
-Open-core. The core, the P0 adapters (Azure DevOps, GitHub, Slack), the recipes, and the CLI/MCP
+Open-core. The core, the adapters (Azure DevOps, GitHub, Linear, Slack), the recipes, and the CLI/MCP
 server are licensed under [Apache-2.0](./LICENSE). Future commercial-tier features (SSO, secret-manager
 integrations, multi-team governance, audit) will ship under a separate commercial license — see
 [ARCHITECTURE.md](./ARCHITECTURE.md) decision #20.

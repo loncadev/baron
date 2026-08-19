@@ -5,14 +5,18 @@ applies your gap policy for anything a provider can't do natively. This page is 
 
 ## Ports × providers
 
-| Port | Azure DevOps | GitHub | Slack |
-| --- | --- | --- | --- |
-| `issues` | ✅ Azure Boards | ✅ GitHub Issues | — |
-| `scm` | ✅ Azure Repos | ✅ GitHub (git refs + pulls) | — |
-| `ci` | ✅ Azure Pipelines | ✅ GitHub Actions | — |
-| `deploy` | ✅ Azure Environments | ✅ GitHub Environments | — |
-| `notify` | — | — | ✅ Slack |
-| `docs` | — (planned, v2) | — (planned, v2) | — (planned, v2) |
+| Port | Azure DevOps | GitHub | Linear | Slack |
+| --- | --- | --- | --- | --- |
+| `issues` | ✅ Azure Boards | ✅ GitHub Issues | ✅ Linear Issues | — |
+| `scm` | ✅ Azure Repos | ✅ GitHub (git refs + pulls) | — | — |
+| `ci` | ✅ Azure Pipelines | ✅ GitHub Actions | — | — |
+| `deploy` | ✅ Azure Environments | ✅ GitHub Environments | — | — |
+| `notify` | — | — | — | ✅ Slack |
+| `docs` | — (planned, v2) | — (planned, v2) | — (planned, v2) | — (planned, v2) |
+
+Linear binds `issues` only: it has no source control, pipelines or environments of its own, which is
+exactly the case ports exist for — pair it with GitHub for `scm` and nothing about the recipes
+changes.
 
 Every provider also exposes the **escape hatch** (`baron_native_request`, ARCHITECTURE decision #18):
 a clearly-labeled, last-resort, non-portable raw authenticated REST call. It only reaches providers
@@ -25,17 +29,27 @@ knowledge, not user-confirmed roles. `notify` (Slack) uses `SLACK_BOT_TOKEN` + `
 
 ## Issues capabilities
 
-| Capability | Azure DevOps | GitHub | If absent, default handling |
-| --- | --- | --- | --- |
-| `hierarchy` (native parent/child) | ✅ | ❌ | `emulate:labels` (`parent:<id>`) |
-| `arbitraryStates` (beyond open/closed) | ✅ | ❌ | `emulate:labels` (mid-roles ride labels) |
-| `separateBoardColumn` | ✅ | ❌ | n/a |
-| `sprints` | ✅ | ❌ | `degrade` |
-| `nativeLabels` | ✅ | ✅ | — |
-| `nativeTypes` (a type is stored at create and read back) | ✅ | ❌ | the role rides a `type:<role>` label |
-| `typeFiltering` (the provider's query filters by type) | ✅ | ❌ | `emulate:post-filter` |
-| `comments` | ✅ | ✅ | — |
-| `issueLinks` (typed links) | ✅ | ❌ | `emulate:labels` (`<type>:<id>`) |
+| Capability | Azure DevOps | GitHub | Linear | If absent, default handling |
+| --- | --- | --- | --- | --- |
+| `hierarchy` (native parent/child) | ✅ | ❌ | ✅ | `emulate:labels` (`parent:<id>`) |
+| `arbitraryStates` (beyond open/closed) | ✅ | ❌ | ✅ | `emulate:labels` (mid-roles ride labels) |
+| `separateBoardColumn` | ✅ | ❌ | ❌ | n/a |
+| `sprints` | ✅ | ❌ | ✅ (cycles) | `degrade` |
+| `nativeLabels` | ✅ | ✅ | ✅ | — |
+| `nativeTypes` (a type is stored at create and read back) | ✅ | ❌ | ❌ | the role rides a `type:<role>` label |
+| `typeFiltering` (the provider's query filters by type) | ✅ | ❌ | ❌ | `emulate:post-filter` |
+| `comments` | ✅ | ✅ | ✅ | — |
+| `issueLinks` (typed links) | ✅ | ❌ | ✅ | `emulate:labels` (`<type>:<id>`) |
+
+**Linear is the first provider whose states are SCOPED.** A `WorkflowState` belongs to a team, not to
+the workspace, so the same role is a different state in each team — `in_progress` is one id in one
+team and another id in another, even where both are named "In Progress". Its role map is therefore
+written per team (`policy.roleMap.linear.scopes.<TEAM>`), `baron init` proposes one map per team, and
+a role can legitimately exist in one team and not another. Nothing else in the model changes: recipes
+still speak roles.
+
+Linear also has no work-item types at all — an issue is an issue — so the type role rides a label
+exactly as it does on GitHub.
 
 GitHub's flatness is the point: the same `issue.create` / `transition` produce correct-but-different
 behavior, and every gap is negotiated explicitly — never silent. The recommended GitHub gap policy
