@@ -430,7 +430,8 @@ function announcePlan(prompter: Prompter, provider: string): void {
   );
   prompter.note('  • offer to add a Baron steering block to AGENTS.md (so an agent uses Baron).');
   prompter.note(
-    'The only thing it creates on your provider is your workflow labels (GitHub); it never touches',
+    'The only thing it creates on your provider is the labels Baron needs, on a provider whose ' +
+      'roles or types ride labels (GitHub and Linear today); it never touches',
   );
   prompter.note('your existing issues or PRs, and never prints or commits your token.\n');
 }
