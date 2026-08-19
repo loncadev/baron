@@ -1,6 +1,7 @@
 export * from './memory-transport.js';
 export * from './issues-conformance.js';
 export * from './scoped-roles-conformance.js';
+export * from './gated-transitions-conformance.js';
 export * from './transport-fidelity.js';
 export * from './memory-introspector.js';
 export * from './introspection-conformance.js';
