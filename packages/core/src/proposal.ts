@@ -79,20 +79,72 @@ export function proposeRoleMap(
   manifest: CapabilityManifest,
 ): { entry: PolicyRoleMapEntry; notes: string[] } {
   const notes: string[] = [];
-  const states: Partial<Record<WorkflowRole, NativeTarget>> = {};
 
   if (manifest.issues.arbitraryStates) {
     const stateKey = introspection.stateKey;
+
+    // A provider whose states are SCOPED proposes one map per scope, not one map. Linear forces it:
+    // `WorkflowState.team` is non-null, so "In Progress" names a different row in every team and a
+    // single flat map would be some team's states imposed on all of them. The matching itself is
+    // unchanged — each scope runs exactly the rules an unscoped provider runs, which is the point of
+    // splitting the input rather than the logic.
+    const scopeNames = [
+      ...new Set(
+        introspection.states
+          .map((state) => state.scope)
+          .filter((scope): scope is string => scope !== undefined),
+      ),
+    ];
+    if (scopeNames.length > 0) {
+      const scopes: Record<string, Partial<Record<WorkflowRole, NativeTarget>>> = {};
+      for (const scope of scopeNames) {
+        const own = introspection.states.filter((state) => state.scope === scope);
+        const matched = matchStates(own, stateKey, manifest, introspection, notes, scope);
+        if (Object.keys(matched).length > 0) scopes[scope] = matched;
+        else notes.push(`Scope '${scope}' matched no roles and was left out; confirm its states.`);
+      }
+      notes.push(
+        `States are scoped on '${introspection.provider}', so the map is per scope ` +
+          `(${scopeNames.join(', ')}). A role can legitimately exist in one scope and not another.`,
+      );
+      return { entry: { stateKey, states: {}, scopes }, notes };
+    }
+
+    const states = matchStates(introspection.states, stateKey, manifest, introspection, notes);
+    return { entry: { stateKey, states }, notes };
+  }
+
+  return proposeFlatRoleMap(introspection, notes);
+}
+
+/**
+ * Match every role onto one of `available`, by the provider's own state categories.
+ *
+ * Split out so a scoped provider runs it once per scope with that scope's states, and an unscoped
+ * one runs it once with all of them — the same rules either way. `scope` is only used to say which
+ * map a note is about.
+ */
+function matchStates(
+  available: readonly IntrospectedState[],
+  stateKey: string,
+  manifest: CapabilityManifest,
+  introspection: ProviderIntrospection,
+  notes: string[],
+  scope?: string,
+): Partial<Record<WorkflowRole, NativeTarget>> {
+  const states: Partial<Record<WorkflowRole, NativeTarget>> = {};
+  const where = scope === undefined ? '' : ` in scope '${scope}'`;
+  {
     const used = new Set<string>();
     for (const [role, category] of Object.entries(ROLE_CATEGORY) as [
       WorkflowRole,
       StateCategory,
     ][]) {
-      let stateName = firstStateByCategory(introspection.states, category);
+      let matched = available.find((s) => !used.has(s.name) && s.category === category);
       // Fallback for in_review: a process may have no 'resolved'-category state but a review state
       // (e.g. 'Test') in the InProgress category — match it by name, not reusing another role's state.
-      if (stateName === undefined && role === 'in_review') {
-        const named = introspection.states.find(
+      if (matched === undefined && role === 'in_review') {
+        const named = available.find(
           (s) =>
             !used.has(s.name) &&
             s.category !== 'completed' &&
@@ -100,19 +152,24 @@ export function proposeRoleMap(
             REVIEW_STATE_NAME.test(s.name),
         );
         if (named !== undefined) {
-          stateName = named.name;
+          matched = named;
           notes.push(
-            `Mapped role 'in_review' to state '${named.name}' by name (no 'resolved'-category ` +
-              'state found); confirm it.',
+            `Mapped role 'in_review' to state '${named.name}'${where} by name (no 'resolved'-` +
+              'category state found); confirm it.',
           );
         }
       }
-      if (stateName === undefined) {
-        notes.push(`No '${category}'-category state found for role '${role}'; left unmapped.`);
+      if (matched === undefined) {
+        notes.push(
+          `No '${category}'-category state found for role '${role}'${where}; left unmapped.`,
+        );
         continue;
       }
-      used.add(stateName);
-      const target: NativeTarget = { [stateKey]: stateName };
+      used.add(matched.name);
+      // `value` when the provider gives one, the name otherwise. Linear supplies a state id because
+      // its names collide across teams; Azure and GitHub have nothing to supply and the name IS the
+      // identity there.
+      const target: NativeTarget = { [stateKey]: matched.value ?? matched.name };
       if (manifest.issues.separateBoardColumn && introspection.boardColumns) {
         const probe = COLUMN_KEYWORDS[role];
         const column = probe ? matchColumn(introspection.boardColumns, probe) : undefined;
@@ -123,11 +180,19 @@ export function proposeRoleMap(
       }
       states[role] = target;
     }
-    return { entry: { stateKey, states }, notes };
   }
+  return states;
+}
 
-  // Flat provider: arbitrary workflow states must be emulated. Mid-workflow roles ride on labels;
-  // `done` closes the issue. The discriminator is therefore the label, not the native state.
+/**
+ * A provider with no arbitrary states: mid-workflow roles are emulated on labels and `done` closes
+ * the issue, so the discriminator is the label rather than the native state.
+ */
+function proposeFlatRoleMap(
+  introspection: ProviderIntrospection,
+  notes: string[],
+): { entry: PolicyRoleMapEntry; notes: string[] } {
+  const states: Partial<Record<WorkflowRole, NativeTarget>> = {};
   const doneState = firstStateByCategory(introspection.states, 'completed');
   states.in_progress = { label: 'in-progress' };
   states.in_review = { label: 'in-review' };

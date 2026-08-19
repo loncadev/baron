@@ -30,6 +30,21 @@ export interface IntrospectedState {
   readonly name: string;
   /** The provider's own lifecycle categorization, when it exposes one. */
   readonly category?: StateCategory | undefined;
+  /**
+   * The value that identifies this state in a {@link NativeTarget}, when the name will not do.
+   *
+   * Linear needs it: its states are owned by a team, so "In Progress" names a different row in each
+   * one and only the id picks a single state. Absent where the name is the identity, which is every
+   * provider whose states belong to the whole project.
+   */
+  readonly value?: string | undefined;
+  /**
+   * Which scope owns this state, on a provider that scopes them (a Linear team key).
+   *
+   * Reported per state rather than as a separate list of scopes so the flat shape survives: a
+   * provider that does not scope simply leaves it unset and every existing reader is unaffected.
+   */
+  readonly scope?: string | undefined;
 }
 
 export interface IntrospectedType {

@@ -268,6 +268,15 @@ function summarizeProposal(prompter: Prompter, proposal: ProviderProposal, bindS
   for (const [role, target] of Object.entries(proposal.roleMap.states)) {
     prompter.note(`  role ${role} -> ${JSON.stringify(target)}`);
   }
+  // A scoped provider proposes one map per scope and leaves the flat one empty, so a display that
+  // only read `states` would show a confirmation screen with no mapping on it — and the whole point
+  // of this screen is that a human confirms what was guessed.
+  for (const [scope, states] of Object.entries(proposal.roleMap.scopes ?? {})) {
+    prompter.note(`  scope ${scope}:`);
+    for (const [role, target] of Object.entries(states)) {
+      prompter.note(`    role ${role} -> ${JSON.stringify(target)}`);
+    }
+  }
   for (const [typeRole, native] of Object.entries(proposal.typeMap)) {
     prompter.note(`  type ${typeRole} -> ${native}`);
   }
