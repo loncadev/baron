@@ -1,6 +1,12 @@
-import type { ProviderRoleMap } from '@lonca/baron-core';
+import {
+  type Logger,
+  type ProviderRoleMap,
+  parsePolicyJson,
+  resolveIssuesConfig,
+} from '@lonca/baron-core';
 import { describe, expect, it } from 'vitest';
 import {
+  LINEAR_PROVIDER,
   LINEAR_STATE_KEY,
   createLinearTransport,
   defineLinearIssuesAdapter,
@@ -171,4 +177,52 @@ describe.skipIf(!live)('linear live smoke', () => {
       expect(issue.nativeState, `'${issue.key}' came back from an in_progress filter`).toBe(wanted);
     }
   }, 60_000);
+  it('carries a scoped map from an on-disk policy through to a live query', async () => {
+    // Every other test here hands the adapter a config built in TypeScript, which is precisely the
+    // blind spot that let `resolveIssuesConfig` drop `scopes` while the policy, the proposal, the
+    // resolver and this adapter were all correct. This one starts where a user starts — at the file.
+    const roleMap = await discoverRoleMap();
+    const onDisk = JSON.stringify({
+      version: 1,
+      providers: { issues: LINEAR_PROVIDER },
+      roleMap: { [LINEAR_PROVIDER]: roleMap },
+      typeMap: { [LINEAR_PROVIDER]: exampleLinearTypeMap },
+    });
+    const config = resolveIssuesConfig(parsePolicyJson(onDisk));
+    expect(
+      config.roleMap.scopes?.[team as string],
+      'the scope did not survive the trip through the policy file',
+    ).toBeDefined();
+
+    const warnings: string[] = [];
+    const logger: Logger = {
+      debug() {},
+      info() {},
+      error() {},
+      warn(message) {
+        warnings.push(message);
+      },
+    };
+    const adapter = defineLinearIssuesAdapter(
+      config,
+      createLinearTransport({ apiKey: apiKey as string, team: team as string }),
+      logger,
+    );
+
+    const created = await adapter.create({
+      title: `baron smoke policy ${new Date().toISOString()}`,
+      typeRole: 'task',
+    });
+    await adapter.transition(created.id, 'in_progress');
+    expect(
+      (await adapter.query({ role: 'in_progress', limit: 50 })).map((issue) => issue.id),
+    ).toContain(created.id);
+
+    // `in_review` is deliberately absent from the discovered map: no state in this team carries it.
+    // An unmapped role has to come back empty AND say why. The failure being guarded is not the
+    // empty result but its opposite — a role that resolves to no target, dropped from the filter,
+    // makes the provider answer with the whole workspace, which reads exactly like a match.
+    expect(await adapter.query({ role: 'in_review', limit: 50 })).toEqual([]);
+    expect(warnings.join(' ')).toContain('in_review');
+  }, 90_000);
 });
