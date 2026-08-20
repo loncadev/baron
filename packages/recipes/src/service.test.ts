@@ -82,3 +82,35 @@ describe('RecipeService', () => {
     );
   });
 });
+
+describe('task-land and an explicit rejection', () => {
+  it('refuses before it mutates anything', async () => {
+    // The gate ran on checks alone and never looked at the review, so a pull request a reviewer had
+    // explicitly rejected merged exactly as readily as an approved one. Found dogfooding on a real
+    // Azure project, where the review decision is the only signal Baron can actually read.
+    const scm = defineGithubScmAdapter(
+      createMemoryScmTransport({ reviewDecision: 'changes_requested' }),
+    );
+    const service = createRecipeService({ ...ports(), scm }, ROOT);
+
+    const created = await service.run('task-new', { title: 'Rejected work', typeRole: 'task' });
+    const issueId = (created.context.issue as { id: string }).id;
+    const started = await service.run('task-start', { issueId });
+    const branch = (started.context.branch as { name: string }).name;
+    const finished = await service.run('task-finish', {
+      issueId,
+      branch,
+      title: 'Rejected work',
+      body: '',
+      relation: 'closes',
+      autoComplete: 'no',
+    });
+    const prId = (finished.context.pr as { id: string }).id;
+
+    await expect(service.run('task-land', { issueId })).rejects.toThrow(/changes requested/i);
+    // The point of a gate is where it sits: the PR must still be open and still a draft, because
+    // task-land undrafts before it merges and neither may have happened.
+    const after = await scm.prStatus(prId);
+    expect(after.state).toBe('open');
+  });
+});
