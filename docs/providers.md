@@ -80,6 +80,12 @@ by GitHub. Without a `typeFiltering` policy that query is **refused**, not answe
 A requested `draft` on a provider without draft support is gap-negotiated (degrade → open a ready PR
 + warn), never silently downgraded.
 
+**What a PR's checks are** differs by provider, and the normalized rollup hides the difference: on
+GitHub they are check runs and commit statuses; on Azure they are **branch-policy evaluations**,
+which live on a separate (preview) API. Either way `unknown` means Baron could not read them and
+`none` means it read them and there are none — a distinction `task-land` depends on, since it warns
+on the first and proceeds quietly on the second.
+
 ## Ci capabilities
 
 | Capability | Azure Pipelines | GitHub Actions |
