@@ -444,3 +444,55 @@ describe('what init shows before it replaces a policy', () => {
     expect(shown).toContain('replaced');
   });
 });
+
+describe('where the steering block goes', () => {
+  const run = (fs: ReturnType<typeof memoryFileSystem>, answers: boolean[]) =>
+    runInit({
+      root: ROOT,
+      issuesProvider: 'github',
+      fs,
+      env: GH_ENV,
+      prompter: scriptedPrompter(answers),
+      introspector: createMemoryIntrospector(githubIntrospectionFixture),
+    });
+  const AGENTS = `${ROOT}/AGENTS.md`;
+  const CLAUDE = `${ROOT}/CLAUDE.md`;
+  const MARKER = 'baron:begin';
+
+  it('goes into CLAUDE.md when that is the file the project keeps', async () => {
+    // AGENTS.md was written unconditionally, so a CLAUDE.md project got a SECOND steering document
+    // instead of a refreshed one — and the stale one is the one the harness loads by name.
+    const fs = memoryFileSystem({ [CLAUDE]: '# Project notes\n' });
+    await run(fs, [true, true]);
+    expect(fs.read(CLAUDE)).toContain(MARKER);
+    expect(fs.exists(AGENTS), 'init created a competing steering file').toBe(false);
+    expect(fs.read(CLAUDE), "the project's own notes were dropped").toContain('# Project notes');
+  });
+
+  it('prefers AGENTS.md when the project keeps both', async () => {
+    const fs = memoryFileSystem({ [AGENTS]: '# Agents\n', [CLAUDE]: '# Claude\n' });
+    await run(fs, [true, true]);
+    expect(fs.read(AGENTS)).toContain(MARKER);
+    expect(fs.read(CLAUDE)).not.toContain(MARKER);
+  });
+
+  it('refreshes the block where it already is, not where it would have gone', async () => {
+    // The case that produces two: a block living in CLAUDE.md while an unrelated AGENTS.md exists.
+    const fs = memoryFileSystem({
+      [AGENTS]: '# Unrelated\n',
+      [CLAUDE]:
+        '# Claude\n\n<!-- baron:begin — managed by `baron init`; edit outside these markers -->\nstale\n<!-- baron:end -->\n',
+    });
+    await run(fs, [true, true]);
+    expect(fs.read(CLAUDE)).toContain('Work tracking — route through Baron');
+    expect(fs.read(CLAUDE), 'the old block was left beside the new one').not.toContain('stale');
+    expect(fs.read(AGENTS)).not.toContain(MARKER);
+  });
+
+  it('creates AGENTS.md when the project keeps neither', async () => {
+    const fs = memoryFileSystem();
+    await run(fs, [true, true]);
+    expect(fs.read(AGENTS)).toContain(MARKER);
+    expect(fs.exists(CLAUDE)).toBe(false);
+  });
+});

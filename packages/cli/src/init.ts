@@ -490,8 +490,32 @@ not a silent failure to report as a bug.`;
 }
 
 /**
- * Write (or refresh) the Baron steering block in AGENTS.md so an agent knows to drive work through
- * Baron. Idempotent: an existing marked block is replaced in place; anything outside the markers is
+ * The files a project might already keep its agent instructions in, most neutral first.
+ *
+ * AGENTS.md is the harness-neutral name and stays the default for a project with neither. CLAUDE.md
+ * is here because most Claude Code projects have one and nothing else, and writing AGENTS.md there
+ * anyway produced a SECOND steering document rather than a refreshed one — two files disagreeing,
+ * with the stale one being the one the harness loads by name.
+ */
+const STEERING_FILES = ['AGENTS.md', 'CLAUDE.md'] as const;
+
+/**
+ * Which file the block belongs in: wherever it already is, else whichever the project already keeps,
+ * else AGENTS.md. Finding an existing block first is what stops a second copy appearing next to one
+ * that is merely older.
+ */
+function steeringTarget(fs: FileSystem, root: string): string {
+  const paths = STEERING_FILES.map((name) => `${root}/${name}`);
+  const holdingBlock = paths.find((path) => {
+    const body = fs.read(path);
+    return body?.includes(STEERING_BEGIN) === true && body.includes(STEERING_END);
+  });
+  return holdingBlock ?? paths.find((path) => fs.exists(path)) ?? (paths[0] as string);
+}
+
+/**
+ * Write (or refresh) the Baron steering block so an agent knows to drive work through Baron.
+ * Idempotent: an existing marked block is replaced in place; anything outside the markers is
  * preserved; a fresh file is created. Asks first (it's the user's file) unless `force`. Returns
  * whether it wrote.
  */
@@ -501,8 +525,9 @@ async function ensureAgentsSteering(
   root: string,
   force: boolean,
   ctx: SteeringContext,
-): Promise<boolean> {
-  const path = `${root}/AGENTS.md`;
+): Promise<string | undefined> {
+  const path = steeringTarget(fs, root);
+  const name = path.slice(path.lastIndexOf('/') + 1);
   const current = fs.read(path);
   const hasBlock = current?.includes(STEERING_BEGIN) === true && current.includes(STEERING_END);
   const verb =
@@ -511,9 +536,8 @@ async function ensureAgentsSteering(
       : hasBlock
         ? 'Refresh the Baron block in'
         : 'Add a Baron block to';
-  const ok =
-    force || (await prompter.confirm(`${verb} AGENTS.md (agent steering for Baron)?`, true));
-  if (!ok) return false;
+  const ok = force || (await prompter.confirm(`${verb} ${name} (agent steering for Baron)?`, true));
+  if (!ok) return undefined;
 
   const block = steeringBlock(ctx);
   let next: string;
@@ -528,7 +552,7 @@ async function ensureAgentsSteering(
     next = `${current}${sep}${block}\n`;
   }
   fs.write(path, next);
-  return true;
+  return name;
 }
 
 /** Ask which provider to bind when `--provider` was omitted — only those with an issues adapter. */
@@ -552,7 +576,9 @@ function announcePlan(prompter: Prompter, provider: string): void {
   prompter.note(
     `  • write ${BARON_DIR}/policy.json — the confirmed mapping, COMMITTED (no secrets);`,
   );
-  prompter.note('  • offer to add a Baron steering block to AGENTS.md (so an agent uses Baron).');
+  prompter.note(
+    '  • offer to add a Baron steering block to your AGENTS.md or CLAUDE.md (so an agent uses Baron).',
+  );
   prompter.note(
     'The only thing it creates on your provider is the labels Baron needs, on a provider whose ' +
       'roles or types ride labels (GitHub and Linear today); it never touches',
@@ -675,7 +701,9 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
   );
 
   options.prompter.note(`\nWrote ${path} (commit it — it holds no secrets).`);
-  if (steered) options.prompter.note('Added a Baron steering block to AGENTS.md.');
+  if (steered !== undefined) {
+    options.prompter.note(`Added a Baron steering block to ${steered}.`);
+  }
   await options.afterWrite?.(path);
   options.prompter.note('Next steps:');
   options.prompter.note(
