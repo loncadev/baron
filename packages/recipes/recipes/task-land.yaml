@@ -62,9 +62,10 @@ steps:
   # all, so refusing on unknown would make task-land unusable for exactly the token `baron init`
   # recommends. It is loud instead, and says what it could not see — silence here would be the same
   # false assurance in a quieter voice.
-  # The remedy comes from the provider, not from here: naming GitHub permissions in a recipe that
-  # also runs on Azure — where the rollup is unknown on every PR because the adapter does not read
-  # branch policies — would fire unactionable advice on every single land there.
+  # The remedy comes from the provider, not from here: a permission a GitHub token needs is not one
+  # an Azure token has, and each adapter knows which of its own reads failed. Azure used to make this
+  # concrete by reporting 'unknown' on every pull request — it reads branch-policy evaluations now,
+  # so an unknown there means a read genuinely failed rather than that nobody looked.
   - message: "WARNING — could not verify checks on ${pr.url}: the rollup is 'unknown' (unreadable: ${status.checks.unreadable}). Landing anyway; confirm CI yourself. ${status.checks.remedy}"
     when:
       equals: ["${status.checks.rollup}", "unknown"]

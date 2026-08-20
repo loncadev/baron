@@ -1,6 +1,7 @@
 import {
   BaronError,
   BaseScmAdapter,
+  type CheckSummary,
   type GapPolicy,
   type Logger,
   type MergeOptions,
@@ -18,6 +19,7 @@ import {
   type ScmTransport,
 } from '@lonca/baron-core';
 import * as azdev from 'azure-devops-node-api';
+import type { IPolicyApi } from 'azure-devops-node-api/PolicyApi.js';
 import {
   PullRequestStatus as AzurePrStatus,
   type GitPullRequest,
@@ -25,6 +27,7 @@ import {
   GitRefUpdateStatus,
   PullRequestAsyncStatus,
 } from 'azure-devops-node-api/interfaces/GitInterfaces.js';
+import { PolicyEvaluationStatus } from 'azure-devops-node-api/interfaces/PolicyInterfaces.js';
 import { AZURE_DEVOPS_PROVIDER } from './provider.js';
 
 export interface AzureDevOpsScmTransportOptions {
@@ -117,6 +120,87 @@ export function createAzureDevOpsScmTransport(
   const api = (): Promise<GitApi> => {
     gitApi ??= webApi.getGitApi();
     return gitApi;
+  };
+
+  // A PR's "checks" on Azure are branch-policy evaluations, which live on a different API from the
+  // pull request itself — which is why they went unread for so long and every rollup came back
+  // 'unknown'.
+  let policyApiPromise: Promise<IPolicyApi> | undefined;
+  const policyApi = (): Promise<IPolicyApi> => {
+    policyApiPromise ??= webApi.getPolicyApi();
+    return policyApiPromise;
+  };
+
+  /**
+   * The evaluations for one pull request, mapped onto Baron's normalized check summary.
+   *
+   * Only ENABLED policies count. `notApplicable` ones are excluded by the API's own default and
+   * would be misleading here anyway: a policy that does not apply cannot go red. Non-blocking
+   * (advisory) policies ARE counted, so a failing one stops `task-land` even though Azure would let
+   * the merge through — the same conservative reading GitHub's rollup already gives an optional
+   * check, and the cheaper mistake of the two.
+   *
+   * A failure to read them returns `unknown`, never `none`: claiming "no checks" would tell a caller
+   * the merge is unblocked when Baron simply could not look.
+   */
+  const policyChecks = async (
+    projectId: string | undefined,
+    pullRequestId: string,
+  ): Promise<CheckSummary> => {
+    const unreadable = (why: string): CheckSummary => ({
+      total: 0,
+      succeeded: 0,
+      failed: 0,
+      pending: 0,
+      rollup: 'unknown',
+      unreadable: ['policy-evaluations'],
+      remedy: `Could not read this pull request's branch-policy evaluations (${why}). Check the PR in Azure DevOps.`,
+    });
+    if (projectId === undefined) {
+      return unreadable('the pull request did not report which project it belongs to');
+    }
+    try {
+      // The artifact id embeds the project GUID, not its name — a name here returns an empty list
+      // rather than an error, which would read as "no policies" and be exactly the false green this
+      // whole path exists to avoid.
+      const artifactId = `vstfs:///CodeReview/CodeReviewId/${projectId}/${pullRequestId}`;
+      const records = await (await policyApi()).getPolicyEvaluations(project, artifactId);
+      let succeeded = 0;
+      let failed = 0;
+      let pending = 0;
+      for (const record of records) {
+        if (record.configuration?.isEnabled !== true) continue;
+        switch (record.status) {
+          case PolicyEvaluationStatus.Approved:
+            succeeded += 1;
+            break;
+          case PolicyEvaluationStatus.Rejected:
+          case PolicyEvaluationStatus.Broken:
+            failed += 1;
+            break;
+          case PolicyEvaluationStatus.Queued:
+          case PolicyEvaluationStatus.Running:
+            pending += 1;
+            break;
+          default:
+            break;
+        }
+      }
+      const total = succeeded + failed + pending;
+      // 'none' is honest here in a way it never was before: the API answered, and this repository
+      // has no branch policy gating the pull request.
+      const rollup =
+        total === 0
+          ? ('none' as const)
+          : failed > 0
+            ? ('failed' as const)
+            : pending > 0
+              ? ('pending' as const)
+              : ('succeeded' as const);
+      return { total, succeeded, failed, pending, rollup };
+    } catch (error) {
+      return unreadable(error instanceof Error ? error.message : String(error));
+    }
   };
 
   // Auto-complete is attributed to an identity ("set by"), so it needs the token owner's id — not a
@@ -348,27 +432,13 @@ export function createAzureDevOpsScmTransport(
             ? false
             : undefined;
       const id = String(pr.pullRequestId ?? pullRequestId);
+      const checks = await policyChecks(pr.repository?.project?.id, id);
       return {
         id,
         state,
         reviewDecision,
         ...(mergeable !== undefined ? { mergeable } : {}),
-        // Azure PR checks are policy evaluations (a separate Policy API) this slice does not read.
-        // 'unknown', not 'none': claiming "no checks" would tell a caller the merge is unblocked by
-        // CI when Baron simply never looked — the same false green a missing permission produces.
-        checks: {
-          total: 0,
-          succeeded: 0,
-          failed: 0,
-          pending: 0,
-          rollup: 'unknown',
-          unreadable: ['policy-evaluations'],
-          // Not a permission the caller can grant: this adapter does not read the Policy API yet.
-          // Say so, rather than let a caller hunt for a setting that would not help.
-          remedy:
-            'Azure PR checks are branch-policy evaluations, which this adapter does not read yet — ' +
-            'no permission change will make them visible. Check the PR in Azure DevOps.',
-        },
+        checks,
         url: prWebUrl(id),
       };
     },
