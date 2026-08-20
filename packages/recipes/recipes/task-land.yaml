@@ -50,6 +50,14 @@ steps:
   - require:
       notEquals: ["${status.checks.rollup}", "pending"]
       message: "${pr.url} still has checks running (${status.checks.pending} pending). Wait and re-run task-land, or open it with auto-complete so the provider merges it when they pass."
+  # An explicit rejection is the one review signal that means the same thing on every provider, so it
+  # stops the land. `review_required` deliberately does NOT: it means no formal vote was cast, which a
+  # repository where nobody votes reports on every single pull request — measured on a live Azure
+  # project whose merged PRs come back with an empty `reviewers` array. Refusing on that would make
+  # task-land unusable there, and a guard that fires on everything teaches nothing.
+  - require:
+      notEquals: ["${status.reviewDecision}", "changes_requested"]
+      message: "${pr.url} has changes requested by a reviewer. Address them and re-run task-land — merging over an explicit rejection is what this guard exists to prevent."
   # 'unknown' does NOT stop the land. A fine-grained token cannot be granted the Checks permission at
   # all, so refusing on unknown would make task-land unusable for exactly the token `baron init`
   # recommends. It is loud instead, and says what it could not see — silence here would be the same

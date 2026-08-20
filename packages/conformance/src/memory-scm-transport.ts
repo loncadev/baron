@@ -7,6 +7,7 @@ import type {
   NativeThread,
   PrState,
   PrStateFilter,
+  ReviewDecision,
   ScmTransport,
 } from '@lonca/baron-core';
 
@@ -22,6 +23,14 @@ export interface MemoryScmTransportOptions {
    * transport that can only ever say 'succeeded' cannot be asked that question.
    */
   readonly checks?: CheckSummary | undefined;
+  /**
+   * The review decision every PR reports. Defaults to `review_required`, which is what a real
+   * repository says when nobody has cast a formal vote — measured against a live Azure project whose
+   * merged pull requests come back with an empty `reviewers` array. Overridable for the same reason
+   * as `checks`: a transport that can only ever say one thing cannot be asked what a caller does
+   * with a decision it should refuse to merge over.
+   */
+  readonly reviewDecision?: ReviewDecision | undefined;
 }
 
 const ALL_GREEN: CheckSummary = {
@@ -113,7 +122,7 @@ export function createMemoryScmTransport(opts: MemoryScmTransportOptions = {}): 
       return {
         id: pullRequestId,
         state: 'open' as const,
-        reviewDecision: 'review_required' as const,
+        reviewDecision: opts.reviewDecision ?? ('review_required' as const),
         mergeable: true,
         checks: opts.checks ?? ALL_GREEN,
         url: `mem://pr/${pullRequestId}`,
