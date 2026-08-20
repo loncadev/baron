@@ -2,6 +2,7 @@ import {
   BaronError,
   type BaronPolicyFile,
   type Introspector,
+  type NativeTarget,
   type ProviderProposal,
   WORK_ITEM_TYPE_ROLES,
   parsePolicy,
@@ -300,6 +301,81 @@ async function ensureCredentials(
   return effective;
 }
 
+/**
+ * What this run would do to the policy already on disk.
+ *
+ * The proposal alone is not enough on an upgrade: it says what the mapping WOULD be, not what is
+ * about to be lost. A real installation had `done` mapped to state `Closed` with board column
+ * `Resolved` — a deliberate pairing a re-proposal would quietly replace, and nothing would have said
+ * so. Removals and changes are therefore called out separately from additions, and only differences
+ * are printed: a list where everything is "unchanged" is one nobody reads to the end of.
+ */
+function summarizeChanges(
+  prompter: Prompter,
+  existing: string | undefined,
+  proposal: ProviderProposal,
+): void {
+  prompter.note('\nAgainst the policy already here:');
+  if (existing === undefined) {
+    prompter.note('  (could not read it — this run replaces it wholesale)');
+    return;
+  }
+  let current: BaronPolicyFile;
+  try {
+    current = parsePolicy(JSON.parse(existing));
+  } catch (error) {
+    // Unreadable is not "nothing to lose": say so, rather than print an empty diff that reads like
+    // agreement between two files only one of which was understood.
+    prompter.note(
+      `  (the policy here could not be parsed: ${error instanceof Error ? error.message : String(error)})`,
+    );
+    prompter.note('  Everything in it is replaced by the mapping above.');
+    return;
+  }
+
+  const flat = (
+    targets: Partial<Record<string, NativeTarget>> | undefined,
+  ): Record<string, string> =>
+    Object.fromEntries(
+      Object.entries(targets ?? {}).map(([role, target]) => [role, JSON.stringify(target)]),
+    );
+  const lines: string[] = [];
+  const diff = (label: string, before: Record<string, string>, after: Record<string, string>) => {
+    for (const key of [...new Set([...Object.keys(before), ...Object.keys(after)])].sort()) {
+      const was = before[key];
+      const now = after[key];
+      if (was === now) continue;
+      if (was === undefined) lines.push(`  + ${label} ${key} -> ${now}`);
+      else if (now === undefined) lines.push(`  - ${label} ${key} was ${was} — this run DROPS it`);
+      else lines.push(`  ~ ${label} ${key}: ${was} -> ${now}`);
+    }
+  };
+
+  const before = current.roleMap[proposal.provider];
+  diff('role', flat(before?.states), flat(proposal.roleMap.states));
+  const scopes = [
+    ...new Set([
+      ...Object.keys(before?.scopes ?? {}),
+      ...Object.keys(proposal.roleMap.scopes ?? {}),
+    ]),
+  ].sort();
+  for (const scope of scopes) {
+    diff(`role [${scope}]`, flat(before?.scopes?.[scope]), flat(proposal.roleMap.scopes?.[scope]));
+  }
+  const typesBefore = current.typeMap[proposal.provider] ?? {};
+  diff(
+    'type',
+    Object.fromEntries(Object.entries(typesBefore).map(([k, v]) => [k, String(v)])),
+    Object.fromEntries(Object.entries(proposal.typeMap).map(([k, v]) => [k, String(v)])),
+  );
+
+  if (lines.length === 0) {
+    prompter.note('  nothing changes — the mapping above is what is already on disk.');
+    return;
+  }
+  for (const line of lines) prompter.note(line);
+}
+
 function summarizeProposal(
   prompter: Prompter,
   proposal: ProviderProposal,
@@ -504,22 +580,12 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
   const path = policyPath(options.root);
   announcePlan(options.prompter, issuesProvider);
 
-  if (options.fs.exists(path) && options.force !== true) {
-    const overwrite = await options.prompter.confirm(
-      `${path} already exists. Overwrite it?`,
-      false,
-    );
-    if (!overwrite) {
-      const introspection = await (
-        options.introspector ?? createIntrospector(options.env ?? {})
-      ).introspect();
-      return {
-        written: false,
-        policyPath: path,
-        proposal: proposePolicy(introspection, manifest),
-      };
-    }
-  }
+  // Whether this run REPLACES a policy, which changes what has to be shown before anything is asked.
+  // This used to be an "Overwrite it?" prompt right here, answered before the proposal existed — and
+  // on `no` it introspected anyway, built the proposal, and threw it away. So the one question an
+  // upgrade turns on ("what would change?") was unanswerable without agreeing to replace the very
+  // file being protected. The proposal, and what it does to what is already there, now come first.
+  const replacing = options.fs.exists(path);
 
   // Bind scm to the same provider when it ships an scm adapter — the task-start/finish flow needs it.
   const bindScm =
@@ -567,10 +633,14 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
   const proposal = proposePolicy(introspection, manifest);
 
   summarizeProposal(options.prompter, proposal, bindScm, scmProvider);
+  if (replacing) summarizeChanges(options.prompter, options.fs.read(path), proposal);
 
   const confirmed =
     options.force === true ||
-    (await options.prompter.confirm(`Write ${path} with this mapping?`, true));
+    (await options.prompter.confirm(
+      replacing ? `Overwrite ${path} with this mapping?` : `Write ${path} with this mapping?`,
+      !replacing,
+    ));
   if (!confirmed) {
     return { written: false, policyPath: path, proposal };
   }

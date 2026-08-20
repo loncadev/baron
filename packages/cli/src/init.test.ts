@@ -383,3 +383,64 @@ describe('an issues provider that has no source control of its own', () => {
     expect(policy.providers.scm).toBeUndefined();
   });
 });
+
+describe('what init shows before it replaces a policy', () => {
+  it('names what changes and what it would drop, and changes nothing when declined', async () => {
+    // Upgrading used to be blind: the overwrite question came before the proposal existed, and on
+    // "no" init introspected anyway, built the proposal and threw it away. So the one question an
+    // upgrade turns on could only be answered by agreeing to replace the file being protected.
+    const fs = memoryFileSystem();
+    await runInit({
+      root: ROOT,
+      issuesProvider: 'github',
+      fs,
+      env: GH_ENV,
+      prompter: scriptedPrompter([true]),
+      introspector: createMemoryIntrospector(githubIntrospectionFixture),
+    });
+
+    // Give this policy something to lose. The scope is the deterministic part: a GitHub proposal
+    // never produces one, so it can only ever be dropped — which is the case worth being loud about.
+    const onDisk = JSON.parse(fs.read(policyPath(ROOT)) as string);
+    onDisk.typeMap.github.task = 'chore';
+    onDisk.roleMap.github.scopes = { TEAM: { done: { label: 'shipped' } } };
+    fs.write(policyPath(ROOT), JSON.stringify(onDisk, null, 2));
+
+    const prompter = scriptedPrompter([false]);
+    const result = await runInit({
+      root: ROOT,
+      issuesProvider: 'github',
+      fs,
+      env: GH_ENV,
+      prompter,
+      introspector: createMemoryIntrospector(githubIntrospectionFixture),
+    });
+
+    const shown = prompter.notes.join('\n');
+    expect(shown).toContain('Against the policy already here');
+    expect(shown, 'a changed mapping went unmentioned').toContain('chore');
+    expect(shown, 'a mapping about to be lost went unmentioned').toContain('DROPS');
+    expect(shown).toContain('TEAM');
+
+    expect(result.written).toBe(false);
+    const after = JSON.parse(fs.read(policyPath(ROOT)) as string);
+    expect(after.typeMap.github.task, 'declining still rewrote the file').toBe('chore');
+  });
+
+  it('says the policy is unreadable rather than printing an empty diff', async () => {
+    // An empty diff reads as "these two agree". Only one of them was understood.
+    const fs = memoryFileSystem({ [policyPath(ROOT)]: '{ not json' });
+    const prompter = scriptedPrompter([false]);
+    await runInit({
+      root: ROOT,
+      issuesProvider: 'github',
+      fs,
+      env: GH_ENV,
+      prompter,
+      introspector: createMemoryIntrospector(githubIntrospectionFixture),
+    });
+    const shown = prompter.notes.join('\n');
+    expect(shown).toContain('could not be parsed');
+    expect(shown).toContain('replaced');
+  });
+});
