@@ -1,6 +1,7 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { companionNotice } from './companion-check.js';
 import { type McpPorts, type ToolResult, activeToolDefinitions, dispatchTool } from './tools.js';
 import { startUpdateCheck } from './update-check.js';
 import { OWN_PACKAGE } from './version.js';
@@ -45,6 +46,22 @@ export function withUpdateNotice(result: ToolResult, notice: string | undefined)
 }
 
 /**
+ * Where a notice comes from when the caller does not supply one: a stale companion first, then the
+ * registry's "a newer server exists".
+ *
+ * Order matters when both are true. An outdated server is advice — it still works. Skills and
+ * steering naming tools this server no longer publishes fail the moment the agent acts on them, and
+ * that is the half the plugin path leaves frozen while the server rolls forward on `@latest`.
+ */
+function defaultNotice(): () => string | undefined {
+  const registry = startUpdateCheck({
+    name: OWN_PACKAGE.name,
+    currentVersion: OWN_PACKAGE.version,
+  });
+  return () => companionNotice({ serverVersion: OWN_PACKAGE.version }) ?? registry.notice();
+}
+
+/**
  * Wire the bound ports' primitives onto a low-level MCP {@link Server}. It advertises only the tools
  * for ports present in {@link McpPorts} and routes each call to the right port by name prefix. The
  * handlers only marshal — all translation lives in the ports (invariant #4). The pure tool-definition
@@ -56,9 +73,7 @@ export function createMcpServer(ports: McpPorts, options: McpServerOptions = {})
     capabilities: { tools: {} },
     instructions: SERVER_INSTRUCTIONS,
   });
-  const updateNotice =
-    options.updateNotice ??
-    startUpdateCheck({ name: OWN_PACKAGE.name, currentVersion: OWN_PACKAGE.version }).notice;
+  const updateNotice = options.updateNotice ?? defaultNotice();
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: activeToolDefinitions(ports) as unknown as Tool[],
