@@ -8,6 +8,12 @@ coverage/
 # keeps machine-local scratch files out of the lint baseline.
 .impeccable/
 
+# The MCP registry's publisher binary. RELEASING now unpacks it outside the repository, but the
+# name is ignored anyway: it is 20MB, and the tarball that carries it also carries a LICENSE and
+# a README that would quietly replace this project's own.
+mcp-publisher
+mcp-publisher.exe
+
 # Baron credentials are NEVER committed - policy is, secrets are not.
 .baron/credentials
 .baron/credentials.*

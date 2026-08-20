@@ -128,7 +128,11 @@ The official registry (`registry.modelcontextprotocol.io`) is the surface severa
 it goes first and in the same week as a release — that ranking weights recency.
 
 ```bash
-curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_windows_amd64.tar.gz" | tar xz   # ships mcp-publisher.exe on Windows
+# The tarball carries LICENSE and README.md alongside the binary, so it is unpacked OUTSIDE the
+# repository and only the one member is taken. Extracting it here replaces Baron's licence and
+# front page in the working tree, silently, one step before the release someone `git add -A`s.
+mkdir -p ../.mcp-publisher && curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_windows_amd64.tar.gz" | tar xz -C ../.mcp-publisher mcp-publisher.exe
+alias mcp-publisher=../.mcp-publisher/mcp-publisher.exe
 mcp-publisher login github --token "$(gh auth token)"   # see below — plain `login github` will NOT do
 mcp-publisher publish                                   # reads ./server.json from the cwd
 ```
