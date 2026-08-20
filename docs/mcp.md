@@ -106,6 +106,22 @@ An `@latest` npx launcher picks the new version up on the next restart. Offline/
 installs stay silent (a failed check is never an error); set `BARON_NO_UPDATE_CHECK=1` to disable
 the check entirely.
 
+A second, network-free check runs beside it and takes precedence when both fire. The Claude Code
+plugin pins its **skills and steering** to a commit while launching the server with `@latest`, so the
+two halves of one install move at different speeds — and a plugin frozen before a tool rename hands
+an agent instructions naming tools the server no longer publishes. The plugin manifest therefore
+declares the release its skills came from (`BARON_PLUGIN_VERSION` in its `env`), and a server newer
+than that says so:
+
+> ⚠️ The Baron plugin here is v0.31.1 but this server is v0.34.0. Its skills and steering are from
+> the older release and may name tools this server no longer publishes…
+
+Nothing is said when the two agree, when the client is newer (someone pinned the server back
+deliberately), or when no version is declared at all — a hand-wired `.mcp.json` has no companion
+artifacts to be stale, and warning every install would make the notice one nobody believes on the day
+it matters. Installs predating the check declare nothing, so it starts working from the first plugin
+release that carries the field.
+
 ## Errors: `isError`, not a thrown protocol error
 
 A primitive that hits a capability gap or bad input returns an **`isError` tool result** whose text

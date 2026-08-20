@@ -186,3 +186,46 @@ describe('mutation channel over the MCP protocol', () => {
     expect(result.structuredContent?.code).toBe('MUTATION_OUTSIDE_RECIPE');
   });
 });
+
+describe('the notice a server produces when nobody hands it one', () => {
+  // Every other test here injects `updateNotice`, so the default path — the seam where the companion
+  // check and the registry check are composed — was never exercised. That is the shape of bug this
+  // repository keeps finding: both halves correct, the join wrong and invisible.
+  it('carries the stale-companion warning through a real tool call', async () => {
+    const previous = {
+      plugin: process.env.BARON_PLUGIN_VERSION,
+      noCheck: process.env.BARON_NO_UPDATE_CHECK,
+    };
+    // Disabling the registry check keeps this network-free and leaves the companion as the only
+    // possible source, so a pass cannot come from the other branch.
+    process.env.BARON_NO_UPDATE_CHECK = '1';
+    process.env.BARON_PLUGIN_VERSION = '0.1.0';
+    try {
+      const server = createMcpServer({ issues: githubPort() });
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+      await server.connect(serverTransport);
+      const client = new Client({ name: 'baron-test-client', version: '0.0.0' }, {});
+      await client.connect(clientTransport);
+
+      const result = await call(client, TOOL_NAMES.issueWrite, {
+        op: 'create',
+        title: 'anything',
+        typeRole: 'task',
+      });
+      const blocks = result.content ?? [];
+      // The notice is its OWN block: the first stays parseable JSON, which every consumer relies on.
+      expect(() => JSON.parse(blocks[0]?.text ?? '')).not.toThrow();
+      expect(blocks.map((b) => b.text).join(' ')).toContain('0.1.0');
+    } finally {
+      // Removed rather than assigned undefined: `process.env.X = undefined` stores the STRING
+      // "undefined", which a later reader sees as a set value and this very check would act on.
+      for (const [key, value] of [
+        ['BARON_PLUGIN_VERSION', previous.plugin],
+        ['BARON_NO_UPDATE_CHECK', previous.noCheck],
+      ] as const) {
+        if (value === undefined) Reflect.deleteProperty(process.env, key);
+        else process.env[key] = value;
+      }
+    }
+  });
+});

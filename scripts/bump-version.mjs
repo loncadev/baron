@@ -62,4 +62,20 @@ for (const file of packageFiles()) {
   console.log(`  ${manifest.name} ${manifest.version} -> ${version}`);
 }
 
+// The plugin declares the same version to the server it launches, so a frozen plugin can be told
+// apart from the rolling `@latest` server beside it. Bumped here because it is the same release, and
+// a test holds the two equal — a plugin claiming a version it is not is worse than claiming none.
+const PLUGIN_MANIFEST = 'plugins/claude-code/.claude-plugin/plugin.json';
+const manifestRaw = readFileSync(`${ROOT}${PLUGIN_MANIFEST}`, 'utf8');
+const bumpedManifest = manifestRaw.replace(
+  /("BARON_PLUGIN_VERSION"\s*:\s*)"[^"]*"/,
+  (_match, prefix) => `${prefix}"${version}"`,
+);
+if (bumpedManifest === manifestRaw && !manifestRaw.includes(`"${version}"`)) {
+  console.error(`could not find BARON_PLUGIN_VERSION in ${PLUGIN_MANIFEST}`);
+  process.exit(1);
+}
+writeFileSync(`${ROOT}${PLUGIN_MANIFEST}`, bumpedManifest, 'utf8');
+console.log(`  ${PLUGIN_MANIFEST} -> ${version}`);
+
 console.log('\nNow run: pnpm sync:server-json && pnpm install && pnpm build && pnpm test');
