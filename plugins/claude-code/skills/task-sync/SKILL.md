@@ -23,10 +23,10 @@ For each in-flight item, correlate it to its branch's PR via the **core-derived 
   → should be `in_review`. Auto-fixable.
 - **C — closed with a stale role label** (label-keyed providers): the item's role reads `done`
   (the provider closed it — a PR merging with `Closes #N`) but `labels` still carries another
-  role's label, so boards and label filters keep showing it as in-flight. Auto-fixable: run
-  `baron_issue_move op=reconcile`. It commands no role — it clears the label the provider's own state
-  contradicts. Prefer it over `baron_issue_move op=transition` here: transitioning would work on GitHub
-  and be wrong on a provider where a close does not mean `done`. Since task-land reconciles after
+  role's label, so boards and label filters keep showing it as in-flight. Auto-fixable: run the
+  `task-reconcile` recipe. It commands no role — it clears the label the provider's own state
+  contradicts. Prefer it over a transition here: transitioning would work on GitHub and be wrong on a
+  provider where a close does not mean `done`. Since task-land reconciles after
   every merge, this class should now only appear for items landed before that, or where the
   provider had not closed the item yet when the run finished.
 
@@ -35,28 +35,32 @@ For each in-flight item, correlate it to its branch's PR via the **core-derived 
 
 ## Steps
 
-1. **Scope.** Default to the current user's items (`@me`); `all` sweeps everyone. Query the two
-   candidate sets:
-   - `baron_issue_read { op: "query", role: "in_progress", assignee: "@me" }`  (drop `assignee` for `all`)
-   - `baron_issue_read { op: "query", role: "in_review", assignee: "@me" }`
-2. **Correlate each candidate** (skip any with no `branchName` — containers never have one):
-   - Scenario A: `baron_scm_read { op: "pr_for_branch", sourceBranch: "<branchName>", state: "merged" }`.
-     A non-null result → **drift A** (merged but still in_progress).
-   - Scenario B: `baron_scm_read { op: "pr_for_branch", sourceBranch: "<branchName>", state: "all" }`.
-     A null result → **drift B** (in_review with no PR at all).
-3. **Report + confirm.** Show a compact table (key · title · current role · finding · suggested fix).
-   If nothing drifted, say so and stop. For the drift-A set, batch-confirm with `AskUserQuestion`
-   ("N items merged but still in progress — move them to in_review?"). Drift-B items are reported for
-   manual attention only.
-4. **Apply** the confirmed drift-A fixes: `baron_issue_move { op: "transition", id, role: "in_review" }` for each,
-   then re-report what moved.
+1. **Detect — one call, no correlating by hand.**
+   `baron_recipe_run { name: "task-sync-report", inputs: { scope } }` — `scope: "all"` sweeps
+   everyone, empty sweeps the caller's own items. The engine runs the sweep and its context comes
+   back with two lists of item keys:
+   - `mergedButOpen` — class A, auto-fixable
+   - `reviewWithoutPr` — class B, report only
+2. **Class C is yours to spot.** The report cannot express it: recipe conditions compare values, they
+   do not search a list of labels. Read it off `baron_issue_read { op: "query", role: "done" }` and
+   look for a stale role label. Reading is always allowed; fixing goes through a recipe like
+   everything else.
+3. **Report + confirm.** A compact table (key · current role · finding · fix). Nothing drifted → say
+   so and stop. Batch-confirm the class-A set with `AskUserQuestion`. Class B is never auto-fixed.
+4. **Apply — one recipe call per item**, so one failure cannot abort the rest:
+   - class A → `baron_recipe_run { name: "task-move", inputs: { issueId, role: "in_review" } }`
+   - class C → `baron_recipe_run { name: "task-reconcile", inputs: { issueId } }`
 
 ## Rules
 
-- **Read-only until the user confirms.** Detection never mutates; only step 4 does, and only on an
-  explicit batch-confirm.
-- Never invent a branch — use the issue's `branchName` verbatim; skip items without one.
-- A `dry-run` argument (or the user asking to only preview / "just show me") means report and STOP —
-  no transitions.
-- Surface any `isError` code with its hint; a single item's failure must not abort the whole sweep —
-  report it and continue with the rest.
+- **Every mutation goes through a recipe.** Not a style preference: an installation may set
+  `policy.mutations.channel` to `recipe-only`, and a direct `baron_issue_move` is REFUSED there. This
+  skill used to prescribe exactly that, so on those installs it could fix nothing at all — and the
+  refusal told the caller to find the recipe that covers it, which did not exist.
+- **Read-only until the user confirms.** Detection cannot mutate: `task-sync-report` has no mutating
+  step in it.
+- Never invent a branch. The report correlates on each item's own `branchName` and skips items
+  without one — containers never have a PR, and their absence is not a finding.
+- A `dry-run` argument, or the user asking to preview, means steps 1–3 and STOP.
+- Surface any `isError` code with its hint. One item's failure must not abort the sweep, which is why
+  the fixes are separate calls rather than one batch.

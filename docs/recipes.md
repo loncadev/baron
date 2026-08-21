@@ -213,6 +213,17 @@ item on merge lands it in `done`; elsewhere `task-move` / `task-sync` settles it
   PR; a provider that declines the merge surfaces as `MERGE_FAILED` instead of a reported success.
   It does not transition the item either: a native closing link (GitHub `Closes #N`) already closes
   it on merge, and where it doesn't (Azure), `task-move` settles it.
+- `task-sync-report` — sweep in-flight items for drift between their role and their branch's PR, and
+  report it. **Read-only**, so it runs on an installation that routes every mutation through recipes.
+  Two findings: an item still `in_progress` whose branch has a MERGED pull request (the common one —
+  most trackers cannot advance an item when its PR merges), and an item `in_review` whose branch has
+  no pull request at all. The first is applied with `task-move`, one item at a time, after a human
+  agrees; the second is reported and never acted on, because a wrong branch, a force-push and a
+  hand-moved card all look identical and want different answers.
+- `task-reconcile` — clear a role label the provider's own state contradicts: an item the provider
+  closed while a stale label keeps it showing as in-flight. It commands no role — it reads what the
+  provider says and removes what disagrees — and refuses on an item the provider has not closed,
+  because on a provider where closing does not mean `done`, commanding `done` invents a fact.
 - `ship` — a multi-port example: draft PR (`scm`) + `in_review` (`issues`) + CI trigger (`ci`) +
   notify (`notify`) in one run.
 

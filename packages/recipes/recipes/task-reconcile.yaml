@@ -1,0 +1,28 @@
+name: task-reconcile
+description: >-
+  Clear a role label the provider's own state contradicts — an item the provider closed while a
+  stale role label keeps it showing as in-flight on boards and label filters. Commands no role: it
+  reads what the provider says and removes what disagrees, which is why it is safe where a
+  transition would not be.
+steps:
+  - ask: { as: issueId, type: text, message: "Work item id?" }
+
+  - do: issue.get
+    as: before
+    with:
+      id: ${issueId}
+
+  # A transition would be wrong here and this is the difference worth guarding. `reconcile` follows
+  # the provider; `transition` commands it. On a provider where closing does not mean `done`,
+  # commanding `done` because the item is closed invents a fact — so this refuses to run on an item
+  # the provider has not actually closed, rather than quietly doing nothing.
+  - require:
+      equals: ["${before.role}", "done"]
+      message: "${before.key} reads '${before.role}', not 'done' — there is no provider state for a label to contradict. Use task-move if you mean to change its role."
+
+  - do: issue.reconcile
+    as: issue
+    with:
+      id: ${issueId}
+
+  - message: "${issue.key} reconciled: role ${issue.role} (${issue.nativeState}), labels now ${issue.labels}."

@@ -615,6 +615,8 @@ async function runSteps(
         const scope: RecipeContext = { ...context, [step.as]: element };
         await runSteps(step.steps, scope, notes, options);
         if (step.collect !== undefined) {
+          const gate = step.collect.when;
+          if (gate !== undefined && !evalCondition(gate, scope)) continue;
           const value = interpolate(step.collect.from, scope);
           if (value !== undefined && value !== null && value !== '') collected.push(value);
         }
