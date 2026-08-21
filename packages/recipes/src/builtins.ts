@@ -13,6 +13,8 @@ export const BUILTIN_RECIPE_NAMES = [
   'task-move',
   'task-finish',
   'task-land',
+  'task-sync-report',
+  'task-reconcile',
   'ship',
 ] as const;
 export type BuiltinRecipeName = (typeof BUILTIN_RECIPE_NAMES)[number];

@@ -61,3 +61,17 @@ describe('the built-in recipe registry', () => {
     expect(unresolvable).toEqual([]);
   });
 });
+
+describe('the built-in recipes a reader is told about', () => {
+  it('are the ones that actually ship', () => {
+    // The reverse of the tie above: that one catches a skill naming a recipe that does not exist,
+    // and this one catches a recipe nobody is told exists. Adding a built-in and forgetting the docs
+    // passed every check until now — the same two-hand-maintained-lists defect, one direction shy.
+    const docs = readFileSync(
+      fileURLToPath(new URL('../../../docs/recipes.md', import.meta.url)),
+      'utf8',
+    );
+    const undocumented = BUILTIN_RECIPE_NAMES.filter((name) => !docs.includes(`\`${name}\``));
+    expect(undocumented).toEqual([]);
+  });
+});

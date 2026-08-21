@@ -114,3 +114,69 @@ describe('task-land and an explicit rejection', () => {
     expect(after.state).toBe('open');
   });
 });
+
+describe('task-sync-report', () => {
+  it('finds the card whose PR merged, and leaves the honest one alone', async () => {
+    // The drift Baron exists to catch: most trackers cannot advance an item when its PR merges, so
+    // the card rots in the wrong state. It lived as prose in a skill until the grammar could sweep.
+    const scmTransport = createMemoryScmTransport();
+    const scm = defineGithubScmAdapter(scmTransport);
+    const service = createRecipeService({ ...ports(), scm }, ROOT);
+
+    const drifted = await service.run('task-new', { title: 'Merged already', typeRole: 'task' });
+    const driftedId = (drifted.context.issue as { id: string }).id;
+    const started = await service.run('task-start', { issueId: driftedId });
+    const branch = (started.context.branch as { name: string }).name;
+    const finished = await service.run('task-finish', {
+      issueId: driftedId,
+      branch,
+      title: 'Merged already',
+      body: '',
+      relation: 'closes',
+      autoComplete: 'no',
+    });
+    await scm.mergePr((finished.context.pr as { id: string }).id);
+
+    // A second item in progress whose PR is still open must NOT be reported.
+    const honest = await service.run('task-new', { title: 'Still working', typeRole: 'task' });
+    const honestId = (honest.context.issue as { id: string }).id;
+    const honestStart = await service.run('task-start', { issueId: honestId });
+    await service.run('task-finish', {
+      issueId: honestId,
+      branch: (honestStart.context.branch as { name: string }).name,
+      title: 'Still working',
+      body: '',
+      relation: 'closes',
+      autoComplete: 'no',
+    });
+
+    const { context, notes } = await service.run('task-sync-report', { scope: 'all' });
+    const merged = context.mergedButOpen as string[];
+    expect(merged.length, 'the honest item was swept up with the drifted one').toBe(1);
+    expect(notes.join('\n')).toContain('Merged but still in progress');
+  });
+
+  it('says so plainly when nothing has drifted', async () => {
+    const service = createRecipeService(
+      { ...ports(), scm: defineGithubScmAdapter(createMemoryScmTransport()) },
+      ROOT,
+    );
+    const { context, notes } = await service.run('task-sync-report', { scope: 'all' });
+    // An empty array, not an absent key: a report that cannot say "0" interpolates to nothing.
+    expect(context.mergedButOpen).toEqual([]);
+    expect(notes.join('\n')).toContain('Nothing merged is still in progress');
+  });
+});
+
+describe('task-reconcile', () => {
+  it('refuses on an item the provider has not closed', async () => {
+    // The difference this guards: `reconcile` FOLLOWS the provider, `transition` commands it. Running
+    // it on an item the provider never closed would clear a label on the strength of nothing.
+    const service = createRecipeService(ports(), ROOT);
+    const created = await service.run('task-new', { title: 'Still open', typeRole: 'task' });
+    const issueId = (created.context.issue as { id: string }).id;
+    await expect(service.run('task-reconcile', { issueId })).rejects.toThrow(
+      /there is no provider/,
+    );
+  });
+});

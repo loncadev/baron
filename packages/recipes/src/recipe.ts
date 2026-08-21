@@ -132,7 +132,17 @@ export interface ForEachStep {
    * it touched. Iterations where the expression resolves to nothing contribute nothing, so "the ones
    * that matched" falls out of the same mechanism rather than needing a second concept.
    */
-  readonly collect?: { readonly as: string; readonly from: string };
+  readonly collect?: {
+    readonly as: string;
+    readonly from: string;
+    /**
+     * Collect only from iterations where this holds, evaluated in the ITERATION's scope so it can
+     * read what the nested steps just bound. Without it a sweep cannot say "the ones that matched":
+     * the value it wants to record (the item) and the value that decides whether it matched (what
+     * the provider answered) are different expressions, and no conditional exists inside one.
+     */
+    readonly when?: StepCondition;
+  };
   /** Skip the whole loop unless the condition holds. */
   readonly when?: StepCondition;
 }
@@ -331,7 +341,12 @@ function parseForEach(raw: Record<string, unknown>, where: string): ForEachStep 
     if (typeof spec.from !== 'string' || spec.from.length === 0) {
       fail(`${where}.collect: 'from' must be a non-empty string.`);
     }
-    collect = { as: spec.as, from: spec.from };
+    const collectWhen = parseWhen(spec, `${where}.collect`);
+    collect = {
+      as: spec.as,
+      from: spec.from,
+      ...(collectWhen !== undefined ? { when: collectWhen } : {}),
+    };
   }
   const when = parseWhen(raw, where);
   return {

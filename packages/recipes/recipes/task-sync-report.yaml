@@ -1,0 +1,90 @@
+name: task-sync-report
+description: >-
+  Sweep in-flight work items for drift between their role and their branch's PR reality, and report
+  it. Read-only — it changes nothing, so it runs on an installation that routes every mutation
+  through recipes. Apply the fixes with task-move, one item at a time, after a human has agreed.
+steps:
+  - ask:
+      as: scope
+      type: text
+      message: "Whose items? ('all' sweeps everyone; empty sweeps yours)"
+      optional: true
+
+  # Two alternatives rather than a conditional parameter: exactly one runs, and which one ran is
+  # readable from the recipe rather than from an interpolation that quietly became an empty string.
+  - do: issue.query
+    as: inProgress
+    when:
+      equals: ["${scope}", "all"]
+    with:
+      role: in_progress
+  - do: issue.query
+    as: inProgress
+    when:
+      notEquals: ["${scope}", "all"]
+    with:
+      role: in_progress
+      assignee: "@me"
+  - do: issue.query
+    as: inReview
+    when:
+      equals: ["${scope}", "all"]
+    with:
+      role: in_review
+  - do: issue.query
+    as: inReview
+    when:
+      notEquals: ["${scope}", "all"]
+    with:
+      role: in_review
+      assignee: "@me"
+
+  # Drift A — merged but still in progress. The common one: most trackers cannot advance an item when
+  # its PR merges, so the card rots in the wrong state. Correlated through the item's OWN branchName,
+  # never a branch guessed from its title; items without one (containers) cannot have a PR and are
+  # skipped rather than reported as suspicious.
+  - for_each: ${inProgress}
+    as: item
+    collect:
+      as: mergedButOpen
+      from: "${item.key}"
+      when:
+        truthy: "${merged.id}"
+    steps:
+      - do: scm.pr.find
+        as: merged
+        when:
+          truthy: "${item.branchName}"
+        with:
+          sourceBranch: "${item.branchName}"
+          state: merged
+
+  # Drift B — in review with no PR at all. Rare, and deliberately NOT auto-fixable: a wrong branch, a
+  # force-push and a hand-moved card all look like this, and they want different answers. Reported for
+  # a human, never acted on.
+  - for_each: ${inReview}
+    as: item
+    collect:
+      as: reviewWithoutPr
+      from: "${item.key}"
+      when:
+        falsy: "${any.id}"
+    steps:
+      - do: scm.pr.find
+        as: any
+        when:
+          truthy: "${item.branchName}"
+        with:
+          sourceBranch: "${item.branchName}"
+          state: all
+
+  - message: "Swept ${inProgress.length} in progress and ${inReview.length} in review."
+  - message: "Merged but still in progress (move these to in_review with task-move): ${mergedButOpen}"
+    when:
+      truthy: "${mergedButOpen.length}"
+  - message: "In review with no pull request — look at these yourself, Baron will not guess: ${reviewWithoutPr}"
+    when:
+      truthy: "${reviewWithoutPr.length}"
+  - message: "Nothing merged is still in progress."
+    when:
+      falsy: "${mergedButOpen.length}"
