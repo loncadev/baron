@@ -96,6 +96,35 @@ live in the engine, not in agent judgement (decision #19). Conditions (exactly o
 `equals: [a, b]` / `notEquals: [a, b]` (interpolated string comparison). Deliberately not an
 expression language.
 
+### `for_each` — run steps once per element
+
+```yaml
+  - for_each: ${items}          # must resolve to a list; anything else is an error, not an empty run
+    as: item                     # the element, bound for one iteration
+    collect: { as: moved, from: "${done.key}" }   # optional: one value per iteration, bound after
+    steps:
+      - do: issue.transition
+        as: done
+        with: { id: "${item.id}", role: in_review }
+```
+
+The rest of the grammar is single-shot, which is why the one workflow Baron ships that *sweeps* had
+to live as prose in a skill — and on an install that sets `mutations.channel` to `recipe-only` that
+prose cannot run at all, since every fix it prescribes is refused and the refusal points at a recipe
+that did not exist.
+
+Three rules, each of them a footgun closed rather than a preference:
+
+- **Bindings made inside an iteration do not leak.** Reading `${done}` after the loop gets nothing,
+  not whichever element happened to be last — a value that is real, just never the one meant.
+- **`collect` binds an array even when nothing matched**, so a recipe can report "0 items" instead of
+  interpolating a reference that resolves to nothing. Iterations whose expression resolves to nothing
+  contribute nothing, so "the ones that matched" needs no second concept.
+- **No `ask` inside a loop, and no loop inside a loop.** Asks are hoisted by `baron_recipe_list` so a
+  caller can supply them upfront — that is what makes a recipe runnable in one shot — and an ask in a
+  loop is both invisible to that and asked once per element. Nesting is refused because one level
+  covers every sweep here, and it is easier to allow later than to take back.
+
 ### `when:` — conditional do/message steps
 
 ```yaml
