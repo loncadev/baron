@@ -31,15 +31,39 @@ export function formatCompanionNotice(companion: string, server: string): string
 }
 
 /**
- * The notice when the client's artifacts are older than this server, else undefined.
+ * The other direction, and the remedy is the opposite one: the SERVER is what is behind.
  *
- * Only an OLDER companion is reported. A newer one means the user is running a released plugin
- * against a server they pinned back, which is a deliberate act, and equality is the normal case.
- * Nothing here throws or blocks: it reads one string.
+ * Skills ship through the plugin marketplace and the recipes and tools they call ship through npm,
+ * so a plugin newer than its server is not someone pinning deliberately — it is the ordinary state
+ * between two updates. v0.36.0 made that concrete: its task-sync skill calls a recipe a v0.35.0
+ * server has never heard of, and without this the failure is an unknown-recipe error explaining
+ * nothing.
+ */
+export function formatServerBehindNotice(companion: string, server: string): string {
+  return (
+    `⚠️ The Baron plugin here is v${companion} but this server is v${server}. Its skills may call ` +
+    'recipes and tools this older server does not have. If your launcher uses ' +
+    '`@lonca/baron-mcp-server@latest`, restart the MCP server to pick the new one up; if it pins a ' +
+    'version, raise it.'
+  );
+}
+
+/**
+ * The notice when the client and this server are not the same release, else undefined.
+ *
+ * Both directions are reported, with opposite remedies, because both happen without anyone choosing
+ * them: the skills and the code they call are published through different channels, so either half
+ * can be the one in front. Equality is the normal case and says nothing; so does a client that
+ * declares no version, since there is then nothing to compare. Nothing here throws or blocks — it
+ * reads one string.
  */
 export function companionNotice(options: CompanionCheckOptions): string | undefined {
   const declared = (options.env ?? process.env)[COMPANION_VERSION_ENV];
   if (declared === undefined || declared.trim().length === 0) return undefined;
-  if (compareSemver(declared, options.serverVersion) >= 0) return undefined;
-  return formatCompanionNotice(declared.trim(), options.serverVersion);
+  const order = compareSemver(declared.trim(), options.serverVersion);
+  // 0 covers both "same release" and "not comparable" — neither is something to warn about.
+  if (order === 0) return undefined;
+  return order < 0
+    ? formatCompanionNotice(declared.trim(), options.serverVersion)
+    : formatServerBehindNotice(declared.trim(), options.serverVersion);
 }

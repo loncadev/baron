@@ -116,8 +116,13 @@ than that says so:
 > ⚠️ The Baron plugin here is v0.31.1 but this server is v0.34.0. Its skills and steering are from
 > the older release and may name tools this server no longer publishes…
 
-Nothing is said when the two agree, when the client is newer (someone pinned the server back
-deliberately), or when no version is declared at all — a hand-wired `.mcp.json` has no companion
+A plugin AHEAD of its server gets the opposite notice, and the opposite remedy — restart the server,
+or raise the version its launcher pins. That direction was silent at first, on the reasoning that a
+newer client meant someone had pinned the server back on purpose; it does not, because the skills
+ship through the marketplace and the recipes and tools they call ship through npm, so either half can
+be the one in front between two updates.
+
+Nothing is said when the two agree, or when no version is declared at all — a hand-wired `.mcp.json` has no companion
 artifacts to be stale, and warning every install would make the notice one nobody believes on the day
 it matters. Installs predating the check declare nothing, so it starts working from the first plugin
 release that carries the field.
