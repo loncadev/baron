@@ -108,7 +108,36 @@ export interface MessageStep {
   readonly when?: StepCondition;
 }
 
-export type Step = AskStep | DoStep | MessageStep | RequireStep;
+/**
+ * Run nested steps once per element of a list.
+ *
+ * The grammar was `ask` / `do` / `require` / `message`, every one of them single-shot, so a workflow
+ * that sweeps N items could not be expressed at all — which is why the one sweeping workflow Baron
+ * ships (task-sync) lived as prose in a skill. On an install that sets `mutations.channel` to
+ * `recipe-only` that prose cannot even run: each fix it prescribes is refused, and the refusal tells
+ * the caller to find the recipe that covers it, which did not exist. Iteration is what closes that.
+ *
+ * Bindings made inside an iteration are scoped to it. Leaking them would mean the last element
+ * silently wins, and a recipe reading `${pr.id}` after a loop would get whichever item happened to
+ * be last — a bug that looks like data.
+ */
+export interface ForEachStep {
+  /** Interpolated reference to the list to walk. Anything but an array is an error, not an empty run. */
+  readonly for_each: string;
+  /** Context name the current element is bound to, for the duration of one iteration. */
+  readonly as: string;
+  readonly steps: readonly Step[];
+  /**
+   * Accumulate one value per iteration into an array bound AFTER the loop — how a sweep reports what
+   * it touched. Iterations where the expression resolves to nothing contribute nothing, so "the ones
+   * that matched" falls out of the same mechanism rather than needing a second concept.
+   */
+  readonly collect?: { readonly as: string; readonly from: string };
+  /** Skip the whole loop unless the condition holds. */
+  readonly when?: StepCondition;
+}
+
+export type Step = AskStep | DoStep | ForEachStep | MessageStep | RequireStep;
 
 export interface Recipe {
   readonly name: string;
@@ -145,6 +174,10 @@ export function isDoStep(step: Step): step is DoStep {
 export function isMessageStep(step: Step): step is MessageStep {
   return 'message' in step;
 }
+export function isForEachStep(step: Step): step is ForEachStep {
+  return 'for_each' in step;
+}
+
 export function isRequireStep(step: Step): step is RequireStep {
   return 'require' in step;
 }
@@ -258,20 +291,73 @@ function parseDo(raw: Record<string, unknown>, where: string): DoStep {
   };
 }
 
+/**
+ * Nesting is refused rather than supported. One level covers every sweep Baron has, and a loop
+ * inside a loop over provider calls is a runaway nobody authored on purpose — easier to allow later
+ * than to take back.
+ */
+function parseForEach(raw: Record<string, unknown>, where: string): ForEachStep {
+  if (typeof raw.for_each !== 'string' || raw.for_each.length === 0) {
+    fail(`${where}: 'for_each' must be a non-empty string referencing a list.`);
+  }
+  if (typeof raw.as !== 'string' || raw.as.length === 0) {
+    fail(`${where}: 'for_each' needs 'as' — the name each element is bound to.`);
+  }
+  if (!Array.isArray(raw.steps) || raw.steps.length === 0) {
+    fail(`${where}: 'for_each' needs a non-empty 'steps' array.`);
+  }
+  const steps = raw.steps.map((step, index) => {
+    if (isRecord(step) && 'for_each' in step) {
+      fail(`${where}.steps[${index}]: a for_each may not contain another for_each.`);
+    }
+    // `recipeInputs` hoists every ask so a caller can supply them upfront, which is what makes a
+    // recipe runnable in one shot over MCP. An ask inside a loop is invisible to that and would ask
+    // once per element besides — a hidden input nobody can find, which this repository has shipped
+    // once already.
+    if (isRecord(step) && 'ask' in step) {
+      fail(
+        `${where}.steps[${index}]: a for_each may not contain an 'ask' — declare it before the loop.`,
+      );
+    }
+    return parseStep(step, index);
+  });
+  let collect: ForEachStep['collect'];
+  if (raw.collect !== undefined) {
+    const spec = raw.collect;
+    if (!isRecord(spec)) fail(`${where}.collect must be an object.`);
+    if (typeof spec.as !== 'string' || spec.as.length === 0) {
+      fail(`${where}.collect: 'as' must be a non-empty string.`);
+    }
+    if (typeof spec.from !== 'string' || spec.from.length === 0) {
+      fail(`${where}.collect: 'from' must be a non-empty string.`);
+    }
+    collect = { as: spec.as, from: spec.from };
+  }
+  const when = parseWhen(raw, where);
+  return {
+    for_each: raw.for_each,
+    as: raw.as,
+    steps,
+    ...(collect !== undefined ? { collect } : {}),
+    ...(when !== undefined ? { when } : {}),
+  };
+}
+
 function parseStep(raw: unknown, index: number): Step {
   const where = `steps[${index}]`;
   if (!isRecord(raw)) fail(`${where} must be an object.`);
   // A step must be exactly one kind; a step with e.g. both `ask` and `do` is a typo, not a silent
   // "pick the first" — dropping the other key would run a different program than the author wrote.
-  const kinds = ['ask', 'do', 'message', 'require'].filter((kind) => kind in raw);
+  const kinds = ['ask', 'do', 'for_each', 'message', 'require'].filter((kind) => kind in raw);
   if (kinds.length !== 1) {
     fail(
-      `${where} must have exactly one of 'ask', 'do', 'message', or 'require' (found: ${kinds.join(', ') || 'none'}).`,
+      `${where} must have exactly one of 'ask', 'do', 'for_each', 'message', or 'require' (found: ${kinds.join(', ') || 'none'}).`,
     );
   }
   if ('ask' in raw) return parseAsk(raw, where);
   if ('do' in raw) return parseDo(raw, where);
   if ('require' in raw) return parseRequire(raw, where);
+  if ('for_each' in raw) return parseForEach(raw, where);
   if (typeof raw.message !== 'string') fail(`${where}: 'message' must be a string.`);
   const when = parseWhen(raw, where);
   return { message: raw.message, ...(when !== undefined ? { when } : {}) };

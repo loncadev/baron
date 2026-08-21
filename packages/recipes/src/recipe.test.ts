@@ -68,7 +68,7 @@ describe('parseRecipe', () => {
 
   it('rejects a step that is none of ask/do/message/require', () => {
     expect(() => parseRecipe({ name: 'r', steps: [{ frob: true }] })).toThrow(
-      /'ask', 'do', 'message', or 'require'/,
+      /'ask', 'do', 'for_each', 'message', or 'require'/,
     );
   });
 
@@ -110,5 +110,42 @@ describe('parseRecipe', () => {
       require: { truthy: '${takeover}' },
       when: { truthy: '${issue.assignee}' },
     });
+  });
+});
+
+describe('parseRecipe — for_each', () => {
+  const parse = (body: string) => () => loadRecipe(`name: r\nsteps:\n${body}`);
+
+  it('refuses a loop inside a loop', () => {
+    // Easier to allow later than to take back. One level covers every sweep Baron has, and nested
+    // loops over provider calls are a runaway nobody authored on purpose.
+    expect(
+      parse(
+        '  - for_each: "${a}"\n    as: x\n    steps:\n      - for_each: "${b}"\n        as: y\n        steps:\n          - message: hi\n',
+      ),
+    ).toThrow(/may not contain another for_each/);
+  });
+
+  it("refuses an 'ask' inside a loop", () => {
+    // recipeInputs hoists asks so a caller can supply them upfront, which is what makes a recipe
+    // runnable in one shot over MCP. An ask in a loop is invisible to that AND asks once per element.
+    expect(
+      parse(
+        '  - for_each: "${a}"\n    as: x\n    steps:\n      - ask: { as: q, type: text, message: "?" }\n',
+      ),
+    ).toThrow(/may not contain an 'ask'/);
+  });
+
+  it('requires the element name and a non-empty body', () => {
+    expect(parse('  - for_each: "${a}"\n    steps:\n      - message: hi\n')).toThrow(/needs 'as'/);
+    expect(parse('  - for_each: "${a}"\n    as: x\n')).toThrow(/non-empty 'steps'/);
+  });
+
+  it('validates the collect spec rather than ignoring a malformed one', () => {
+    expect(
+      parse(
+        '  - for_each: "${a}"\n    as: x\n    collect: { as: out }\n    steps:\n      - message: hi\n',
+      ),
+    ).toThrow(/'from' must be/);
   });
 });

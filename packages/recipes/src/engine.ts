@@ -35,9 +35,11 @@ import {
   RECIPE_OPS,
   type Recipe,
   type RecipeOp,
+  type Step,
   type StepCondition,
   isAskStep,
   isDoStep,
+  isForEachStep,
   isMessageStep,
   isRequireStep,
 } from './recipe.js';
@@ -488,6 +490,9 @@ async function dispatchOp(ports: RecipePorts, op: RecipeOp, params: Params): Pro
   }
 }
 
+/** A `for_each` pointed at something that is not a list — an authoring mistake, not empty data. */
+const FOR_EACH_NOT_A_LIST = 'FOR_EACH_NOT_A_LIST';
+
 const REQUIRE = 'RECIPE_REQUIRE';
 
 /** A guard/when operand is "present" unless it resolved to nothing: undefined/null/''/false. */
@@ -534,8 +539,22 @@ export async function runRecipe(
 ): Promise<RunRecipeResult> {
   const context: RecipeContext = { ...options.inputs };
   const notes: string[] = [];
+  await runSteps(recipe.steps, context, notes, options);
+  return { context, notes };
+}
 
-  for (const step of recipe.steps) {
+/**
+ * Run a list of steps against one context. Extracted so `for_each` can run its nested steps through
+ * exactly the same machinery — a loop whose body behaved differently from the top level would be a
+ * second, quieter language.
+ */
+async function runSteps(
+  steps: readonly Step[],
+  context: RecipeContext,
+  notes: string[],
+  options: RunRecipeOptions,
+): Promise<void> {
+  for (const step of steps) {
     if (isAskStep(step)) {
       const { as, type, message, choices, optional } = step.ask;
       if (context[as] !== undefined) continue; // pre-seeded; don't re-ask
@@ -574,8 +593,35 @@ export async function runRecipe(
       const params = (interpolate(step.with ?? {}, context) ?? {}) as Params;
       const result = await dispatchOp(options.ports, step.do, params);
       if (step.as !== undefined) context[step.as] = result;
+      continue;
+    }
+
+    if (isForEachStep(step)) {
+      if (step.when !== undefined && !evalCondition(step.when, context)) continue;
+      const list = interpolate(step.for_each, context);
+      if (!Array.isArray(list)) {
+        // Not an empty run: sweeping something that is not a list is a mistake in the recipe, and
+        // quietly doing nothing is how a sweep reports "all clear" for a board it never read.
+        throw new BaronError(
+          `Step 'for_each' expected a list at '${step.for_each}', found ` +
+            `${list === undefined ? 'nothing' : typeof list}.`,
+          FOR_EACH_NOT_A_LIST,
+        );
+      }
+      const collected: unknown[] = [];
+      for (const element of list) {
+        // One scope per iteration. Bindings made inside must not leak: otherwise the last element
+        // silently wins for anything read after the loop, which looks like data rather than a bug.
+        const scope: RecipeContext = { ...context, [step.as]: element };
+        await runSteps(step.steps, scope, notes, options);
+        if (step.collect !== undefined) {
+          const value = interpolate(step.collect.from, scope);
+          if (value !== undefined && value !== null && value !== '') collected.push(value);
+        }
+      }
+      // Bound even when nothing matched, so a recipe can say "0 items" rather than interpolate a
+      // reference that resolves to nothing.
+      if (step.collect !== undefined) context[step.collect.as] = collected;
     }
   }
-
-  return { context, notes };
 }

@@ -850,3 +850,92 @@ steps:
     ).rejects.toThrow(/closes, relates/);
   });
 });
+
+describe('for_each', () => {
+  // The grammar was four single-shot step kinds, so a workflow that sweeps N items could not be
+  // written at all — which is why the one sweeping workflow Baron ships lived as prose in a skill,
+  // unable even to run on an install that routes mutations through recipes.
+  it('runs its steps once per element and collects what matched', async () => {
+    const recipe = loadRecipe(`
+name: sweep
+steps:
+  - do: issue.query
+    as: items
+    with: { role: in_progress }
+  - for_each: \${items}
+    as: item
+    collect: { as: moved, from: "\${done.key}" }
+    steps:
+      - do: issue.transition
+        as: done
+        with: { id: "\${item.id}", role: done }
+`);
+    const issues = issuesPort();
+    for (const title of ['one', 'two']) {
+      const created = await issues.create({ title, typeRole: 'task' });
+      await issues.transition(created.id, 'in_progress');
+    }
+    const { context } = await runRecipe(recipe, { ports: { issues }, asker: scriptedAsker() });
+    expect((context.moved as string[]).length).toBe(2);
+    for (const issue of await issues.query({ role: 'done' })) {
+      expect(issue.role).toBe('done');
+    }
+  });
+
+  it('does not leak a binding made inside an iteration', async () => {
+    // Leaking would mean the LAST element silently wins for anything read after the loop — a bug
+    // that reads as data, because the value is real, just not the one the author meant.
+    const recipe = loadRecipe(`
+name: scope
+steps:
+  - do: issue.query
+    as: items
+    with: { role: backlog }
+  - for_each: \${items}
+    as: item
+    steps:
+      - do: issue.get
+        as: seen
+        with: { id: "\${item.id}" }
+`);
+    const issues = issuesPort();
+    await issues.create({ title: 'only', typeRole: 'task' });
+    const { context } = await runRecipe(recipe, { ports: { issues }, asker: scriptedAsker() });
+    expect(context.seen, 'an iteration binding escaped the loop').toBeUndefined();
+  });
+
+  it('binds an empty list rather than nothing when the sweep matched none', async () => {
+    const recipe = loadRecipe(`
+name: empty
+steps:
+  - do: issue.query
+    as: items
+    with: { role: in_review }
+  - for_each: \${items}
+    as: item
+    collect: { as: moved, from: "\${item.id}" }
+    steps:
+      - message: "never"
+`);
+    const { context } = await runRecipe(recipe, {
+      ports: { issues: issuesPort() },
+      asker: scriptedAsker(),
+    });
+    expect(context.moved).toEqual([]);
+  });
+
+  it('refuses to sweep something that is not a list', async () => {
+    // Quietly doing nothing is how a sweep reports "all clear" for a board it never read.
+    const recipe = loadRecipe(`
+name: bad
+steps:
+  - for_each: \${nothing}
+    as: item
+    steps:
+      - message: "never"
+`);
+    await expect(
+      runRecipe(recipe, { ports: { issues: issuesPort() }, asker: scriptedAsker() }),
+    ).rejects.toThrow(/expected a list/);
+  });
+});
