@@ -24,19 +24,20 @@ const live = Boolean(site && email && apiToken && project);
  * It CREATES an issue and deletes it at the end. Point JIRA_PROJECT at a throwaway project.
  */
 describe.skipIf(!live)('jira live smoke', () => {
-  // Defaulted rather than asserted: a skipped describe still evaluates its body at collection
-  // time, and constructing the transport must not throw on a machine without credentials.
-  const opts = {
-    site: site ?? '',
-    email: email ?? '',
-    apiToken: apiToken ?? '',
-    project: project ?? '',
-  };
-  const transport = createJiraTransport(opts);
-  const authorization = `Basic ${Buffer.from(`${opts.email}:${opts.apiToken}`).toString('base64')}`;
+  // Built inside the test, not the describe: a skipped describe still evaluates its body at
+  // collection time, and the transport refuses an empty site — on a machine without credentials
+  // that refusal must not fail the file.
+  const opts = () => ({
+    site: site as string,
+    email: email as string,
+    apiToken: apiToken as string,
+    project: project as string,
+  });
 
   it('introspects, creates, transitions by destination, labels, and cleans up', async () => {
-    const introspection = await createJiraIntrospector(opts).introspect();
+    const transport = createJiraTransport(opts());
+    const authorization = `Basic ${Buffer.from(`${opts().email}:${opts().apiToken}`).toString('base64')}`;
+    const introspection = await createJiraIntrospector(opts()).introspect();
     expect(introspection.states.length).toBeGreaterThan(0);
     expect(introspection.workItemTypes.length).toBeGreaterThan(0);
     const type =
@@ -52,7 +53,7 @@ describe.skipIf(!live)('jira live smoke', () => {
       labels: ['baron-smoke'],
     });
     try {
-      expect(created.key).toMatch(new RegExp(`^${opts.project}-\\d+$`));
+      expect(created.key).toMatch(new RegExp(`^${opts().project}-\\d+$`));
       expect(introspection.states.map((s) => s.name)).toContain(created.discriminator);
       expect(created.labels).toContain('baron-smoke');
 
@@ -80,7 +81,7 @@ describe.skipIf(!live)('jira live smoke', () => {
       });
       expect(mine.map((i) => i.key)).toContain(created.key);
     } finally {
-      await fetch(`${opts.site.replace(/\/+$/, '')}/rest/api/2/issue/${created.key}`, {
+      await fetch(`${opts().site.replace(/\/+$/, '')}/rest/api/2/issue/${created.key}`, {
         method: 'DELETE',
         headers: { authorization },
       });

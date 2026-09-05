@@ -4,6 +4,7 @@ import {
   BaseScmAdapter,
   type CheckRollup,
   type CheckSummary,
+  CredentialPermissionError,
   type GapPolicy,
   type Logger,
   type MergeOptions,
@@ -144,13 +145,20 @@ export function createGithubScmTransport(options: GithubTransportOptions): ScmTr
     let sawActionsCapableSource = false;
 
     // A 403 is "this credential may not look", which is a different fact from "there is nothing to
-    // see" — swallow only that, so a real outage still surfaces as an error.
+    // see" — swallow only that, so a real outage still surfaces as an error. It arrives in two
+    // shapes: the octokit this transport is built on translates a 403 into CredentialPermissionError
+    // BEFORE it gets here (so `status` is gone), and a bare client still carries `status`. Matching
+    // only the second let the first through — on a private repository with a fine-grained token,
+    // task-land died on check-runs instead of falling back, exactly the case the fallbacks exist for.
     const ifPermitted = async (source: string, read: () => Promise<void>): Promise<boolean> => {
       try {
         await read();
         return true;
       } catch (error) {
-        if ((error as { status?: number }).status !== 403) throw error;
+        const denied =
+          error instanceof CredentialPermissionError ||
+          (error as { status?: number }).status === 403;
+        if (!denied) throw error;
         unreadable.push(source);
         return false;
       }

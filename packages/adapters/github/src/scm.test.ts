@@ -1,3 +1,4 @@
+import { CredentialPermissionError } from '@lonca/baron-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Stub octokit: the conformance suite runs on the in-memory transport, so it cannot see what the
@@ -90,8 +91,24 @@ describe('github scm createPullRequest', () => {
   });
 });
 
-/** A GitHub permission refusal, as octokit surfaces it. */
-function forbidden(): Error & { status: number } {
+/**
+ * A GitHub permission refusal as this transport actually receives it: `createGithubOctokit` turns
+ * the 403 into a CredentialPermissionError before any transport code sees it, so the `status` is
+ * gone. The tests used to hand the transport the RAW 403 instead, which is why they passed while
+ * `task-land` on a private repository died on check-runs instead of falling back.
+ */
+function forbidden(): CredentialPermissionError {
+  return new CredentialPermissionError(
+    'github',
+    'scm',
+    'GET /repos/{owner}/{repo}/commits/{ref}/check-runs',
+    'checks=read',
+    'Resource not accessible by personal access token',
+  );
+}
+
+/** The same refusal from a bare octokit, which still carries the status. Both shapes must count. */
+function rawForbidden(): Error & { status: number } {
   return Object.assign(new Error('Resource not accessible by personal access token'), {
     status: 403,
   });
@@ -174,6 +191,23 @@ describe('github scm prStatus when the credential cannot read checks', () => {
 
     const status = await transport().getPullRequestStatus('7');
     expect(status.checks.rollup).toBe('failed');
+  });
+
+  it('falls back from check-runs to workflow runs whichever shape the 403 arrives in', async () => {
+    // The translated shape (what the wrapped octokit throws) and the raw one (a bare client) are
+    // both "this credential may not look": a fine-grained token on a private repository gets the
+    // first on check-runs and reads Actions fine, and must land on 'succeeded', not on an error.
+    for (const refusal of [forbidden(), rawForbidden()]) {
+      mocks.checksListForRef.mockRejectedValue(refusal);
+      mocks.listWorkflowRuns.mockResolvedValue({
+        data: { workflow_runs: [{ status: 'completed', conclusion: 'success' }] },
+      });
+      mocks.combinedStatus.mockResolvedValue({ data: { statuses: [] } });
+
+      const status = await transport().getPullRequestStatus('7');
+      expect(status.checks.rollup).toBe('succeeded');
+      expect(status.checks.unreadable).toEqual(['check-runs']);
+    }
   });
 
   it('reports a green check run as succeeded when check-runs IS readable', async () => {

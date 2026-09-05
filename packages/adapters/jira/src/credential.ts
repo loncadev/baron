@@ -1,4 +1,5 @@
 import type { CredentialCapability, CredentialFinding, CredentialProbe } from '@lonca/baron-core';
+import { normalizeSite } from './site.js';
 
 export interface JiraCredentialProbeOptions {
   readonly site: string;
@@ -26,7 +27,7 @@ const NATIVE_PERMISSIONS: Partial<Record<CredentialCapability, string>> = {
  * guesses converts "nobody checked" into "checked, and wrong".
  */
 export function createJiraCredentialProbe(opts: JiraCredentialProbeOptions): CredentialProbe {
-  const site = opts.site.replace(/\/+$/, '');
+  const site = normalizeSite(opts.site);
   const doFetch = opts.fetchImpl ?? fetch;
   const authorization = `Basic ${Buffer.from(`${opts.email}:${opts.apiToken}`).toString('base64')}`;
 
