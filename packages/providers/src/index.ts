@@ -33,6 +33,14 @@ import {
   githubScmManifest,
 } from '@lonca/baron-adapter-github';
 import {
+  JIRA_PROVIDER,
+  createJiraCredentialProbe,
+  createJiraIntrospector,
+  createJiraTransport,
+  exampleJiraLinkMap,
+  jiraManifest,
+} from '@lonca/baron-adapter-jira';
+import {
   LINEAR_PROVIDER,
   createLinearCredentialProbe,
   createLinearIntrospector,
@@ -154,6 +162,45 @@ export interface ProviderDescriptor {
 }
 
 const DESCRIPTORS: Record<string, ProviderDescriptor> = {
+  [JIRA_PROVIDER]: {
+    id: JIRA_PROVIDER,
+    credentialsHelp: [
+      'Jira Cloud needs an API token, the email it belongs to, the site, and a project key.',
+      '  1. Create the token at: https://id.atlassian.com/manage-profile/security/api-tokens',
+      '  2. JIRA_SITE is the site root, e.g. https://acme.atlassian.net',
+      '  3. JIRA_EMAIL is the Atlassian account the token was created under.',
+      '  4. JIRA_PROJECT is the project KEY, the prefix on its issue keys (PROJ in PROJ-123).',
+      '  The token needs Browse Projects, Create Issues, Edit Issues, Transition Issues, Add',
+      '  Comments and Link Issues on that project — the defaults for a project member.',
+    ],
+    manifest: jiraManifest,
+    credentialEnvKeys: ['JIRA_SITE', 'JIRA_EMAIL', 'JIRA_API_TOKEN', 'JIRA_PROJECT'],
+    linkMap: exampleJiraLinkMap,
+    createTransport(env) {
+      return createJiraTransport({
+        site: env.JIRA_SITE ?? '',
+        email: env.JIRA_EMAIL ?? '',
+        apiToken: env.JIRA_API_TOKEN ?? '',
+        project: env.JIRA_PROJECT ?? '',
+      });
+    },
+    createIntrospector(env) {
+      return createJiraIntrospector({
+        site: env.JIRA_SITE ?? '',
+        email: env.JIRA_EMAIL ?? '',
+        apiToken: env.JIRA_API_TOKEN ?? '',
+        project: env.JIRA_PROJECT ?? '',
+      });
+    },
+    createCredentialProbe(env) {
+      return createJiraCredentialProbe({
+        site: env.JIRA_SITE ?? '',
+        email: env.JIRA_EMAIL ?? '',
+        apiToken: env.JIRA_API_TOKEN ?? '',
+        project: env.JIRA_PROJECT ?? '',
+      });
+    },
+  },
   [LINEAR_PROVIDER]: {
     id: LINEAR_PROVIDER,
     credentialsHelp: [

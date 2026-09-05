@@ -256,7 +256,7 @@ never committed.
 - Adapter SDK published interface + versioning/compat strategy
 - Telemetry / audit log (enterprise / commercial tier)
 - OAuth app flows (GitHub App, Slack OAuth, Azure OAuth)
-- Additional adapters: Jira, Linear, GitLab, Asana, Notion
+- Additional adapters: GitLab, Asana, Notion (Jira and Linear have since shipped)
 - Commercial tier features: SSO, secret-manager integrations, multi-team governance
 - **Entitlements machinery (decision #20): deferred until a validated paying design-partner** — the
   `Entitlements`/`LicenseProvider` seam, signed-offline license validator, private enterprise repo/
@@ -294,5 +294,5 @@ with the conformance suite + per-adapter status maps:
 - **Provider-native escape hatch** (#18): `baron_native_request`, scoped to policy-bound providers.
 - Recipe ops for all of the above (`recipes/ship.yaml` composes scm + issues + ci + notify).
 
-**Next (v2):** the GitLab / Jira / Linear / Notion adapters and the `docs` port. The ci/deploy/notify/
+**Next (v2):** the GitLab / Notion adapters and the `docs` port (Jira and Linear have shipped). The ci/deploy/notify/
 escape-hatch surfaces are conformance-tested; only the Azure ci read path has been validated live so far.

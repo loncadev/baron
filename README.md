@@ -121,11 +121,12 @@ scratch (PAT scopes, `init → doctor → MCP`, troubleshooting).
 | --- | --- |
 | **Azure DevOps** | `issues` · `scm` · `ci` · `deploy` |
 | **GitHub** | `issues` · `scm` · `ci` · `deploy` |
+| **Jira** | `issues` |
 | **Linear** | `issues` |
 | **Slack** | `notify` |
 
-GitLab and Jira are on the [roadmap](./ROADMAP.md) — adding one never changes how the agent
-talks to Baron, which is the whole point. Until they land, those names describe intent, not support.
+GitLab is on the [roadmap](./ROADMAP.md) — adding a provider never changes how the agent talks to
+Baron, which is the whole point. Until it lands, that name describes intent, not support.
 
 ## Documentation
 
@@ -134,6 +135,7 @@ talks to Baron, which is the whole point. Until they land, those names describe 
 | [Getting started](./docs/getting-started.md) | Install, prerequisites, first `init` → `doctor` → `run`. |
 | [Setup walkthrough — Azure DevOps](./docs/setup-azure-devops.md) | From-scratch, copy-paste setup on Azure DevOps + Claude Code. |
 | [Setup walkthrough — Linear](./docs/setup-linear.md) | From-scratch setup on Linear: per-team scoped states, branches from GitHub. |
+| [Setup walkthrough — Jira](./docs/setup-jira.md) | From-scratch setup on Jira Cloud: workflow-gated transitions and transition screens. |
 | [Concepts](./docs/concepts.md) | Ports, roles, capability gaps, the knowledge loop — the mental model. |
 | [Configuration](./docs/configuration.md) | `.baron/policy.json`, role/type/gap maps, credentials. |
 | [CLI](./docs/cli.md) | `baron init` / `doctor` / `run` reference. |

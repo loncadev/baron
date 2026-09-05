@@ -10,8 +10,8 @@ The OSS packages in this repository are licensed under Apache-2.0:
   @lonca/baron-core, @lonca/baron-providers, @lonca/baron-recipes, @lonca/baron-cli,
   @lonca/baron-mcp-server, @lonca/baron-knowledge-loop, @lonca/baron-conformance, and the
   adapters @lonca/baron-adapter-azure-devops, @lonca/baron-adapter-github,
-  @lonca/baron-adapter-linear, @lonca/baron-adapter-slack, plus the Claude Code plugin under
-  plugins/claude-code.
+  @lonca/baron-adapter-jira, @lonca/baron-adapter-linear, @lonca/baron-adapter-slack, plus the
+  Claude Code plugin under plugins/claude-code.
 
   (@lonca/baron-conformance is licensed the same way but is not published: it is a devDependency
   of the adapters and the CLI, never a runtime dependency of anything shipped.)

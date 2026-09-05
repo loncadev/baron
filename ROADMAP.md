@@ -85,8 +85,8 @@ The fourth was shaped by a provider Baron has no adapter for yet, and is now als
   move that wants fields fails with `TRANSITION_FIELDS_REQUIRED` naming every one (with accepted
   values), and the caller passes them back as `fields`. The core checks presence and nothing else;
   what a field means stays the provider's. Both halves are pinned by conformance against an
-  in-memory provider that refuses the way Jira does. The Jira adapter itself is the first thing to
-  build on it, and waits on a live site to validate against.
+  in-memory provider that refuses the way Jira does. The Jira adapter is built on it — the first
+  consumer of both halves — and its live validation waits on a Jira Cloud site.
 
 Gate 3's contract work is done. What remains of the gate is its second half: first users.
 
