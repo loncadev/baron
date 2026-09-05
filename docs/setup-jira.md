@@ -242,6 +242,8 @@ field means, and whether a value is acceptable, stays Jira's.
 | `POLICY_NOT_FOUND` | No `.baron/policy.json` at the root — run `init`, or check `BARON_ROOT`. |
 | `TRANSITION_NOT_PERMITTED` | The workflow has no transition from the issue's current status to the mapped one. The message lists what it permits; move through an intermediate role, or adjust the workflow. |
 | `TRANSITION_FIELDS_REQUIRED` | The transition's screen wants fields. Pass them as `fields`, keyed exactly as named (see §6). |
+| `HTTP 400 — resolution: Field 'resolution' cannot be set` | You passed a field to a transition whose screen does not carry it. Jira refuses rather than dropping it; pass only what the refusal asked for. |
+| `task-land`: "could not verify checks … rollup is 'unknown'" | On a **private** GitHub repository a fine-grained token cannot read check runs at all. Add **Actions (Read)** and **Commit statuses (Read)** to the token so the gate sees CI; until then it warns and lands, and you confirm CI yourself. Public repositories expose check runs without any permission. |
 | `PORT_UNBOUND` on `scm.branch.create` | `providers.scm` is unbound, because Jira provides no source control. Re-run `init` and accept the GitHub offer. |
 | `LINK_MAPPING` for `blocked_by` | Jira links are directional and named from the outward side; write "A is blocked by B" as `blocks` from B to A. |
 | Sprints do nothing | Sprints live on the Jira Software agile API and are not wired yet; the manifest declares it and the gap policy (`degrade` by default) decides. |

@@ -203,8 +203,9 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
           additionalProperties: true,
           description:
             'Answers for the fields a gated transition demands (a Jira transition screen), keyed by ' +
-            'the provider-native names a TRANSITION_FIELDS_REQUIRED refusal reported. Ignored by a ' +
-            'provider that asks for none.',
+            'the provider-native names a TRANSITION_FIELDS_REQUIRED refusal reported. Pass only what ' +
+            'the refusal asked for: a provider may reject a field its transition screen does not ' +
+            'carry (Jira does).',
         },
       },
     },

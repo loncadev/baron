@@ -92,6 +92,7 @@ import {
   type NativeRequest,
   type NativeResponse,
   azureBasicAuth,
+  jiraBasicAuth,
   runNativeRequest,
 } from './native.js';
 
@@ -199,6 +200,13 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
         apiToken: env.JIRA_API_TOKEN ?? '',
         project: env.JIRA_PROJECT ?? '',
       });
+    },
+    // The site root rather than /rest/api/2: the agile API (sprints, boards) lives under
+    // /rest/agile/1.0 on the same host, and the escape hatch is precisely for what the adapter
+    // does not cover yet.
+    nativeHttp: {
+      baseUrl: (env) => (env.JIRA_SITE ?? '').replace(/\/+$/, ''),
+      authHeader: (env) => jiraBasicAuth(env.JIRA_EMAIL ?? '', env.JIRA_API_TOKEN ?? ''),
     },
   },
   [LINEAR_PROVIDER]: {

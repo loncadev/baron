@@ -38,6 +38,11 @@ export function azureBasicAuth(token: string): string {
   return `Basic ${Buffer.from(`:${token}`).toString('base64')}`;
 }
 
+/** Jira Cloud API tokens authenticate as HTTP Basic with the account email as the username. */
+export function jiraBasicAuth(email: string, token: string): string {
+  return `Basic ${Buffer.from(`${email}:${token}`).toString('base64')}`;
+}
+
 const MAX_BODY_CHARS = 20_000;
 
 /** Pure request plan (URL + method + headers + body) — unit-testable without the network. */
