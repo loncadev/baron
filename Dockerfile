@@ -55,9 +55,11 @@ COPY --from=builder --chown=baron:baron /app ./
 COPY --from=builder --chown=baron:baron /src/.baron /app/.baron
 ENV BARON_ROOT=/app
 
-# Mount your project here and point the server at it. Built locally on purpose: no image is
-# published anywhere, because the one consumer that needs a container (Glama) builds it in its own
-# sandbox, and the Docker catalog — the surface a published image would serve — is deliberately last.
+# Mount your project here and point the server at it. We publish no image ourselves: Glama builds
+# this file in its own sandbox, and the Docker MCP Catalog builds, signs and hosts it as `mcp/baron`
+# from the commit pinned in docker/mcp-registry (servers/baron/server.yaml), re-pinning to `main`
+# nightly. Both start the container with no mount and judge it by `tools/list`, which is why the
+# default root above has to work on its own.
 #   docker build -t baron-mcp .
 #   docker run -i --rm -v "$PWD:/project" -e BARON_ROOT=/project baron-mcp
 VOLUME ["/project"]

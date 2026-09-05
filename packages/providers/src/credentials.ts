@@ -30,8 +30,17 @@ export function parseCredentials(text: string): Record<string, string> {
  * Overlay a `.baron/credentials` file onto the process environment. A real environment variable
  * wins over the file (so CI secrets override a local file); the file fills the gaps. Returns the
  * base env unchanged when no file is present.
+ *
+ * An environment variable set to the empty string counts as a gap, not a value. Container hosts
+ * that surface credentials as a form (the Docker MCP Toolkit among them) pass every declared
+ * variable whether or not the user filled it in, and an empty token or owner is never what anyone
+ * meant — but it would otherwise mask the value in the mounted project's credentials file.
  */
 export function mergeCredentials(baseEnv: Env, fileText: string | undefined): Env {
   if (fileText === undefined) return baseEnv;
-  return { ...parseCredentials(fileText), ...baseEnv };
+  const merged: Record<string, string | undefined> = { ...parseCredentials(fileText) };
+  for (const [key, value] of Object.entries(baseEnv)) {
+    if (value !== '') merged[key] = value;
+  }
+  return merged;
 }

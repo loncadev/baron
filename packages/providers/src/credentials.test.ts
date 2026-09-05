@@ -32,6 +32,15 @@ describe('mergeCredentials', () => {
     expect(merged.AZURE_DEVOPS_ORG).toBe('beekod');
   });
 
+  it('lets the file fill a variable the environment declares but leaves empty', () => {
+    const merged = mergeCredentials(
+      { GITHUB_TOKEN: '', GITHUB_OWNER: 'from-env' },
+      'GITHUB_TOKEN=from-file\nGITHUB_OWNER=from-file',
+    );
+    expect(merged.GITHUB_TOKEN).toBe('from-file');
+    expect(merged.GITHUB_OWNER).toBe('from-env');
+  });
+
   it('returns the base env unchanged when no file is present', () => {
     const base = { A: '1' };
     expect(mergeCredentials(base, undefined)).toBe(base);
