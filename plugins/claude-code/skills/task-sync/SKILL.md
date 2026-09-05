@@ -30,6 +30,11 @@ For each in-flight item, correlate it to its branch's PR via the **core-derived 
   every merge, this class should now only appear for items landed before that, or where the
   provider had not closed the item yet when the run finished.
 
+- **D — merged-but-still-in-review**: role is `in_review` AND its branch has a **merged** PR
+  → should be `done`. Auto-fixable. This is the ordinary aftermath of `task-land` on a provider that
+  does not close an item when its PR merges — Jira, and Azure Boards without a linked repository —
+  so on those providers expect one of these per landed item.
+
 - **B — in-review-without-a-PR** (rare): role is `in_review` AND its branch has **no** PR at all
   → flag for the human; do NOT auto-change (something is off — wrong branch, force-push, manual move).
 
@@ -38,17 +43,20 @@ For each in-flight item, correlate it to its branch's PR via the **core-derived 
 1. **Detect — one call, no correlating by hand.**
    `baron_recipe_run { name: "task-sync-report", inputs: { scope } }` — `scope: "all"` sweeps
    everyone, empty sweeps the caller's own items. The engine runs the sweep and its context comes
-   back with two lists of item keys:
+   back with three lists of item keys:
    - `mergedButOpen` — class A, auto-fixable
+   - `mergedButInReview` — class D, auto-fixable
    - `reviewWithoutPr` — class B, report only
 2. **Class C is yours to spot.** The report cannot express it: recipe conditions compare values, they
    do not search a list of labels. Read it off `baron_issue_read { op: "query", role: "done" }` and
    look for a stale role label. Reading is always allowed; fixing goes through a recipe like
    everything else.
 3. **Report + confirm.** A compact table (key · current role · finding · fix). Nothing drifted → say
-   so and stop. Batch-confirm the class-A set with `AskUserQuestion`. Class B is never auto-fixed.
+   so and stop. Batch-confirm the class-A and class-D sets with `AskUserQuestion`. Class B is never
+   auto-fixed.
 4. **Apply — one recipe call per item**, so one failure cannot abort the rest:
    - class A → `baron_recipe_run { name: "task-move", inputs: { issueId, role: "in_review" } }`
+   - class D → `baron_recipe_run { name: "task-move", inputs: { issueId, role: "done" } }`
    - class C → `baron_recipe_run { name: "task-reconcile", inputs: { issueId } }`
 
 ## Rules
