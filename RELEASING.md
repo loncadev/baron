@@ -119,6 +119,15 @@ that is not JSON-RPC — is invisible until a client chokes on it. It runs `init
 and prints the version and tool count, so a stale cache or a broken publish shows up as the wrong
 number rather than as silence.
 
+**To try the bits that would ship before publishing them**, build a self-contained tree the way the
+Dockerfile does — `pnpm --filter @lonca/baron-cli deploy --prod --legacy <dir>` then
+`node scripts/apply-publish-config.mjs <dir>` — and run `node <dir>/dist/bin.js`. Do it from a
+**throwaway copy of the repository, not the working tree**: under pnpm 11, `deploy` rewrites the
+workspace packages' own `package.json` files to their `publishConfig` (main/types/exports flipped to
+`dist`) and leaves them that way, so the next `pnpm test` runs against stale built output and
+`git status` shows nine modified manifests. The Dockerfile is unaffected because it deploys from a
+copy.
+
 Consumers launching via `@latest` (the plugin manifest and the documented `.mcp.json` shape do) pick
 up the new release on their next MCP restart automatically.
 

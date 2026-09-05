@@ -12,6 +12,7 @@ import type {
   TransitionFields,
 } from '@lonca/baron-core';
 import { JIRA_STATE_KEY } from './provider.js';
+import { normalizeSite } from './site.js';
 
 const ERROR_CODE = 'JIRA_API';
 
@@ -28,7 +29,7 @@ const API_PREFIX = '/rest/api/2';
 const ME = '@me';
 
 export interface JiraTransportOptions {
-  /** The site root, e.g. `https://acme.atlassian.net`. A trailing slash is tolerated. */
+  /** The site root, e.g. `https://acme.atlassian.net`. A missing scheme or trailing slash is tolerated. */
   readonly site: string;
   /** The Atlassian account email the API token was issued to. */
   readonly email: string;
@@ -94,7 +95,7 @@ function jql(value: string): string {
  * a branch name, so the numeric id is never surfaced.
  */
 export function createJiraTransport(opts: JiraTransportOptions): IssuesTransport {
-  const site = opts.site.replace(/\/+$/, '');
+  const site = normalizeSite(opts.site);
   const doFetch = opts.fetchImpl ?? fetch;
   const authorization = `Basic ${Buffer.from(`${opts.email}:${opts.apiToken}`).toString('base64')}`;
 

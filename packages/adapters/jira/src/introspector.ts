@@ -7,6 +7,7 @@ import type {
 } from '@lonca/baron-core';
 import { BaronError } from '@lonca/baron-core';
 import { JIRA_PROVIDER, JIRA_STATE_KEY } from './provider.js';
+import { normalizeSite } from './site.js';
 
 export interface JiraIntrospectorOptions {
   readonly site: string;
@@ -51,7 +52,7 @@ interface ProjectStatuses {
  * person reads a workflow in and the order the proposal is shown in.
  */
 export function createJiraIntrospector(opts: JiraIntrospectorOptions): Introspector {
-  const site = opts.site.replace(/\/+$/, '');
+  const site = normalizeSite(opts.site);
   const doFetch = opts.fetchImpl ?? fetch;
   const authorization = `Basic ${Buffer.from(`${opts.email}:${opts.apiToken}`).toString('base64')}`;
 
