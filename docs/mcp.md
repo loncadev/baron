@@ -167,6 +167,20 @@ It performs the same `initialize` → `tools/list` exchange an indexer does, and
 two things that break stdio servers quietly: a process that exits before answering, and anything
 non-JSON on stdout.
 
+### Docker MCP Toolkit
+
+The same image is listed in the [Docker MCP Catalog](https://hub.docker.com/mcp) as `mcp/baron`,
+built and signed by Docker from the pinned commit in
+[docker/mcp-registry](https://github.com/docker/mcp-registry/tree/main/servers/baron). Enabling it
+from Docker Desktop's MCP Toolkit asks for one required value — the host path of the project that
+holds your `.baron/policy.json` — and mounts it over `/project`. Run `npx @lonca/baron init` in that
+project first; the container has no `baron` CLI and cannot create the policy for you.
+
+Provider credentials are optional in the form. Whatever you enter arrives as environment variables
+and wins over the mounted project's `.baron/credentials`; a field left blank is treated as absent, so
+the file fills it. Only the providers your policy binds need values — `PORT_UNBOUND` is what you get
+for the rest, exactly as with `npx`.
+
 ## Claude Code plugin
 
 `plugins/claude-code` registers the `baron` MCP server and ships **skills** — a `baron` skill that

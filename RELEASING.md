@@ -179,6 +179,15 @@ follow at any pace. Two need a human at a browser and cannot be scripted:
   `/plugin marketplace add loncadev/baron` already works from the committed
   `.claude-plugin/marketplace.json`. Never open a PR against `anthropics/claude-plugins-community`;
   it closes them automatically and syncs from an internal pipeline instead.
+- **Docker MCP Catalog** — a PR against `docker/mcp-registry` adding `servers/baron/server.yaml`
+  (no `tools.json`: the image starts on its baked-in policy, so Docker lists the tools itself and
+  a nightly bot re-pins `source.commit` to `main` from then on). Docker builds, signs and hosts the
+  image as `mcp/baron`; nothing here publishes one. The entry's `config.env` block enumerates every
+  credential variable Baron reads (`credentialEnvKeys` in `packages/providers/src/index.ts`) — a new
+  provider means a follow-up PR there, or its credentials cannot be entered in Docker Desktop. Before
+  submitting or updating the entry, run the container the way Docker's lister does:
+  `docker run --rm -i --init --cap-drop=ALL` with every `config.env` example and secret placeholder
+  set, and check it answers `tools/list`; CI's `container` job covers the plain launch only.
 
 `punkpeye/awesome-mcp-servers` takes a PR, but its bot labels any entry lacking a Glama score badge,
 and that badge 404s until Glama has indexed the repo — so it waits on the claim above. PulseMCP needs
