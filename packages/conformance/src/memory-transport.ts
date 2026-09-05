@@ -6,6 +6,8 @@ import type {
   NativeQuery,
   NativeTarget,
   NativeUpdateInput,
+  TransitionField,
+  TransitionFields,
 } from '@lonca/baron-core';
 
 interface Rec {
@@ -23,6 +25,8 @@ interface Rec {
   iteration: string | undefined;
   url: string;
   links: Array<{ toId: string; type: string }>;
+  /** Screen answers the last transition carried — what a Jira issue would show on its fields. */
+  fields: Record<string, unknown>;
 }
 
 /** The fixed fake identity '@me' resolves to — shared by currentUser/assign/query so they cohere. */
@@ -84,6 +88,13 @@ export interface MemoryTransportOptions {
    * to prove the gate refuses, and that a transport without one behaves exactly as before.
    */
   readonly reachableFrom?: Readonly<Record<string, readonly string[]>> | undefined;
+  /**
+   * The screen a move INTO each discriminator carries, for a provider whose transitions can demand
+   * fields the way Jira's do. When set the transport implements `transitionFields`, and its
+   * `applyTarget` REFUSES a move whose required fields are missing — the fidelity that matters: a
+   * fake that wrote anyway would let a core that skipped the check pass a suite Jira fails.
+   */
+  readonly screenFor?: Readonly<Record<string, readonly TransitionField[]>> | undefined;
 }
 
 /**
@@ -137,6 +148,7 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
         iteration: undefined,
         url: `mem://${id}`,
         links: [],
+        fields: {},
       };
       store.set(id, rec);
       return snapshot(rec);
@@ -146,7 +158,11 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
       return snapshot(must(id));
     },
 
-    async applyTarget(id: string, target: NativeTarget): Promise<NativeIssue> {
+    async applyTarget(
+      id: string,
+      target: NativeTarget,
+      fields?: TransitionFields,
+    ): Promise<NativeIssue> {
       const rec = must(id);
       const discriminator = target[opts.stateKey];
       if (
@@ -159,7 +175,20 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
             `(it owns: ${opts.ownedDiscriminators.join(', ')})`,
         );
       }
-      if (discriminator !== undefined) rec.discriminator = discriminator;
+      if (discriminator !== undefined) {
+        // Jira rejects the POST outright when the screen's required fields are absent; so does this,
+        // so the suite can tell a core that checked from one that got lucky.
+        const screen = opts.screenFor?.[discriminator] ?? [];
+        const unanswered = screen.filter((f) => f.required && fields?.[f.name] === undefined);
+        if (unanswered.length > 0) {
+          throw new Error(
+            `memory transport: moving to '${discriminator}' requires ` +
+              `${unanswered.map((f) => f.name).join(', ')}`,
+          );
+        }
+        rec.discriminator = discriminator;
+        rec.fields = { ...fields };
+      }
       const label = target.label;
       if (label !== undefined && !rec.labels.includes(label)) rec.labels.push(label);
       return snapshot(rec);
@@ -171,6 +200,19 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
             const rec = must(id);
             const reachable = opts.reachableFrom?.[rec.discriminator] ?? [];
             return reachable.map((value) => ({ [opts.stateKey]: value }));
+          },
+        }
+      : {}),
+
+    ...(opts.screenFor !== undefined
+      ? {
+          async transitionFields(
+            id: string,
+            target: NativeTarget,
+          ): Promise<readonly TransitionField[]> {
+            must(id);
+            const discriminator = target[opts.stateKey];
+            return discriminator === undefined ? [] : (opts.screenFor?.[discriminator] ?? []);
           },
         }
       : {}),

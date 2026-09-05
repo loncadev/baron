@@ -1,7 +1,11 @@
 import { deriveBranchName } from './branch-name.js';
 import type { CapabilityManifest } from './capabilities.js';
 import type { IssuesProviderConfig, LabelSpec, NativeTarget } from './config.js';
-import { BaronError, TransitionNotPermittedError } from './errors.js';
+import {
+  BaronError,
+  TransitionFieldsRequiredError,
+  TransitionNotPermittedError,
+} from './errors.js';
 import type { Issue, IssueComment, IssueDraft, IssueQuery } from './issue.js';
 import { ITERATION_CURRENT, type Iteration } from './iteration.js';
 import type { IssueLinkType } from './links.js';
@@ -17,6 +21,7 @@ import {
   classifyRoleMove,
   isWorkItemTypeRole,
 } from './roles.js';
+import type { TransitionField, TransitionFields, TransitionOptions } from './transition-fields.js';
 
 /** What {@link IssuesPort.classifyMove} answers: the move's kind, and the roles it is between. */
 export interface RoleMoveResult {
@@ -138,7 +143,12 @@ export interface NativeQuery {
 export interface IssuesTransport {
   createIssue(input: NativeCreateInput): Promise<NativeIssue>;
   getIssue(id: string): Promise<NativeIssue>;
-  applyTarget(id: string, target: NativeTarget): Promise<NativeIssue>;
+  /**
+   * Write the target. `fields` is what the caller supplied for the screen this move carries, keyed
+   * by the names the transport itself reported from `transitionFields`; a transport that reports
+   * none may ignore the parameter entirely, which is every provider today.
+   */
+  applyTarget(id: string, target: NativeTarget, fields?: TransitionFields): Promise<NativeIssue>;
   /**
    * Which targets this item can reach right now, for a provider where that is not "all of them".
    *
@@ -153,6 +163,14 @@ export interface IssuesTransport {
    * Optional, so a provider that gates nothing implements nothing and pays nothing.
    */
   availableTargets?(id: string): Promise<readonly NativeTarget[]>;
+  /**
+   * Which fields moving this item to `target` demands right now, for a provider whose transitions
+   * carry a screen (Jira). Reported, never interpreted: the transport says what the provider would
+   * ask a human, the core checks the caller answered the required ones BEFORE writing, and hands
+   * the answers back through `applyTarget`. Optional, so a provider that asks nothing implements
+   * nothing — and a Jira transport can answer this and `availableTargets` from one read.
+   */
+  transitionFields?(id: string, target: NativeTarget): Promise<readonly TransitionField[]>;
   /** Add a label additively WITHOUT touching the role discriminator (used by link emulation). */
   addLabel(id: string, label: string): Promise<void>;
   /**
@@ -198,7 +216,11 @@ export interface IssuesPort {
   update(id: string, update: IssueUpdate): Promise<Issue>;
   /** The caller's own handle (what `@me` resolves to) — lets a recipe ask "is this item mine?". */
   whoAmI(): Promise<string>;
-  transition(id: string, role: WorkflowRole): Promise<Issue>;
+  /**
+   * Move an item to `role`. `options.fields` carries whatever a gated provider's transition screen
+   * demands (see {@link TransitionFieldsRequiredError}); a provider that asks for nothing ignores it.
+   */
+  transition(id: string, role: WorkflowRole, options?: TransitionOptions): Promise<Issue>;
   /**
    * What moving this item to `role` would BE — advance, regress, reopen, noop — without moving it.
    *
@@ -382,7 +404,7 @@ export class BaseIssuesAdapter implements IssuesPort {
     };
   }
 
-  async transition(id: string, role: WorkflowRole): Promise<Issue> {
+  async transition(id: string, role: WorkflowRole, options?: TransitionOptions): Promise<Issue> {
     // On a provider whose states are scoped, the target is a function of the ITEM, not of the role
     // alone — a Linear state belongs to a team — so the item has to be read before the role can be
     // resolved. Only then: an unscoped provider pays nothing, which is every provider today.
@@ -408,13 +430,28 @@ export class BaseIssuesAdapter implements IssuesPort {
       }
     }
 
+    // The other half of a gate: the move is legal but its screen wants answers. Checked here, before
+    // the write, so a refusal costs nothing and names everything at once — a caller who learns the
+    // missing fields one provider rejection at a time is a caller who starts guessing values. Only
+    // presence is checked; what a field means, and whether a value is acceptable, is the provider's.
+    const supplied = options?.fields ?? {};
+    if (this.transport.transitionFields !== undefined) {
+      const wanted = await this.transport.transitionFields(id, target);
+      const missing = wanted.filter(
+        (field) => field.required && supplied[field.name] === undefined,
+      );
+      if (missing.length > 0) {
+        throw new TransitionFieldsRequiredError(role, this.cfg.provider, missing);
+      }
+    }
+
     const needsEmulatedState =
       !this.manifest.issues.arbitraryStates && role !== 'done' && role !== 'backlog';
     if (needsEmulatedState) {
       resolveGap('arbitraryStates', this.manifest, this.cfg.gapPolicy, this.logger);
     }
 
-    const applied = await this.transport.applyTarget(id, target);
+    const applied = await this.transport.applyTarget(id, target, options?.fields);
     // On a label-keyed provider the write only ADDS the new role's label; without clearing the
     // others an item ends up tagged in-progress AND in-review (and a stale label outlives a close).
     // Through the resolver, not past it: which key discriminates is the resolver's knowledge, and

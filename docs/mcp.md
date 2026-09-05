@@ -136,6 +136,13 @@ so an agent can read the gap and self-correct (retry with a different role, drop
 of the failure being swallowed by the protocol channel. Calling a tool for an unconfigured port
 returns `PORT_UNBOUND`.
 
+A refusal that names things also carries them as data, in `structuredContent.details`, so the agent
+can act without parsing prose. `TRANSITION_NOT_PERMITTED` lists the targets the provider permits
+from the item's current state. `TRANSITION_FIELDS_REQUIRED` — a provider whose transition carries a
+screen, such as Jira's "Resolve" — lists every field the move wants, with `required` and any
+`allowedValues`; the agent asks once and retries `baron_issue_move { op: "transition" }` with the
+answers in `fields`, keyed by the names exactly as reported.
+
 ## Running it as a container
 
 `npx` is the shortest path and the one the plugin manifest uses; a container is there for anyone who

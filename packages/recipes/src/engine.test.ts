@@ -590,6 +590,71 @@ steps:
       /not a role/,
     );
   });
+
+  it('passes `fields` through to a transition whose screen demands them', async () => {
+    // The engine validates the container and nothing else: what `resolution` means is the
+    // provider's business, and a recipe author writes the provider's own field names.
+    const doneTarget =
+      exampleGithubRoleMap.states.done?.[exampleGithubRoleMap.stateKey] ?? 'closed';
+    const gated = defineGithubIssuesAdapter(
+      {
+        roleMap: exampleGithubRoleMap,
+        typeMap: exampleGithubTypeMap,
+        gapPolicy: recommendedGithubGapPolicy,
+      },
+      createMemoryTransport({
+        stateKey: exampleGithubRoleMap.stateKey,
+        defaultDiscriminator: 'open',
+        screenFor: { [doneTarget]: [{ name: 'resolution', required: true }] },
+      }),
+    );
+    const withFields = loadRecipe(`
+name: resolve
+steps:
+  - do: issue.create
+    as: issue
+    with: { title: x, typeRole: task }
+  - do: issue.transition
+    as: issue
+    with:
+      id: \${issue.id}
+      role: done
+      fields: { resolution: Fixed }
+`);
+    const { context } = await runRecipe(withFields, {
+      ports: { issues: gated },
+      asker: scriptedAsker(),
+    });
+    expect((context.issue as { role?: string }).role).toBe('done');
+
+    const without = loadRecipe(`
+name: resolve-blind
+steps:
+  - do: issue.create
+    as: issue
+    with: { title: x, typeRole: task }
+  - do: issue.transition
+    with: { id: "\${issue.id}", role: done }
+`);
+    await expect(
+      runRecipe(without, { ports: { issues: gated }, asker: scriptedAsker() }),
+    ).rejects.toMatchObject({ code: 'TRANSITION_FIELDS_REQUIRED' });
+  });
+
+  it('rejects a `fields` that is not an object', async () => {
+    const recipe = loadRecipe(`
+name: bad-fields
+steps:
+  - do: issue.create
+    as: issue
+    with: { title: x, typeRole: task }
+  - do: issue.transition
+    with: { id: "\${issue.id}", role: done, fields: Fixed }
+`);
+    await expect(runRecipe(recipe, { ports: allPorts(), asker: scriptedAsker() })).rejects.toThrow(
+      /'fields' must be an object/,
+    );
+  });
 });
 
 // Blocking is orthogonal, so it is its own op rather than a role a transition could take. Without

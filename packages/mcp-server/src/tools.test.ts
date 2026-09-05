@@ -395,6 +395,62 @@ describe('callTool', () => {
     expect(result.structuredContent?.code).toBe('INVALID_ARGS');
   });
 
+  it('names the fields a gated transition wants in structuredContent, then takes them back', async () => {
+    // A provider whose closing transition carries a screen (Jira's "Resolve"). The refusal has to
+    // be branchable without parsing prose — the agent reads `details.fields`, asks once, retries
+    // with `fields` verbatim — and the retry must land.
+    const port = defineGithubIssuesAdapter(
+      {
+        roleMap: exampleGithubRoleMap,
+        typeMap: exampleGithubTypeMap,
+        gapPolicy: recommendedGithubGapPolicy,
+      },
+      createMemoryTransport({
+        stateKey: exampleGithubRoleMap.stateKey,
+        defaultDiscriminator: 'open',
+        screenFor: {
+          [exampleGithubRoleMap.states.done?.[exampleGithubRoleMap.stateKey] ?? 'closed']: [
+            { name: 'resolution', required: true, allowedValues: ['Fixed'] },
+          ],
+        },
+      }),
+    );
+    const created = parse(
+      await callTool(port, MCP_TOOL_NAMES.create, { title: 'x', typeRole: 'task' }).then(
+        (r) => r.content[0]?.text ?? '{}',
+      ),
+    );
+    const refused = await callTool(port, MCP_TOOL_NAMES.transition, {
+      id: created.id,
+      role: 'done',
+    });
+    expect(refused.isError).toBe(true);
+    expect(refused.structuredContent?.code).toBe('TRANSITION_FIELDS_REQUIRED');
+    expect(refused.structuredContent?.details).toEqual({
+      role: 'done',
+      provider: 'github',
+      fields: [{ name: 'resolution', required: true, allowedValues: ['Fixed'] }],
+    });
+
+    const moved = await callTool(port, MCP_TOOL_NAMES.transition, {
+      id: created.id,
+      role: 'done',
+      fields: { resolution: 'Fixed' },
+    });
+    expect(moved.isError).toBeUndefined();
+    expect(parse(moved.content[0]?.text ?? '{}').role).toBe('done');
+  });
+
+  it('rejects a non-object fields argument as INVALID_ARGS', async () => {
+    const result = await callTool(githubPort(), MCP_TOOL_NAMES.transition, {
+      id: '1',
+      role: 'done',
+      fields: 'Fixed',
+    });
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent?.code).toBe('INVALID_ARGS');
+  });
+
   it('rejects a missing required argument as INVALID_ARGS', async () => {
     const result = await callTool(githubPort(), MCP_TOOL_NAMES.create, { typeRole: 'task' });
     expect(result.isError).toBe(true);

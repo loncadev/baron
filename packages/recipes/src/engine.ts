@@ -269,6 +269,19 @@ function optStrRecord(params: Params, key: string, op: string): Record<string, s
   return out;
 }
 
+/**
+ * An object whose values are left alone — the answers a gated transition's screen wants, which the
+ * core hands to the provider untouched. Only the container's shape is the engine's business.
+ */
+function optRecord(params: Params, key: string, op: string): Record<string, unknown> | undefined {
+  const value = params[key];
+  if (value === undefined) return undefined;
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new BaronError(`Step '${op}' '${key}' must be an object.`, ARGS);
+  }
+  return { ...(value as Record<string, unknown>) };
+}
+
 /** Map a recipe op + resolved params onto the corresponding port call. */
 async function dispatchOp(ports: RecipePorts, op: RecipeOp, params: Params): Promise<unknown> {
   switch (op) {
@@ -297,8 +310,14 @@ async function dispatchOp(ports: RecipePorts, op: RecipeOp, params: Params): Pro
         ...(body !== undefined ? { body } : {}),
       });
     }
-    case RECIPE_OPS.issueTransition:
-      return issues(ports, op).transition(reqStr(params, 'id', op), reqRole(params, 'role', op));
+    case RECIPE_OPS.issueTransition: {
+      const fields = optRecord(params, 'fields', op);
+      return issues(ports, op).transition(
+        reqStr(params, 'id', op),
+        reqRole(params, 'role', op),
+        fields !== undefined ? { fields } : undefined,
+      );
+    }
     // Read-only: what the move WOULD be. The lifecycle order is core vocabulary; what to do about a
     // regress is the recipe's opinion, which is why this answers rather than decides.
     case RECIPE_OPS.issueClassify:

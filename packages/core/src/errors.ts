@@ -1,8 +1,16 @@
+import type { TransitionField } from './transition-fields.js';
+
 /** Base class for all Baron errors so callers can `instanceof BaronError`. */
 export class BaronError extends Error {
   constructor(
     message: string,
     readonly code: string,
+    /**
+     * Structured facts a caller can act on without parsing prose — the fields a transition wants,
+     * the targets a provider permits. Surfaces the same everywhere (MCP `structuredContent`, recipe
+     * failures), so a subclass that has them should put them here rather than only in the message.
+     */
+    readonly details?: Readonly<Record<string, unknown>> | undefined,
   ) {
     super(message);
     this.name = new.target.name;
@@ -121,6 +129,38 @@ export class TransitionNotPermittedError extends BaronError {
       `Provider '${provider}' will not move this item to role '${role}' from its current state. ` +
         `It permits: ${permitted.length > 0 ? permitted.join(', ') : '(nothing from here)'}.`,
       'TRANSITION_NOT_PERMITTED',
+      { role, provider, permitted },
     );
   }
+}
+
+/**
+ * The provider will make this move, but not without fields the caller did not supply.
+ *
+ * The other half of a gated transition: Jira's workflow can attach a screen to a transition, and the
+ * screen can require `resolution` or `fixVersions` — fields that have nothing to do with the role.
+ * Thrown BEFORE anything is written, and naming every missing field (with its accepted values when
+ * the provider publishes them), so the caller can ask once and retry with `fields` rather than
+ * discover them one rejection at a time.
+ */
+export class TransitionFieldsRequiredError extends BaronError {
+  constructor(
+    readonly role: string,
+    readonly provider: string,
+    readonly fields: readonly TransitionField[],
+  ) {
+    super(
+      `Provider '${provider}' needs more to move this item to role '${role}': ` +
+        `${fields.map(describeField).join('; ')}. Pass them as 'fields'.`,
+      'TRANSITION_FIELDS_REQUIRED',
+      { role, provider, fields },
+    );
+  }
+}
+
+function describeField(field: TransitionField): string {
+  const values = field.allowedValues;
+  return values !== undefined && values.length > 0
+    ? `'${field.name}' (one of: ${values.join(', ')})`
+    : `'${field.name}'`;
 }

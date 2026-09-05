@@ -75,10 +75,20 @@ Three have shipped:
   `MUTATION_OUTSIDE_RECIPE` and names the recipe to use instead. The tools stay listed: hiding them
   would trade an enforceable rule for an obscured one.
 
-One remains, shaped by a provider Baron has no adapter for yet:
+The fourth was shaped by a provider Baron has no adapter for yet, and is now also in:
 
-- `applyTarget` assumes a state can be set directly. Jira requires discovering the available
-  transitions first, then supplying any fields its transition screen demands.
+- `applyTarget` assumed a state can be set directly. Jira cannot: you discover the transitions its
+  workflow permits from the issue's current state, perform one, and answer whatever fields its
+  transition screen demands. The contract now lets a transport report both halves — the reachable
+  targets, and the fields a move needs — and the core verifies against them *before* writing: a
+  move the provider will not make fails with `TRANSITION_NOT_PERMITTED` naming what it would, a
+  move that wants fields fails with `TRANSITION_FIELDS_REQUIRED` naming every one (with accepted
+  values), and the caller passes them back as `fields`. The core checks presence and nothing else;
+  what a field means stays the provider's. Both halves are pinned by conformance against an
+  in-memory provider that refuses the way Jira does. The Jira adapter itself is the first thing to
+  build on it, and waits on a live site to validate against.
+
+Gate 3's contract work is done. What remains of the gate is its second half: first users.
 
 ## What Baron will not do
 

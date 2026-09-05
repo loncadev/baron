@@ -161,7 +161,7 @@ to text.
 | --- | --- | --- |
 | `issue.create` | `title`, `typeRole`, `body?`, `parentId?`, `labels?`, `initialRole?` | the issue |
 | `issue.get` | `id` | the issue (incl. `branchName`, the canonical `<prefix>/<id>-<slug>`) |
-| `issue.transition` | `id`, `role` | the issue |
+| `issue.transition` | `id`, `role`, optional `fields` (answers for a gated provider's transition screen, keyed by its native field names) | the issue |
 | `issue.classify` | `id`, `role` | `{ kind: advance \| regress \| reopen \| noop, from, to }` — judge a move BEFORE making it |
 | `issue.reconcile` | `id` | the issue, with any role label Baron itself wrote cleared once the provider's own state contradicts it |
 | `issue.update` | `id`, `title?`, `body?` | the issue |
