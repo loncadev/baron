@@ -54,14 +54,36 @@ describe('the Jira introspector', () => {
       { name: 'Story', hierarchyLevel: 0 },
       { name: 'Sub-task', hierarchyLevel: 1 },
     ]);
-    // De-duplicated across types, in first-seen order; the three Jira categories map onto Baron's,
-    // and a status with none is `unknown` for a human to place rather than guessed.
+    // De-duplicated across types and ordered by category (To Do, In Progress, Done, then the
+    // uncategorised), stable within a category; a status with no category is `unknown` for a
+    // human to place rather than guessed.
     expect(result.states).toEqual([
       { name: 'To Do', category: 'proposed' },
       { name: 'In Progress', category: 'in_progress' },
       { name: 'In Review', category: 'in_progress' },
       { name: 'Done', category: 'completed' },
       { name: 'Parked', category: 'unknown' },
+    ]);
+  });
+
+  it('orders statuses by category however Jira lists them', async () => {
+    const shuffled = [
+      {
+        ...projectStatuses[0],
+        statuses: [
+          { id: '4', name: 'In Review', statusCategory: { key: 'indeterminate' } },
+          { id: '3', name: 'In Progress', statusCategory: { key: 'indeterminate' } },
+          { id: '5', name: 'Done', statusCategory: { key: 'done' } },
+          { id: '1', name: 'To Do', statusCategory: { key: 'new' } },
+        ],
+      },
+    ];
+    const { introspector: i } = introspector(200, shuffled);
+    expect((await i.introspect()).states.map((s) => s.name)).toEqual([
+      'To Do',
+      'In Review',
+      'In Progress',
+      'Done',
     ]);
   });
 

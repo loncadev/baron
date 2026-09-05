@@ -30,6 +30,9 @@ const CATEGORY: Readonly<Record<string, StateCategory>> = {
   done: 'completed',
 };
 
+/** Jira's three categories in workflow order; anything uncategorised sorts last. */
+const CATEGORY_ORDER: Readonly<Record<string, number>> = { new: 0, indeterminate: 1, done: 2 };
+
 interface ProjectStatuses {
   id: string;
   name: string;
@@ -42,8 +45,10 @@ interface ProjectStatuses {
  *
  * One call answers both: `GET /project/{key}/statuses` lists every issue type with the statuses its
  * workflow reaches. Statuses are reported by NAME (the key the role map uses) and de-duplicated
- * across types, in the order Jira lists them, so a project where Bug and Story share a workflow
- * does not show "In Progress" twice.
+ * across types, so a project where Bug and Story share a workflow does not show "In Progress"
+ * twice. Jira lists them in no particular order (a real site answered "In Review, In Progress,
+ * Done, To Do"), so they are ordered by category — To Do, In Progress, Done — which is the order a
+ * person reads a workflow in and the order the proposal is shown in.
  */
 export function createJiraIntrospector(opts: JiraIntrospectorOptions): Introspector {
   const site = opts.site.replace(/\/+$/, '');
@@ -79,18 +84,18 @@ export function createJiraIntrospector(opts: JiraIntrospectorOptions): Introspec
         hierarchyLevel: type.subtask ? 1 : 0,
       }));
 
-      const seen = new Set<string>();
+      const seen = new Map<string, number>();
       const states: IntrospectedState[] = [];
       for (const type of types) {
         for (const status of type.statuses) {
           if (seen.has(status.name)) continue;
-          seen.add(status.name);
-          states.push({
-            name: status.name,
-            category: CATEGORY[status.statusCategory?.key ?? ''] ?? 'unknown',
-          });
+          const key = status.statusCategory?.key ?? '';
+          seen.set(status.name, CATEGORY_ORDER[key] ?? 3);
+          states.push({ name: status.name, category: CATEGORY[key] ?? 'unknown' });
         }
       }
+      // Stable, so two statuses of one category keep the order Jira gave them.
+      states.sort((a, b) => (seen.get(a.name) ?? 3) - (seen.get(b.name) ?? 3));
 
       return { provider: JIRA_PROVIDER, stateKey: JIRA_STATE_KEY, workItemTypes, states };
     },

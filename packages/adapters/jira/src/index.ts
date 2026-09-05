@@ -72,13 +72,17 @@ export const exampleJiraRoleMap: ProviderRoleMap = {
   },
 };
 
-/** The standard issue types of a Jira Software project. `initiative` needs Jira Premium's level. */
+/**
+ * The standard issue types of a Jira Software project. `initiative` needs Jira Premium's level.
+ * The sub-task type is spelled "Subtask" in a team-managed project and "Sub-task" in a
+ * company-managed one; `baron init` reads whichever the project has.
+ */
 export const exampleJiraTypeMap: TypeMap = {
   epic: 'Epic',
   story: 'Story',
   task: 'Task',
   bug: 'Bug',
-  subtask: 'Sub-task',
+  subtask: 'Subtask',
 };
 
 export type JiraIssuesConfig = Omit<IssuesProviderConfig, 'provider'>;

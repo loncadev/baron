@@ -1,6 +1,11 @@
 import type { CapabilityManifest } from './capabilities.js';
 import type { NativeTarget, TypeMap } from './config.js';
-import type { IntrospectedState, ProviderIntrospection, StateCategory } from './introspection.js';
+import type {
+  IntrospectedState,
+  IntrospectedType,
+  ProviderIntrospection,
+  StateCategory,
+} from './introspection.js';
 import type { PolicyRoleMapEntry } from './policy-file.js';
 import {
   TYPE_ROLE_COLLAPSE_ORDER,
@@ -56,6 +61,19 @@ const TYPE_KEYWORDS: Record<WorkItemTypeRole, RegExp> = {
  * which the category-only match would miss.
  */
 const REVIEW_STATE_NAME = /test|review|qa|verif/i;
+
+/** "Sub-task", "Subtask" and "sub task" are one name; so are "Task" and "task". */
+function normalizeTypeName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z]/g, '');
+}
+
+/** The type a provider files below every other, by the level it reports or, failing that, its name. */
+function isSubtaskType(type: IntrospectedType): boolean {
+  return (
+    (type.hierarchyLevel !== undefined && type.hierarchyLevel > 0) ||
+    TYPE_KEYWORDS.subtask.test(type.name)
+  );
+}
 
 function firstStateByCategory(
   states: readonly IntrospectedState[],
@@ -140,7 +158,15 @@ function matchStates(
       WorkflowRole,
       StateCategory,
     ][]) {
-      let matched = available.find((s) => !used.has(s.name) && s.category === category);
+      const candidates = available.filter((s) => !used.has(s.name) && s.category === category);
+      // A provider with only three categories (Jira: To Do / In Progress / Done) files its review
+      // state under in_progress too, and lists states in no particular order — so the first
+      // in_progress-category state can be "In Review", which then takes the in_progress role and
+      // leaves in_review with nothing. Prefer a state that does not READ as review; fall back to any.
+      let matched =
+        role === 'in_progress'
+          ? (candidates.find((s) => !REVIEW_STATE_NAME.test(s.name)) ?? candidates[0])
+          : candidates[0];
       // Fallback for in_review: a process may have no 'resolved'-category state but a review state
       // (e.g. 'Test') in the InProgress category — match it by name, not reusing another role's state.
       if (matched === undefined && role === 'in_review') {
@@ -247,7 +273,15 @@ export function proposeTypeMap(introspection: ProviderIntrospection): {
 
   const unmatched: WorkItemTypeRole[] = [];
   for (const role of WORK_ITEM_TYPE_ROLES) {
-    const match = types.find((t) => TYPE_KEYWORDS[role].test(t.name));
+    // A type NAMED for the role wins outright: Jira lists "Subtask" before "Task", and the keyword
+    // probe for `task` matches both, so keyword order alone handed `task` to the sub-task type.
+    // Failing that, a sub-task-level type is never a candidate for any other role — it is the one
+    // type every provider agrees sits below the rest.
+    const match =
+      types.find((t) => normalizeTypeName(t.name) === role) ??
+      types.find(
+        (t) => TYPE_KEYWORDS[role].test(t.name) && (role === 'subtask' || !isSubtaskType(t)),
+      );
     if (match !== undefined) typeMap[role] = match.name;
     else unmatched.push(role);
   }
