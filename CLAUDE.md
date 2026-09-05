@@ -10,7 +10,7 @@ foundational decisions. This file is the day-to-day working contract.
 
 ## Tech stack
 
-- TypeScript (NodeNext, strict), ESM only. Node >= 20.
+- TypeScript (NodeNext, strict), ESM only. Node >= 20 at runtime; developing needs Node 22+ (pnpm 11).
 - pnpm workspaces monorepo.
 - vitest (tests), biome (lint + format), tsup (build for publish).
 
