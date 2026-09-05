@@ -224,7 +224,8 @@ export const CONSOLIDATED_ISSUE_DEFINITIONS: readonly ToolDefinition[] = [
         additionalProperties: true,
         description:
           'Answers for the fields a gated transition demands, keyed by the provider-native names a ' +
-          'TRANSITION_FIELDS_REQUIRED refusal reported. Ignored by a provider that asks for none.',
+          'TRANSITION_FIELDS_REQUIRED refusal reported. Pass only what the refusal asked for: a ' +
+          'provider may reject a field its transition screen does not carry (Jira does).',
       },
     }),
   },

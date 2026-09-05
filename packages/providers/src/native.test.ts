@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { type NativeHttp, azureBasicAuth, nativeRequestPlan } from './native.js';
+import { type NativeHttp, azureBasicAuth, jiraBasicAuth, nativeRequestPlan } from './native.js';
+
+describe('jiraBasicAuth', () => {
+  it('is HTTP Basic with the account email as the username, the shape the adapter sends', () => {
+    expect(jiraBasicAuth('dev@acme.test', 'tok')).toBe(
+      `Basic ${Buffer.from('dev@acme.test:tok').toString('base64')}`,
+    );
+  });
+});
 
 const http: NativeHttp = {
   baseUrl: (env) => `https://dev.azure.com/${env.ORG ?? ''}`,

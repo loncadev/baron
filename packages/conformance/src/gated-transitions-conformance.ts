@@ -170,9 +170,11 @@ export function runGatedTransitionsConformance(): void {
       expect(moved.role).toBe('done');
     });
 
-    it('ignores fields on a provider that asks for none', async () => {
-      // `transitionFields` is optional; a transport without one must accept a caller who passed
-      // fields anyway, exactly as before — a recipe written for Jira should not break on GitHub.
+    it('passes fields through on a provider that asks for none, and lets it decide', async () => {
+      // `transitionFields` is optional; the core must not refuse a caller who passed fields to a
+      // transport without one — a recipe written for Jira should not break on GitHub. What the
+      // provider then does with them is its own: this fake ignores them, Jira rejects a field its
+      // screen does not carry, and both are correct.
       const port = adapter(true);
       const created = await port.create({ title: 'x', typeRole: 'task' });
       const moved = await port.transition(created.id, 'in_progress', {
