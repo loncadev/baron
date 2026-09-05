@@ -198,6 +198,14 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
           enum: ROLE_ENUM,
           description: 'Target workflow role. Translated to the provider-native target.',
         },
+        fields: {
+          type: 'object',
+          additionalProperties: true,
+          description:
+            'Answers for the fields a gated transition demands (a Jira transition screen), keyed by ' +
+            'the provider-native names a TRANSITION_FIELDS_REQUIRED refusal reported. Ignored by a ' +
+            'provider that asks for none.',
+        },
       },
     },
   },
@@ -855,6 +863,22 @@ function optionalString(
   return value;
 }
 
+/**
+ * The answers a gated transition's screen wants. Values are passed through untouched — the core
+ * checks that the required ones are present, the provider judges them — so only the container is
+ * validated here.
+ */
+function optionalFields(
+  args: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  const value = args?.fields;
+  if (value === undefined) return undefined;
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new BaronError("Argument 'fields' must be an object.", INVALID_ARGS);
+  }
+  return value as Record<string, unknown>;
+}
+
 function optionalLabels(args: Record<string, unknown> | undefined): string[] | undefined {
   const value = args?.labels;
   if (value === undefined) return undefined;
@@ -987,10 +1011,16 @@ async function run(
     // protocol error) so the agent sees the gap and can self-correct (invariant #5: never silent).
     // The code also rides in structuredContent so the agent can branch without parsing prose.
     if (error instanceof BaronError) {
+      // `details` rides along so a refusal that names things — the fields a transition wants, the
+      // targets a provider permits — can be acted on without regex over the message.
       return {
         isError: true,
         content: [{ type: 'text', text: `${error.code}: ${error.message}` }],
-        structuredContent: { code: error.code, message: error.message },
+        structuredContent: {
+          code: error.code,
+          message: error.message,
+          ...(error.details !== undefined ? { details: error.details } : {}),
+        },
       };
     }
     const message = error instanceof Error ? error.message : String(error);
@@ -1028,7 +1058,14 @@ export function callTool(
       );
     }
     case MCP_TOOL_NAMES.transition:
-      return run(() => port.transition(requireString(args, 'id'), requireRole(args)));
+      return run(() => {
+        const fields = optionalFields(args);
+        return port.transition(
+          requireString(args, 'id'),
+          requireRole(args),
+          fields !== undefined ? { fields } : undefined,
+        );
+      });
     case MCP_TOOL_NAMES.reconcile:
       return run(() => port.reconcile(requireString(args, 'id')));
     case MCP_TOOL_NAMES.classify:

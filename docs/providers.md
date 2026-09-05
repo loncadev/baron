@@ -116,3 +116,19 @@ A new provider (Jira, Linear, GitLab, …) is a thin adapter: a `CapabilityManif
 `IssuesTransport` (and/or `ScmTransport`) doing provider I/O only — no role/native translation, which
 stays in the shared core. Every adapter must pass the network-free conformance suite
 (`@lonca/baron-conformance`); live behavior is covered by credential-gated smoke tests.
+
+Two optional transport methods exist for a provider that **gates transitions** the way Jira does,
+where a status cannot simply be set:
+
+- `availableTargets(id)` — the targets the item can reach from where it is now. The core checks the
+  mapped target is among them and refuses with `TRANSITION_NOT_PERMITTED` otherwise, naming what the
+  provider would accept. It verifies; it never picks — the map a human confirmed decides what a role
+  means.
+- `transitionFields(id, target)` — the fields the move's screen demands (`resolution`,
+  `fixVersions`), each with `required` and any `allowedValues`. The core refuses with
+  `TRANSITION_FIELDS_REQUIRED` before writing when a required one is missing from the caller's
+  `fields`, and otherwise hands `fields` to `applyTarget` untouched. The transport reports and
+  applies; it never interprets a role, and the core never interprets a field.
+
+A Jira transport answers both from one `GET /issue/{id}/transitions?expand=transitions.fields` and
+performs the move with `POST …/transitions`. A provider that gates nothing implements neither.

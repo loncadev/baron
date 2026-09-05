@@ -208,8 +208,10 @@ export const CONSOLIDATED_ISSUE_DEFINITIONS: readonly ToolDefinition[] = [
     name: TOOL_NAMES.issueMove,
     mutatesProvider: true,
     description:
-      'Move a work item through the workflow, or flag it. ops: `transition` (id, role) — the ' +
-      'semantic role layer, resolving an abstract role to the provider’s native state/column/label; ' +
+      'Move a work item through the workflow, or flag it. ops: `transition` (id, role, optional ' +
+      'fields) — the semantic role layer, resolving an abstract role to the provider’s native ' +
+      'state/column/label; on a provider whose transition carries a screen (Jira) a refusal with ' +
+      'code TRANSITION_FIELDS_REQUIRED names the fields to pass back, verbatim, as `fields`; ' +
       '`reconcile` (id) — clear a role label the provider’s own state contradicts, commanding no ' +
       'role; `block` (id, reason — required) and `unblock` (id, optional reason), which set and clear ' +
       'an ORTHOGONAL flag and leave the role alone, so an item keeps the role it is blocked in.',
@@ -217,6 +219,13 @@ export const CONSOLIDATED_ISSUE_DEFINITIONS: readonly ToolDefinition[] = [
       id: ID,
       role: { type: 'string' },
       reason: { type: 'string' },
+      fields: {
+        type: 'object',
+        additionalProperties: true,
+        description:
+          'Answers for the fields a gated transition demands, keyed by the provider-native names a ' +
+          'TRANSITION_FIELDS_REQUIRED refusal reported. Ignored by a provider that asks for none.',
+      },
     }),
   },
 ];

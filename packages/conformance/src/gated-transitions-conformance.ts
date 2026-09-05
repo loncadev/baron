@@ -3,6 +3,8 @@ import {
   type CapabilityManifest,
   type IssuesPort,
   type ProviderRoleMap,
+  type TransitionField,
+  TransitionFieldsRequiredError,
 } from '@lonca/baron-core';
 import { describe, expect, it } from 'vitest';
 import { createMemoryTransport } from './memory-transport.js';
@@ -60,7 +62,20 @@ const manifest: CapabilityManifest = {
   },
 };
 
-function adapter(gated: boolean): IssuesPort {
+/**
+ * The screen closing carries: Jira's classic "Resolve" transition, which will not complete without
+ * a resolution, and offers a version it does not insist on.
+ */
+const RESOLUTION = 'resolution';
+const FIX_VERSION = 'fixVersion';
+const SCREENS: Record<string, readonly TransitionField[]> = {
+  [DONE]: [
+    { name: RESOLUTION, required: true, allowedValues: ['Fixed', "Won't Do"] },
+    { name: FIX_VERSION, required: false },
+  ],
+};
+
+function adapter(gated: boolean, screens = false): IssuesPort {
   return new BaseIssuesAdapter(
     manifest,
     {
@@ -73,6 +88,7 @@ function adapter(gated: boolean): IssuesPort {
       stateKey: 'state',
       defaultDiscriminator: NEW,
       ...(gated ? { reachableFrom: WORKFLOW } : {}),
+      ...(screens ? { screenFor: SCREENS } : {}),
     }),
   );
 }
@@ -110,6 +126,59 @@ export function runGatedTransitionsConformance(): void {
       const port = adapter(false);
       const created = await port.create({ title: 'x', typeRole: 'task' });
       expect((await port.transition(created.id, 'done')).role).toBe('done');
+    });
+  });
+
+  describe('a provider whose transitions carry a screen', () => {
+    it('refuses before writing, and names every required field with its accepted values', async () => {
+      // The refusal has to come from the core's check, not from the provider's rejection: the
+      // provider's would arrive after an attempted write, and would name one field at a time.
+      const port = adapter(true, true);
+      const created = await port.create({ title: 'x', typeRole: 'task' });
+      await port.transition(created.id, 'in_progress');
+      const attempt = port.transition(created.id, 'done');
+      await expect(attempt).rejects.toBeInstanceOf(TransitionFieldsRequiredError);
+      await expect(attempt).rejects.toMatchObject({
+        code: 'TRANSITION_FIELDS_REQUIRED',
+        fields: [{ name: RESOLUTION, required: true, allowedValues: ['Fixed', "Won't Do"] }],
+      });
+      await expect(attempt).rejects.toThrow(/'resolution' \(one of: Fixed, Won't Do\)/);
+      // Nothing moved.
+      expect((await port.get(created.id)).role).toBe('in_progress');
+    });
+
+    it('does not demand an optional field', async () => {
+      const port = adapter(true, true);
+      const created = await port.create({ title: 'x', typeRole: 'task' });
+      await port.transition(created.id, 'in_progress');
+      const moved = await port.transition(created.id, 'done', {
+        fields: { [RESOLUTION]: 'Fixed' },
+      });
+      expect(moved.role).toBe('done');
+    });
+
+    it('hands the supplied fields to the provider untouched', async () => {
+      // The core checks presence and nothing else. A value the provider would reject is the
+      // provider's to reject — the memory fake only enforces presence, so a shape the core might
+      // have been tempted to "normalise" arrives exactly as given.
+      const port = adapter(true, true);
+      const created = await port.create({ title: 'x', typeRole: 'task' });
+      await port.transition(created.id, 'in_progress');
+      const moved = await port.transition(created.id, 'done', {
+        fields: { [RESOLUTION]: { name: 'Fixed' }, [FIX_VERSION]: ['1.2.0'] },
+      });
+      expect(moved.role).toBe('done');
+    });
+
+    it('ignores fields on a provider that asks for none', async () => {
+      // `transitionFields` is optional; a transport without one must accept a caller who passed
+      // fields anyway, exactly as before — a recipe written for Jira should not break on GitHub.
+      const port = adapter(true);
+      const created = await port.create({ title: 'x', typeRole: 'task' });
+      const moved = await port.transition(created.id, 'in_progress', {
+        fields: { [RESOLUTION]: 'Fixed' },
+      });
+      expect(moved.role).toBe('in_progress');
     });
   });
 }

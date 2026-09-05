@@ -2,6 +2,7 @@ export * from './roles.js';
 export * from './branch-name.js';
 export * from './links.js';
 export * from './errors.js';
+export * from './transition-fields.js';
 export * from './logger.js';
 export * from './capabilities.js';
 export * from './policy.js';
