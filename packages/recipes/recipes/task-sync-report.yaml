@@ -78,13 +78,39 @@ steps:
           sourceBranch: "${item.branchName}"
           state: all
 
+  # Drift D — merged but still in review. The common one on a provider that does not close an item
+  # when its PR merges (Jira and Azure without a linked repository do not): task-land merges, the
+  # card stays in review, and nothing moves it. The first live Jira run landed exactly here and the
+  # sweep said nothing, because in-review items were only ever checked for the no-PR case.
+  - for_each: ${inReview}
+    as: item
+    collect:
+      as: mergedButInReview
+      from: "${item.key}"
+      when:
+        truthy: "${landed.id}"
+    steps:
+      - do: scm.pr.find
+        as: landed
+        when:
+          truthy: "${item.branchName}"
+        with:
+          sourceBranch: "${item.branchName}"
+          state: merged
+
   - message: "Swept ${inProgress.length} in progress and ${inReview.length} in review."
   - message: "Merged but still in progress (move these to in_review with task-move): ${mergedButOpen}"
     when:
       truthy: "${mergedButOpen.length}"
+  - message: "Merged but still in review (move these to done with task-move): ${mergedButInReview}"
+    when:
+      truthy: "${mergedButInReview.length}"
   - message: "In review with no pull request — look at these yourself, Baron will not guess: ${reviewWithoutPr}"
     when:
       truthy: "${reviewWithoutPr.length}"
   - message: "Nothing merged is still in progress."
     when:
       falsy: "${mergedButOpen.length}"
+  - message: "Nothing merged is still in review."
+    when:
+      falsy: "${mergedButInReview.length}"
