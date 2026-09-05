@@ -1,3 +1,10 @@
 packages:
   - "packages/*"
   - "packages/adapters/*"
+
+# pnpm 11 refuses to install until every dependency with a build script has been ruled on. Both of
+# these ship their real binaries as optional platform packages; the scripts are only sanity checks,
+# and pnpm 10 was already skipping them.
+allowBuilds:
+  "@biomejs/biome": false
+  esbuild: false
