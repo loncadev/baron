@@ -1,22 +1,22 @@
 # Providers
 
-Baron ships two P0 providers. Each contributes a capability manifest per port; the core reads it and
-applies your gap policy for anything a provider can't do natively. This page is the support matrix.
+Each provider contributes a capability manifest per port; the core reads it and applies your gap
+policy for anything a provider can't do natively. This page is the support matrix.
 
 ## Ports × providers
 
-| Port | Azure DevOps | GitHub | Linear | Slack |
-| --- | --- | --- | --- | --- |
-| `issues` | ✅ Azure Boards | ✅ GitHub Issues | ✅ Linear Issues | — |
-| `scm` | ✅ Azure Repos | ✅ GitHub (git refs + pulls) | — | — |
-| `ci` | ✅ Azure Pipelines | ✅ GitHub Actions | — | — |
-| `deploy` | ✅ Azure Environments | ✅ GitHub Environments | — | — |
-| `notify` | — | — | — | ✅ Slack |
-| `docs` | — (planned, v2) | — (planned, v2) | — (planned, v2) | — (planned, v2) |
+| Port | Azure DevOps | GitHub | Jira | Linear | Slack |
+| --- | --- | --- | --- | --- | --- |
+| `issues` | ✅ Azure Boards | ✅ GitHub Issues | ✅ Jira Cloud | ✅ Linear Issues | — |
+| `scm` | ✅ Azure Repos | ✅ GitHub (git refs + pulls) | — | — | — |
+| `ci` | ✅ Azure Pipelines | ✅ GitHub Actions | — | — | — |
+| `deploy` | ✅ Azure Environments | ✅ GitHub Environments | — | — | — |
+| `notify` | — | — | — | — | ✅ Slack |
+| `docs` | — (planned, v2) | — (planned, v2) | — (planned, v2) | — (planned, v2) | — (planned, v2) |
 
-Linear binds `issues` only: it has no source control, pipelines or environments of its own, which is
-exactly the case ports exist for — pair it with GitHub for `scm` and nothing about the recipes
-changes.
+Jira and Linear bind `issues` only: neither has source control, pipelines or environments of its
+own, which is exactly the case ports exist for — pair either with GitHub for `scm` and nothing about
+the recipes changes.
 
 Every provider also exposes the **escape hatch** (`baron_native_request`, ARCHITECTURE decision #18):
 a clearly-labeled, last-resort, non-portable raw authenticated REST call. It only reaches providers
@@ -29,17 +29,31 @@ knowledge, not user-confirmed roles. `notify` (Slack) uses `SLACK_BOT_TOKEN` + `
 
 ## Issues capabilities
 
-| Capability | Azure DevOps | GitHub | Linear | If absent, default handling |
-| --- | --- | --- | --- | --- |
-| `hierarchy` (native parent/child) | ✅ | ❌ | ✅ | `emulate:labels` (`parent:<id>`) |
-| `arbitraryStates` (beyond open/closed) | ✅ | ❌ | ✅ | `emulate:labels` (mid-roles ride labels) |
-| `separateBoardColumn` | ✅ | ❌ | ❌ | n/a |
-| `sprints` | ✅ | ❌ | ✅ (cycles) | `degrade` |
-| `nativeLabels` | ✅ | ✅ | ✅ | — |
-| `nativeTypes` (a type is stored at create and read back) | ✅ | ❌ | ❌ | the role rides a `type:<role>` label |
-| `typeFiltering` (the provider's query filters by type) | ✅ | ❌ | ❌ | `emulate:post-filter` |
-| `comments` | ✅ | ✅ | ✅ | — |
-| `issueLinks` (typed links) | ✅ | ❌ | ✅ | `emulate:labels` (`<type>:<id>`) |
+| Capability | Azure DevOps | GitHub | Jira | Linear | If absent, default handling |
+| --- | --- | --- | --- | --- | --- |
+| `hierarchy` (native parent/child) | ✅ | ❌ | ✅ | ✅ | `emulate:labels` (`parent:<id>`) |
+| `arbitraryStates` (beyond open/closed) | ✅ | ❌ | ✅ | ✅ | `emulate:labels` (mid-roles ride labels) |
+| `separateBoardColumn` | ✅ | ❌ | ❌ | ❌ | n/a |
+| `sprints` | ✅ | ❌ | ❌ (not yet) | ✅ (cycles) | `degrade` |
+| `nativeLabels` | ✅ | ✅ | ✅ | ✅ | — |
+| `nativeTypes` (a type is stored at create and read back) | ✅ | ❌ | ✅ | ❌ | the role rides a `type:<role>` label |
+| `typeFiltering` (the provider's query filters by type) | ✅ | ❌ | ✅ (JQL) | ❌ | `emulate:post-filter` |
+| `comments` | ✅ | ✅ | ✅ | ✅ | — |
+| `issueLinks` (typed links) | ✅ | ❌ | ✅ | ✅ | `emulate:labels` (`<type>:<id>`) |
+
+**Jira is the first provider that GATES transitions.** A status cannot be set: the workflow permits
+some transitions from the issue's current status, and a transition may carry a screen that demands
+fields (`resolution` on "Resolve", say). The adapter reports both — reachable targets and required
+fields — from Jira's `transitions` read, and the core verifies against them *before* writing: a move
+the workflow will not make fails with `TRANSITION_NOT_PERMITTED` naming what it would, and a move
+whose screen wants answers fails with `TRANSITION_FIELDS_REQUIRED` naming every field, which the
+caller passes back as `fields` (`baron_issue_move { op: "transition", fields: { resolution: { name:
+"Fixed" } } }`, or `fields:` on a recipe's `issue.transition`). The role map keys on the status
+*name*; Jira's own three categories (To Do / In Progress / Done) cannot tell `in_review` from
+`in_progress`, so `baron init` proposes from names and a human confirms. Sprints live on the Jira
+Software agile API and are not wired yet — the manifest says so, and the gap policy decides
+(`degrade` by default). Issue links are directional and named from the outward side, so
+`blocked_by` is deliberately unmapped: write "A is blocked by B" as `blocks` from B to A.
 
 **Linear is the first provider whose states are SCOPED.** A `WorkflowState` belongs to a team, not to
 the workspace, so the same role is a different state in each team — `in_progress` is one id in one

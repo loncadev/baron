@@ -62,7 +62,7 @@ describe('runCli', () => {
 
   it('exits 1 on an unknown provider', async () => {
     const { ports, err } = harness();
-    expect(await runCli(['init', '--provider', 'jira'], ports)).toBe(1);
+    expect(await runCli(['init', '--provider', 'asana'], ports)).toBe(1);
     expect(err.join('\n')).toContain('UNKNOWN_PROVIDER');
   });
 
