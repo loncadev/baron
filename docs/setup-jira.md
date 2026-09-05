@@ -4,11 +4,9 @@ A copy-paste walkthrough to wire Baron to a **Jira Cloud** project and drive it 
 End state: you ask Claude *"start PROJ-12"* and it moves the issue through Jira's workflow, cuts the
 branch on GitHub, and assigns the work to you — through one set of normalized tools.
 
-> The adapter is exercised network-free by the conformance suite and by tests that assert every
-> request it sends, and live by a gated smoke test that runs only when Jira credentials are in the
-> environment. Unlike the Linear walkthrough, this one was **not** written from a transcript of a
-> real run — the shapes below are what the code does, and a reader who runs it first is the most
-> useful bug report Baron could get.
+> Written from a real run against a free Jira Cloud site with a team-managed Software project
+> (statuses To Do / In Progress / In Review / Done; types Epic, Story, Task, Bug, Subtask). The
+> commands, prompts and messages below are what actually appeared, not a reconstruction.
 
 Jira is unlike every other provider Baron ships in one way that is worth knowing before you start:
 
@@ -73,13 +71,22 @@ From your project root:
 npx -y @lonca/baron-cli@latest init --provider jira
 ```
 
-It explains what it is about to do, gathers credentials, then reads your project's issue types and
-the statuses their workflows can hold, and **proposes** a mapping. Nothing is written until you
-confirm. For a project on Jira's default software workflow with a review column the proposal looks
-like this:
+It explains what it is about to do, offers to take branches and pull requests from the repository
+your git remote names (Jira has none), gathers credentials, then reads your project's issue types
+and the statuses their workflows can hold, and **proposes** a mapping. Nothing is written until you
+confirm. On a team-managed project with the four default statuses the run looked like this:
 
 ```
-Binding provider 'jira' to: issues, with scm (branches/PRs) on 'github'.
+Provider 'jira' has no source control. Take branches and pull requests from GitHub (loncadev/baron-live-test, read off your git remote)? (Y/n)
+Setting up credentials → .baron/credentials (gitignored, never committed).
+Jira Cloud needs an API token, the email it belongs to, the site, and a project key.
+  1. Create the token at: https://id.atlassian.com/manage-profile/security/api-tokens
+  2. JIRA_SITE is the site root, e.g. https://acme.atlassian.net
+  3. JIRA_EMAIL is the Atlassian account the token was created under.
+  4. JIRA_PROJECT is the project KEY, the prefix on its issue keys (PROJ in PROJ-123).
+  JIRA_SITE:   JIRA_EMAIL:   JIRA_API_TOKEN (paste the token — input hidden):
+  JIRA_PROJECT: Saved .baron/credentials (gitignored — your token is not committed).
+Binding provider 'jira' to: issues.
 Proposed mapping for issues provider 'jira':
   role backlog -> {"status":"To Do"}
   role in_progress -> {"status":"In Progress"}
@@ -89,18 +96,24 @@ Proposed mapping for issues provider 'jira':
   type story -> Story
   type task -> Task
   type bug -> Bug
-  type subtask -> Sub-task
+  type subtask -> Subtask
+  type initiative -> Epic
   gap sprints -> degrade
 Notes (confirm these guesses):
-  - Mapped role 'in_review' to state 'In Review' by name (no 'resolved'-category state found);
-    confirm it.
+  - Mapped role 'in_review' to state 'In Review' by name (no 'resolved'-category state found); confirm it.
+  - No native type matched type role 'initiative'; collapsed onto 'Epic'. Items of that native type no longer resolve back to a single role.
+Write .baron/policy.json with this mapping? (Y/n)
+Create AGENTS.md (agent steering for Baron)? (Y/n)
+Wrote .baron/policy.json (commit it — it holds no secrets).
 ```
 
 **Read the notes.** Jira reports only three status categories, so any status beyond To Do /
-In Progress / Done was matched **by name** — a status called "Code Review", "QA" or "Testing" is
-proposed for `in_review`, and a project with none leaves the role unmapped. A role you map onto a
-status the workflow cannot reach from where an issue is will be refused at transition time, by
-Jira's own rules, with the permitted moves named.
+In Progress / Done was matched **by name** — a status called "In Review", "Code Review", "QA" or
+"Testing" is proposed for `in_review`, and a project with none leaves the role unmapped. The
+`initiative` collapse is the honest answer on a project without Jira Premium's extra hierarchy
+level: it shares the Epic type, so an Epic read back reports `epic`. A role you map onto a status
+the workflow cannot reach from where an issue is will be refused at transition time, by Jira's own
+rules, with the permitted moves named.
 
 If a guess is wrong, answer `n`, fix the workflow in Jira (or edit `policy.json` afterwards), and run
 `init` again.
@@ -120,7 +133,7 @@ npx -y @lonca/baron-cli@latest doctor
 ```
 
 ```
-OK — 9 reference(s) checked for 'jira', no drift.
+OK — 10 reference(s) checked for 'jira', no drift.
 OK — 2 credential capability/capabilities confirmed.
 ```
 
@@ -171,12 +184,23 @@ npx -y @lonca/baron-cli@latest run --recipe task-finish  # open a draft PR, link
 npx -y @lonca/baron-cli@latest run --recipe task-land    # undraft, wait for checks, merge
 ```
 
-`task-start` on a Jira issue with GitHub bound to `scm` reports both halves:
+A recipe that creates an item and walks it through every hop ran like this on the real project —
+each transition is checked against the transitions Jira permits from where the item is, and each
+landed:
 
 ```
-PROJ-12 is in progress on task/proj-12-add-the-webhook (created on the provider), assigned to you.
+created KAN-2 type=Task role=backlog branch=task/kan-2-baron-live-walk-safe-to-delete
+assigned to kemreparlak@gmail.com
+final role=done url=https://kadiremresworkspace-36668184.atlassian.net/browse/KAN-2
+```
+
+The branch name carries the issue key, which is what a person calls the issue and what every Jira
+endpoint accepts. With GitHub bound to `scm`, `task-start` reports both halves:
+
+```
+KAN-12 is in progress on task/kan-12-add-the-webhook (created on the provider), assigned to you.
 Your working copy has not moved. To get onto it:
-  git fetch && git checkout task/proj-12-add-the-webhook
+  git fetch && git checkout task/kan-12-add-the-webhook
 ```
 
 ### When a transition asks for fields
@@ -226,9 +250,15 @@ field means, and whether a value is acceptable, stays Jira's.
 
 ## 8. What's live-validated
 
-The Jira issues path is covered by the network-free conformance suite, by tests that assert every
-request the transport sends (create, transition-by-destination, transition screens, JQL, labels,
-links, assignment), and by a gated smoke test that creates, transitions, labels and deletes an
-issue on a real site when `JIRA_SITE`, `JIRA_EMAIL`, `JIRA_API_TOKEN` and `JIRA_PROJECT` are present
-in the environment. Sprints are not supported yet. See [providers.md](./providers.md) for the full
-capability table.
+Run against a real team-managed Jira Cloud project: introspection, `baron init` with prompted
+credentials, `doctor` (reference check and both credential probes), and a recipe walk — create,
+assign `@me`, `in_progress` → `in_review` → `done` through Jira's transitions, comment, query by
+role, delete. The gated smoke test repeats the transport-level half whenever `JIRA_SITE`,
+`JIRA_EMAIL`, `JIRA_API_TOKEN` and `JIRA_PROJECT` are present in the environment.
+
+Two things were **not** exercised live, and are covered by tests that assert what the transport
+sends instead: a transition **screen** (the default team-managed workflow attaches none, so
+`TRANSITION_FIELDS_REQUIRED` and the `fields` reply are proven against Jira's documented
+`transitions` shape rather than a real screen), and a workflow that refuses a hop (the default
+workflow permits every status from every other). Sprints are not supported yet. See
+[providers.md](./providers.md) for the full capability table.

@@ -96,6 +96,85 @@ describe('proposeRoleMap (customized Scrum: in_review by state name)', () => {
   });
 });
 
+// A team-managed Jira project as its API reports it (2026-09-06, a real site): only three status
+// categories, so the review state is `in_progress` too; statuses in no particular order, review
+// first; and a "Subtask" type listed before "Task". Every one of those tripped the proposal.
+const jiraIntrospection: ProviderIntrospection = {
+  provider: 'jira',
+  stateKey: 'status',
+  workItemTypes: [
+    { name: 'Epic', hierarchyLevel: 0 },
+    { name: 'Subtask', hierarchyLevel: 1 },
+    { name: 'Task', hierarchyLevel: 0 },
+    { name: 'Story', hierarchyLevel: 0 },
+    { name: 'Bug', hierarchyLevel: 0 },
+  ],
+  states: [
+    { name: 'In Review', category: 'in_progress' },
+    { name: 'In Progress', category: 'in_progress' },
+    { name: 'Done', category: 'completed' },
+    { name: 'To Do', category: 'proposed' },
+  ],
+};
+
+const jiraManifest: CapabilityManifest = {
+  ...richManifest,
+  provider: 'jira',
+  issues: { ...richManifest.issues, separateBoardColumn: false, sprints: false },
+};
+
+describe('proposeRoleMap (Jira: three categories, unordered states)', () => {
+  it('does not hand in_progress a state that reads as review when a plainer one exists', () => {
+    const { entry, notes } = proposeRoleMap(jiraIntrospection, jiraManifest);
+    expect(entry.states.backlog).toEqual({ status: 'To Do' });
+    expect(entry.states.in_progress).toEqual({ status: 'In Progress' });
+    expect(entry.states.in_review).toEqual({ status: 'In Review' });
+    expect(entry.states.done).toEqual({ status: 'Done' });
+    expect(notes.some((n) => n.includes("Mapped role 'in_review' to state 'In Review'"))).toBe(
+      true,
+    );
+  });
+
+  it('still takes the only in_progress-category state when that is all there is', () => {
+    const only: ProviderIntrospection = {
+      ...jiraIntrospection,
+      states: [
+        { name: 'In Review', category: 'in_progress' },
+        { name: 'Done', category: 'completed' },
+        { name: 'To Do', category: 'proposed' },
+      ],
+    };
+    const { entry } = proposeRoleMap(only, jiraManifest);
+    expect(entry.states.in_progress).toEqual({ status: 'In Review' });
+    expect(entry.states.in_review).toBeUndefined();
+  });
+});
+
+describe('proposeTypeMap (Jira: Subtask listed before Task)', () => {
+  it('maps task to Task and subtask to Subtask, never task onto the sub-task type', () => {
+    const { typeMap, notes } = proposeTypeMap(jiraIntrospection);
+    expect(typeMap.task).toBe('Task');
+    expect(typeMap.subtask).toBe('Subtask');
+    expect(typeMap.story).toBe('Story');
+    expect(typeMap.bug).toBe('Bug');
+    expect(typeMap.epic).toBe('Epic');
+    expect(notes.some((n) => n.includes("Native type 'Task' is mapped from no type role"))).toBe(
+      false,
+    );
+  });
+
+  it('treats a sub-task-level type as no candidate for any other role, by level or by name', () => {
+    const byName: ProviderIntrospection = {
+      ...jiraIntrospection,
+      workItemTypes: [{ name: 'Sub-task' }, { name: 'Story' }, { name: 'Bug' }],
+    };
+    const { typeMap } = proposeTypeMap(byName);
+    expect(typeMap.subtask).toBe('Sub-task');
+    // No "Task" here: task borrows from its neighbour rather than landing on the sub-task type.
+    expect(typeMap.task).not.toBe('Sub-task');
+  });
+});
+
 describe('proposeTypeMap (Feature vs Product Backlog Item)', () => {
   it('maps story to the backlog item, not Feature, and Feature-as-epic', () => {
     const { typeMap } = proposeTypeMap(scrumIntrospection);
