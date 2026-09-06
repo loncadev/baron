@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
+import { createServer } from 'node:http';
 import { describe, expect, it } from 'vitest';
-import { createLinearPkceAuth } from './pkce-auth.js';
+import { LINEAR_CALLBACK_PORT, createLinearPkceAuth } from './pkce-auth.js';
 
 /** A fetch that records the token exchange and answers with a queued JSON body. */
 function fakeFetch(bodies: unknown[]) {
@@ -33,7 +34,7 @@ describe('the Linear PKCE flow', () => {
     const { fetchImpl, calls } = fakeFetch([
       { access_token: 'lin_oauth_x', refresh_token: 'r', expires_in: 86399 },
     ]);
-    const auth = createLinearPkceAuth({ clientId: 'cid', fetchImpl });
+    const auth = createLinearPkceAuth({ clientId: 'cid', fetchImpl, port: 0 });
     let shown: string | undefined;
     const token = auth.authorize((prompt) => {
       shown = prompt.verificationUri;
@@ -83,9 +84,47 @@ describe('the Linear PKCE flow', () => {
     );
   });
 
+  it('listens on the fixed, registered port by default — Linear matches the redirect URI exactly', async () => {
+    const { fetchImpl } = fakeFetch([{ access_token: 'lin_oauth_x' }]);
+    const auth = createLinearPkceAuth({ clientId: 'cid', fetchImpl });
+    let shown: string | undefined;
+    const token = auth.authorize((prompt) => {
+      shown = prompt.verificationUri;
+      setTimeout(() => {
+        void approve(prompt.verificationUri, (q) => ({
+          code: 'auth-code',
+          state: q.get('state') as string,
+        }));
+      }, 10);
+    });
+    await token;
+    expect(new URL(shown as string).searchParams.get('redirect_uri')).toBe(
+      `http://127.0.0.1:${LINEAR_CALLBACK_PORT}/callback`,
+    );
+  });
+
+  it('names the port and the override when the port is taken, instead of a bare EADDRINUSE', async () => {
+    const squatter = createServer();
+    await new Promise<void>((res) => squatter.listen(0, '127.0.0.1', res));
+    const address = squatter.address();
+    const port = typeof address === 'object' && address !== null ? address.port : 0;
+    try {
+      const { fetchImpl } = fakeFetch([]);
+      const auth = createLinearPkceAuth({ clientId: 'cid', fetchImpl, port });
+      await expect(auth.authorize(() => {})).rejects.toMatchObject({
+        code: 'LINEAR_AUTH',
+        message: expect.stringMatching(
+          new RegExp(`Port ${port} on 127\.0\.0\.1 is in use.*BARON_LINEAR_CALLBACK_PORT`),
+        ),
+      });
+    } finally {
+      squatter.close();
+    }
+  });
+
   it('refuses a callback this sign-in did not start', async () => {
     const { fetchImpl, calls } = fakeFetch([{ access_token: 'never' }]);
-    const auth = createLinearPkceAuth({ clientId: 'cid', fetchImpl });
+    const auth = createLinearPkceAuth({ clientId: 'cid', fetchImpl, port: 0 });
     const token = auth.authorize((prompt) => {
       setTimeout(() => {
         void approve(prompt.verificationUri, () => ({ code: 'auth-code', state: 'forged' }));
@@ -101,7 +140,7 @@ describe('the Linear PKCE flow', () => {
 
   it("reports Linear's own refusal instead of a missing code", async () => {
     const { fetchImpl } = fakeFetch([]);
-    const auth = createLinearPkceAuth({ clientId: 'cid', fetchImpl });
+    const auth = createLinearPkceAuth({ clientId: 'cid', fetchImpl, port: 0 });
     const token = auth.authorize((prompt) => {
       setTimeout(() => {
         void approve(prompt.verificationUri, (q) => ({
@@ -115,7 +154,7 @@ describe('the Linear PKCE flow', () => {
 
   it('gives up when nobody comes back, naming how long it waited', async () => {
     const { fetchImpl } = fakeFetch([]);
-    const auth = createLinearPkceAuth({ clientId: 'cid', fetchImpl, timeoutMs: 50 });
+    const auth = createLinearPkceAuth({ clientId: 'cid', fetchImpl, timeoutMs: 50, port: 0 });
     await expect(auth.authorize(() => {})).rejects.toMatchObject({ code: 'LINEAR_AUTH' });
   });
 
@@ -123,7 +162,7 @@ describe('the Linear PKCE flow', () => {
     const { fetchImpl } = fakeFetch([
       { error: 'invalid_grant', error_description: 'Code expired' },
     ]);
-    const auth = createLinearPkceAuth({ clientId: 'cid', fetchImpl });
+    const auth = createLinearPkceAuth({ clientId: 'cid', fetchImpl, port: 0 });
     const token = auth.authorize((prompt) => {
       setTimeout(() => {
         void approve(prompt.verificationUri, (q) => ({

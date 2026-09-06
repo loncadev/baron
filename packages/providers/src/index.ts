@@ -41,6 +41,7 @@ import {
   jiraManifest,
 } from '@lonca/baron-adapter-jira';
 import {
+  LINEAR_CALLBACK_PORT_ENV,
   LINEAR_OAUTH_CLIENT_ID_KEY,
   LINEAR_PROVIDER,
   LINEAR_REFRESH_TOKEN_KEY,
@@ -50,6 +51,7 @@ import {
   createLinearPkceAuth,
   createLinearTransport,
   exampleLinearLinkMap,
+  linearCallbackUri,
   linearManifest,
 } from '@lonca/baron-adapter-linear';
 import {
@@ -244,6 +246,8 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
       'personal key fails as "authentication required", which reads like a bad key.',
       'With BARON_LINEAR_CLIENT_ID set to a Linear OAuth application’s client id, `baron init`',
       'offers a browser sign-in (PKCE, no secret) instead; the token it stores lasts 24 hours.',
+      `That application must list ${linearCallbackUri()} as a redirect URI — Linear matches it`,
+      `exactly, port included (${LINEAR_CALLBACK_PORT_ENV} moves the port if it is taken).`,
     ],
     manifest: linearManifest,
     credentialEnvKeys: ['LINEAR_API_KEY', 'LINEAR_TEAM'],
@@ -284,9 +288,11 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
       // returns lasts 24 hours — refresh is the next piece, so until it lands this stays opt-in.
       const clientId = env.BARON_LINEAR_CLIENT_ID;
       if (clientId === undefined || clientId.length === 0) return undefined;
+      const port = env[LINEAR_CALLBACK_PORT_ENV];
       return createLinearPkceAuth({
         clientId,
         ...(env.BARON_LINEAR_SCOPE !== undefined ? { scope: env.BARON_LINEAR_SCOPE } : {}),
+        ...(port !== undefined && port.length > 0 ? { port: Number(port) } : {}),
       });
     },
   },

@@ -65,14 +65,18 @@ ready to paste.
 Linear supports the OAuth authorization-code flow with PKCE, so `baron init` can sign you in
 through the browser instead of asking for a key — when it knows which OAuth application to use.
 Set `BARON_LINEAR_CLIENT_ID` to your Linear OAuth application's client id (Settings → API → OAuth
-applications; the application's callback URL must be `http://127.0.0.1/callback` — Baron listens
-on a port of the system's choosing, and Linear accepts any port on a loopback redirect) and `init`
-offers:
+applications) and `init` offers:
 
 ```
 Sign in to linear in your browser instead of pasting a token? (Y/n)
   Open https://linear.app/oauth/authorize?… and approve — Baron is listening for the answer.
 ```
+
+The application's redirect URI must be **exactly** `http://127.0.0.1:41765/callback`. Linear matches
+the redirect URI against the registered list character for character, port included — a
+port-less `http://127.0.0.1/callback` is refused with *"Invalid redirect_uri parameter for the
+application"* — so Baron listens on that fixed port. If it is taken on your machine, set
+`BARON_LINEAR_CALLBACK_PORT` to a free one and register `http://127.0.0.1:<port>/callback` as well.
 
 No client secret is involved: PKCE binds the token exchange to the process that started the flow.
 The access token Linear issues lasts 24 hours; the refresh token, its expiry and the client id are
@@ -236,4 +240,8 @@ The Linear issues path — create, transition, assign, comment, label, link, que
 per-team scoped role map — is exercised against a real workspace by gated smoke tests, which run only
 when `LINEAR_API_KEY` and `LINEAR_TEAM` are present in the environment. The mixed setup this
 walkthrough describes (issues on Linear, branches and pull requests on GitHub) was run end to end
-while writing it. See [providers.md](./providers.md) for the full capability table.
+while writing it. The browser sign-in was run live against a registered Linear OAuth application:
+`init` approving in the browser and writing the refresh token beside the access token; `doctor` on
+that token; a renewal before expiry, a renewal after Linear refused a bad access token, and a
+steady-state run that rotated nothing — each time with the rotated pair written back by the MCP
+server and by `baron run`. See [providers.md](./providers.md) for the full capability table.
