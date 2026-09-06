@@ -253,8 +253,12 @@ export interface IssuesPort {
    * Provision the given labels (idempotent). A no-op on providers whose roles are native states.
    * `baron init` calls this to create a repo's workflow labels deliberately (named colors) so a
    * transition never depends on the provider silently auto-creating a grey one.
+   *
+   * Resolves to whether anything was provisioned: false on a provider whose transport has no
+   * `ensureLabels`, where labels exist by being used (Jira) or the roles never ride labels at all
+   * (Azure). A caller that reports "provisioned N labels" on that answer is reporting a fiction.
    */
-  ensureLabels(labels: readonly LabelSpec[]): Promise<void>;
+  ensureLabels(labels: readonly LabelSpec[]): Promise<boolean>;
   /** The provider's iterations/sprints (empty when the provider has none). */
   iterations(): Promise<readonly Iteration[]>;
   /** The active iteration right now, or undefined (no sprint active / provider has none). */
@@ -582,9 +586,11 @@ export class BaseIssuesAdapter implements IssuesPort {
     return this.transport.currentUser();
   }
 
-  async ensureLabels(labels: readonly LabelSpec[]): Promise<void> {
+  async ensureLabels(labels: readonly LabelSpec[]): Promise<boolean> {
     // Native-state providers have no ensureLabels transport method: nothing to provision.
-    await this.transport.ensureLabels?.(labels);
+    if (this.transport.ensureLabels === undefined) return false;
+    await this.transport.ensureLabels(labels);
+    return true;
   }
 
   async assign(id: string, assignee: string): Promise<Issue> {

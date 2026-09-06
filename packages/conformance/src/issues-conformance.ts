@@ -23,7 +23,7 @@ export interface IssuesConformanceTarget {
     gapPolicy: GapPolicy,
     typeMap?: TypeMap,
     /** Transport fidelity overrides, for asserting what happens when a provider cannot do a thing. */
-    transport?: { readonly canRemoveLabels?: boolean },
+    transport?: { readonly canRemoveLabels?: boolean; readonly canProvisionLabels?: boolean },
   ): { adapter: IssuesPort; logger: RecordingLogger };
   /**
    * A type map in which `bug` and `task` each name a native type no other role uses. Not every
@@ -242,8 +242,17 @@ export function runIssuesConformance(target: IssuesConformanceTarget): void {
         { name: 'in-progress', color: 'fbca04', description: 'Baron: in progress' },
         { name: 'done', color: '0e8a16', description: 'Baron: done' },
       ];
-      await expect(adapter.ensureLabels(specs)).resolves.toBeUndefined();
-      await expect(adapter.ensureLabels(specs)).resolves.toBeUndefined(); // idempotent
+      await expect(adapter.ensureLabels(specs)).resolves.toBe(true);
+      await expect(adapter.ensureLabels(specs)).resolves.toBe(true); // idempotent
+    });
+
+    it('says when it provisioned nothing, so nobody reports labels that were never made', async () => {
+      // A transport without `ensureLabels` — labels exist by being used (Jira), or roles never ride
+      // labels (Azure). The call is a no-op and must SAY so: `baron init` printed "Provisioned 2
+      // workflow labels" on the first live Jira run about two labels nothing had touched.
+      const { adapter } = target.build({}, undefined, { canProvisionLabels: false });
+      const specs = [{ name: 'in-progress', color: '0e8a16', description: 'x' }];
+      await expect(adapter.ensureLabels(specs)).resolves.toBe(false);
     });
 
     it('update patches title/body and leaves omitted fields alone', async () => {

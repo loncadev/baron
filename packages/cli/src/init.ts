@@ -3,6 +3,7 @@ import {
   type BaronPolicyFile,
   type Introspector,
   type NativeTarget,
+  type ProviderIntrospection,
   type ProviderProposal,
   WORK_ITEM_TYPE_ROLES,
   parsePolicy,
@@ -299,6 +300,77 @@ async function ensureCredentials(
     );
   }
   return effective;
+}
+
+/**
+ * What to do when the provider could not be read with the credentials just gathered.
+ *
+ * The first live Jira run got the site wrong, and what it saw was a raw fetch error, a saved
+ * credentials file with the wrong value in it, and a re-run that asked nothing — because gathering
+ * prompts only for MISSING keys, and nothing was missing. The person's only way out was to know
+ * the file existed and edit it by hand. So: say which provider failed and why, name the file and
+ * the keys it holds, and — when someone is there to answer — offer to re-enter that provider's
+ * credentials on the spot and try once more. A non-interactive run gets the hint and stops.
+ */
+async function recoverIntrospection(
+  options: InitOptions,
+  descriptor: ProviderDescriptor,
+  env: Env,
+  error: unknown,
+  introspectorFor: (env: Env) => Introspector,
+): Promise<ProviderIntrospection> {
+  const keys = descriptor.credentialEnvKeys ?? [];
+  const reason = error instanceof Error ? error.message : String(error);
+  const hint =
+    `The credentials it used are in ${CREDENTIALS_IGNORE_ENTRY}` +
+    `${keys.length > 0 ? ` (${keys.join(', ')})` : ''}; fix the wrong one there and re-run \`baron init\`.`;
+  const fail = (): never => {
+    throw new BaronError(
+      `Could not read '${descriptor.id}': ${reason} ${hint}`,
+      'INTROSPECTION_FAILED',
+    );
+  };
+
+  options.prompter.note(`\nCould not read '${descriptor.id}': ${reason}`);
+  if (options.force === true || keys.length === 0) fail();
+  const again = await options.prompter.confirm(
+    `Re-enter the ${descriptor.id} credentials and try again?`,
+    true,
+  );
+  if (!again) fail();
+
+  // Every key of the failing provider, current value shown for the ones that are not secret so a
+  // typo is visible; an empty answer keeps what is there. Re-entered values win over the
+  // environment for the retry — the whole point is to replace what just failed.
+  const file = parseCredentials(options.fs.read(credentialsPath(options.root)) ?? '');
+  const reentered: Record<string, string> = {};
+  for (const key of keys) {
+    const secret = SECRET_KEY.test(key);
+    const current = env[key];
+    const shown = current !== undefined && current !== '' && !secret ? ` [${current}]` : '';
+    const answer = (
+      await options.prompter.text(
+        `  ${key}${shown}${secret ? ' (paste the token — input hidden; empty keeps the current one)' : ''}:`,
+        { secret },
+      )
+    ).trim();
+    if (answer.length > 0) reentered[key] = answer;
+  }
+  const values = { ...file, ...reentered };
+  options.fs.mkdirp(`${options.root}/${BARON_DIR}`);
+  writeCredentialsFile(options.fs, options.root, descriptor, values, Object.keys(values));
+  options.prompter.note(`Saved ${CREDENTIALS_IGNORE_ENTRY}.`);
+
+  const retryEnv: Env = { ...env, ...reentered };
+  try {
+    return await introspectorFor(retryEnv).introspect();
+  } catch (retryError) {
+    const retryReason = retryError instanceof Error ? retryError.message : String(retryError);
+    throw new BaronError(
+      `Could not read '${descriptor.id}' with the re-entered credentials either: ${retryReason} ${hint}`,
+      'INTROSPECTION_FAILED',
+    );
+  }
 }
 
 /**
@@ -654,8 +726,21 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
     scmProvider === undefined ? undefined : getProviderDescriptor(scmProvider),
   );
 
-  const introspector = options.introspector ?? createIntrospector(effectiveEnv);
-  const introspection = await introspector.introspect();
+  // Built INSIDE the try: an adapter may refuse a malformed credential when it is constructed
+  // (Jira validates the site URL there), and that refusal is exactly the failure the recovery
+  // below exists for. The first live run of this path proved it by never reaching it.
+  let introspection: ProviderIntrospection;
+  try {
+    introspection = await (options.introspector ?? createIntrospector(effectiveEnv)).introspect();
+  } catch (error) {
+    introspection = await recoverIntrospection(
+      options,
+      descriptor,
+      effectiveEnv,
+      error,
+      (env) => options.introspector ?? createIntrospector(env),
+    );
+  }
   const proposal = proposePolicy(introspection, manifest);
 
   summarizeProposal(options.prompter, proposal, bindScm, scmProvider);

@@ -61,7 +61,14 @@ export function createJiraIntrospector(opts: JiraIntrospectorOptions): Introspec
       const response = await doFetch(
         `${site}/rest/api/2/project/${encodeURIComponent(opts.project)}/statuses`,
         { headers: { authorization, accept: 'application/json' } },
-      );
+      ).catch((error: unknown) => {
+        // A site that does not resolve surfaces from fetch as a bare "fetch failed"; the site is
+        // the one thing the person can act on, so it is named.
+        throw new BaronError(
+          `Jira introspection: could not reach ${site} (${error instanceof Error ? error.message : String(error)}). Check JIRA_SITE.`,
+          'JIRA_API',
+        );
+      });
       if (!response.ok) {
         throw new BaronError(
           `Jira introspection: HTTP ${response.status} reading project '${opts.project}'. ` +

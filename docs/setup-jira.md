@@ -238,6 +238,7 @@ field means, and whether a value is acceptable, stays Jira's.
 | --- | --- |
 | `HTTP 401` on every call | Wrong email/token pair, or the token was sent as a Bearer. An API token goes in HTTP Basic with the account email. |
 | `no project 'PROJ' is visible to this token` | Wrong key, or the account is not a member of the project. Jira answers 404 for both and does not say which. |
+| `init` says it could not read the provider | A credential is wrong. `init` offers to re-enter them on the spot and tries again; on a `--force` run it names the file (`.baron/credentials`) and the keys to fix instead. |
 | `POLICY_NOT_FOUND` | No `.baron/policy.json` at the root — run `init`, or check `BARON_ROOT`. |
 | `TRANSITION_NOT_PERMITTED` | The workflow has no transition from the issue's current status to the mapped one. The message lists what it permits; move through an intermediate role, or adjust the workflow. |
 | `TRANSITION_FIELDS_REQUIRED` | The transition's screen wants fields. Pass them as `fields`, keyed exactly as named (see §6). |

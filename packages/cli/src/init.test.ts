@@ -260,6 +260,94 @@ describe('runInit', () => {
     ).rejects.toMatchObject({ code: 'CREDENTIALS_MISSING' });
   });
 
+  // The first live Jira run saved a wrong JIRA_SITE, saw a raw fetch error, and on a re-run was
+  // asked nothing because nothing was missing. These pin the way out.
+  describe('when the provider cannot be read with the credentials just gathered', () => {
+    /** Fails on the first call with a provider-shaped error, answers on the second. */
+    function flakyIntrospector() {
+      let calls = 0;
+      return {
+        calls: () => calls,
+        async introspect() {
+          calls += 1;
+          if (calls === 1) throw new Error("HTTP 404 reading project 'n'");
+          return githubIntrospectionFixture;
+        },
+      };
+    }
+
+    it('offers to re-enter that provider’s credentials on the spot, and tries again with them', async () => {
+      const fs = memoryFileSystem({
+        [credentialsPath(ROOT)]: 'GITHUB_OWNER=n\nGITHUB_REPO=r\nGITHUB_TOKEN=old\n',
+      });
+      // confirms: re-enter? yes; write policy? yes. texts: owner, repo, token (empty keeps).
+      const prompter = scriptedPrompter([true, true], ['acme', 'widgets', '']);
+      const introspector = flakyIntrospector();
+      const result = await runInit({
+        root: ROOT,
+        issuesProvider: 'github',
+        fs,
+        env: {},
+        prompter,
+        introspector,
+      });
+      expect(result.written).toBe(true);
+      expect(introspector.calls()).toBe(2);
+      const saved = fs.read(credentialsPath(ROOT)) as string;
+      expect(saved).toContain('GITHUB_OWNER=acme');
+      expect(saved).toContain('GITHUB_REPO=widgets');
+      // An empty answer keeps the value that was there — a token is not something to retype.
+      expect(saved).toContain('GITHUB_TOKEN=old');
+      expect(prompter.notes.join('\n')).toContain("Could not read 'github': HTTP 404");
+      // A current value is shown as `[value]` next to the prompt so a typo is visible; a secret
+      // never is, in a note or anywhere else.
+      expect(prompter.notes.join('\n')).not.toContain('[old]');
+    });
+
+    it('names the file and the keys, and stops, when nobody can answer (--force)', async () => {
+      const fs = memoryFileSystem();
+      const failing = {
+        async introspect(): Promise<never> {
+          throw new Error('HTTP 401');
+        },
+      };
+      await expect(
+        runInit({
+          root: ROOT,
+          issuesProvider: 'github',
+          fs,
+          env: GH_ENV,
+          prompter: scriptedPrompter([]),
+          introspector: failing,
+          force: true,
+        }),
+      ).rejects.toMatchObject({
+        code: 'INTROSPECTION_FAILED',
+        message: expect.stringMatching(/HTTP 401.*\.baron\/credentials.*GITHUB_TOKEN/s),
+      });
+    });
+
+    it('stops with the same hint when re-entry is declined', async () => {
+      const fs = memoryFileSystem();
+      const failing = {
+        async introspect(): Promise<never> {
+          throw new Error('HTTP 401');
+        },
+      };
+      await expect(
+        runInit({
+          root: ROOT,
+          issuesProvider: 'github',
+          fs,
+          env: GH_ENV,
+          prompter: scriptedPrompter([false]),
+          introspector: failing,
+        }),
+      ).rejects.toMatchObject({ code: 'INTROSPECTION_FAILED' });
+      expect(fs.read(policyPath(ROOT))).toBeUndefined();
+    });
+  });
+
   it('does not duplicate the gitignore entry when it already exists', async () => {
     const fs = memoryFileSystem({
       [gitignorePath(ROOT)]: `node_modules\n${CREDENTIALS_IGNORE_ENTRY}\n`,
