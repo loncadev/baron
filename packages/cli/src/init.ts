@@ -248,7 +248,13 @@ async function ensureCredentials(
         // Printed before any attempt to open a browser, and never replaced by it: every reason the
         // opener fails — headless, SSH, a container, no registered handler — is a reason the user
         // still needs to read the URL and the code off the screen.
-        prompter.note(`  Open ${code.verificationUri} and enter:  ${code.userCode}`);
+        // A device flow shows a code to type; a callback flow (Linear) has nothing to type — the
+        // page itself is the approval, and the provider sends the browser back to Baron.
+        prompter.note(
+          code.userCode !== undefined
+            ? `  Open ${code.verificationUri} and enter:  ${code.userCode}`
+            : `  Open ${code.verificationUri} and approve — Baron is listening for the answer.`,
+        );
         // The provider's pre-filled variant, when it offers one, saves typing the code. The user
         // still confirms the code on screen matches, which is what makes the shortcut safe.
         if (openBrowser(code.verificationUriComplete ?? code.verificationUri)) {
