@@ -138,6 +138,13 @@ export function createJiraTransport(opts: JiraTransportOptions): IssuesTransport
         ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
       },
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    }).catch((error: unknown) => {
+      // Name the site: a bare "fetch failed" from a host that does not resolve says nothing a
+      // person can act on.
+      throw new BaronError(
+        `Jira API ${method} ${path}: could not reach ${site} (${error instanceof Error ? error.message : String(error)}). Check JIRA_SITE.`,
+        ERROR_CODE,
+      );
     });
     const text = await response.text();
     if (!response.ok) {

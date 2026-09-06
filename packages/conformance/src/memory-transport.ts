@@ -1,5 +1,6 @@
 import type {
   IssuesTransport,
+  LabelSpec,
   NativeComment,
   NativeCreateInput,
   NativeIssue,
@@ -67,6 +68,12 @@ export interface MemoryTransportOptions {
    * real adapter lacked.
    */
   readonly canRemoveLabels?: boolean | undefined;
+  /**
+   * Set false to model a transport with no `ensureLabels` at all — Jira, where labels exist by
+   * being used, and Azure, whose roles never ride labels. The base adapter must then report that it
+   * provisioned nothing rather than let `baron init` announce labels it never made.
+   */
+  readonly canProvisionLabels?: boolean | undefined;
   /**
    * The scope every item created here belongs to, for a provider whose states are owned by
    * something inside the workspace (a Linear team). Reported on every {@link NativeIssue}.
@@ -231,11 +238,15 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
           },
         }),
 
-    async ensureLabels(labels): Promise<void> {
-      // Idempotent provisioning: record each name once (a repeat is a no-op), mirroring a real
-      // create-if-missing without a network.
-      for (const label of labels) provisionedLabels.add(label.name);
-    },
+    ...(opts.canProvisionLabels === false
+      ? {}
+      : {
+          async ensureLabels(labels: readonly LabelSpec[]): Promise<void> {
+            // Idempotent provisioning: record each name once (a repeat is a no-op), mirroring a
+            // real create-if-missing without a network.
+            for (const label of labels) provisionedLabels.add(label.name);
+          },
+        }),
 
     async addComment(id: string, body: string): Promise<NativeComment> {
       must(id);

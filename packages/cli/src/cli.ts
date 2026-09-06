@@ -135,9 +135,18 @@ async function provisionRoleLabels(ports: CliPorts, root: string): Promise<void>
   ];
   if (specs.length === 0) return;
   try {
-    await buildIssuesPort(config, effectiveEnv(ports, root)).ensureLabels(specs);
+    const provisioned = await buildIssuesPort(config, effectiveEnv(ports, root)).ensureLabels(
+      specs,
+    );
+    // Only claim what happened: on a provider whose labels exist by being used (Jira) the call is
+    // a no-op, and "Provisioned 2 workflow labels" there was a line the first live run printed
+    // about nothing.
     ports.out(
-      `Provisioned ${specs.length} workflow labels: ${specs.map((s) => s.name).join(', ')}.`,
+      provisioned
+        ? `Provisioned ${specs.length} workflow labels: ${specs.map((s) => s.name).join(', ')}.`
+        : `Workflow labels on '${config.provider}' need no provisioning (${specs
+            .map((s) => s.name)
+            .join(', ')} will exist by being used).`,
     );
   } catch (error) {
     ports.err(
