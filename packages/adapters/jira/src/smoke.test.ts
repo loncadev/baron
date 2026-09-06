@@ -80,6 +80,17 @@ describe.skipIf(!live)('jira live smoke', () => {
         limit: 50,
       });
       expect(mine.map((i) => i.key)).toContain(created.key);
+
+      // Sprints, when the project has a Scrum board: the active sprint is current, an issue moves
+      // into it through the agile API and reads back in it, and a query by sprint finds it.
+      const iterations = await transport.listIterations();
+      const current = iterations.find((i) => i.current);
+      if (current !== undefined) {
+        const inSprint = await transport.setIteration(created.id, current.path);
+        expect(inSprint.iteration).toBe(current.name);
+        const sprinted = await transport.queryIssues({ iterationPath: current.path, limit: 50 });
+        expect(sprinted.map((i) => i.key)).toContain(created.key);
+      }
     } finally {
       await fetch(`${opts().site.replace(/\/+$/, '')}/rest/api/2/issue/${created.key}`, {
         method: 'DELETE',

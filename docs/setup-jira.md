@@ -98,7 +98,6 @@ Proposed mapping for issues provider 'jira':
   type bug -> Bug
   type subtask -> Subtask
   type initiative -> Epic
-  gap sprints -> degrade
 Notes (confirm these guesses):
   - Mapped role 'in_review' to state 'In Review' by name (no 'resolved'-category state found); confirm it.
   - No native type matched type role 'initiative'; collapsed onto 'Epic'. Items of that native type no longer resolve back to a single role.
@@ -246,7 +245,7 @@ field means, and whether a value is acceptable, stays Jira's.
 | `task-land`: "could not verify checks … rollup is 'unknown'" | On a **private** GitHub repository a fine-grained token cannot read check runs at all. Add **Actions (Read)** and **Commit statuses (Read)** to the token so the gate sees CI; until then it warns and lands, and you confirm CI yourself. Public repositories expose check runs without any permission. |
 | `PORT_UNBOUND` on `scm.branch.create` | `providers.scm` is unbound, because Jira provides no source control. Re-run `init` and accept the GitHub offer. |
 | `LINK_MAPPING` for `blocked_by` | Jira links are directional and named from the outward side; write "A is blocked by B" as `blocks` from B to A. |
-| Sprints do nothing | Sprints live on the Jira Software agile API and are not wired yet; the manifest declares it and the gap policy (`degrade` by default) decides. |
+| No sprints, or the wrong ones | Sprints belong to a Scrum board. A project with no Scrum board has none; a project with several uses the first unless `JIRA_BOARD` (id or name) says otherwise. `@current` is the board's *active* sprint — start one in Jira. |
 
 ---
 
@@ -268,4 +267,7 @@ landed on Resolved; Close landed on Closed; and a move from Closed to `in_progre
 `TRANSITION_NOT_PERMITTED` naming Reopened as the only hop the workflow permits. Nine checks, nine
 passes, no code change needed.
 
-Sprints are not supported yet. See [providers.md](./providers.md) for the full capability table.
+Sprints were proven on the same company-managed project with a Scrum board: the board's sprints
+list as iterations with the active one current, an issue moves into a sprint through the agile
+API, and a query by sprint finds it. See [providers.md](./providers.md) for the full capability
+table.

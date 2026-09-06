@@ -34,7 +34,7 @@ knowledge, not user-confirmed roles. `notify` (Slack) uses `SLACK_BOT_TOKEN` + `
 | `hierarchy` (native parent/child) | ✅ | ❌ | ✅ | ✅ | `emulate:labels` (`parent:<id>`) |
 | `arbitraryStates` (beyond open/closed) | ✅ | ❌ | ✅ | ✅ | `emulate:labels` (mid-roles ride labels) |
 | `separateBoardColumn` | ✅ | ❌ | ❌ | ❌ | n/a |
-| `sprints` | ✅ | ❌ | ❌ (not yet) | ✅ (cycles) | `degrade` |
+| `sprints` | ✅ | ❌ | ✅ (Scrum board) | ✅ (cycles) | `degrade` |
 | `nativeLabels` | ✅ | ✅ | ✅ | ✅ | — |
 | `nativeTypes` (a type is stored at create and read back) | ✅ | ❌ | ✅ | ❌ | the role rides a `type:<role>` label |
 | `typeFiltering` (the provider's query filters by type) | ✅ | ❌ | ✅ (JQL) | ❌ | `emulate:post-filter` |
@@ -50,10 +50,12 @@ whose screen wants answers fails with `TRANSITION_FIELDS_REQUIRED` naming every 
 caller passes back as `fields` (`baron_issue_move { op: "transition", fields: { resolution: { name:
 "Fixed" } } }`, or `fields:` on a recipe's `issue.transition`). The role map keys on the status
 *name*; Jira's own three categories (To Do / In Progress / Done) cannot tell `in_review` from
-`in_progress`, so `baron init` proposes from names and a human confirms. Sprints live on the Jira
-Software agile API and are not wired yet — the manifest says so, and the gap policy decides
-(`degrade` by default). Issue links are directional and named from the outward side, so
-`blocked_by` is deliberately unmapped: write "A is blocked by B" as `blocks` from B to A.
+`in_progress`, so `baron init` proposes from names and a human confirms. Sprints belong to a
+**Scrum board**, not to the project: the adapter reads the project's first Scrum board (or the one
+`JIRA_BOARD` names), its sprints are the iterations, the active one is `@current`, and an issue is
+moved into a sprint through the agile API. A project with no Scrum board simply has no sprints.
+Issue links are directional and named from the outward side, so `blocked_by` is deliberately
+unmapped: write "A is blocked by B" as `blocks` from B to A.
 
 **Linear is the first provider whose states are SCOPED.** A `WorkflowState` belongs to a team, not to
 the workspace, so the same role is a different state in each team — `in_progress` is one id in one

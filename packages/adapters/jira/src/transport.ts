@@ -37,11 +37,34 @@ export interface JiraTransportOptions {
   readonly apiToken: string;
   /** Project key (e.g. `PROJ`) new issues are created in and queries are scoped to. */
   readonly project: string;
+  /**
+   * The Scrum board whose sprints are the project's iterations, by id or name. Sprints belong to
+   * boards, not projects, and a project can have several; unset, the first Scrum board for the
+   * project is used, and a project with none simply has no iterations.
+   */
+  readonly board?: string | undefined;
   readonly fetchImpl?: typeof fetch | undefined;
 }
 
 /** The field set every read asks for, so one parser serves create, get, update and search. */
 const ISSUE_FIELDS = 'summary,description,status,issuetype,parent,labels,assignee';
+
+/** Sprints live on the Jira Software API, under a different prefix on the same host. */
+const AGILE_PREFIX = '/rest/agile/1.0';
+
+/** How Jira identifies its sprint field: the id varies per site, the schema type does not. */
+const SPRINT_FIELD_SCHEMA = 'com.pyxis.greenhopper.jira:gh-sprint';
+
+/** Jira's sprint states; `active` is the one the core calls the current iteration. */
+const SPRINT_ACTIVE = 'active';
+
+interface JiraSprint {
+  id: number;
+  name: string;
+  state: string;
+  startDate?: string;
+  endDate?: string;
+}
 
 interface JiraUser {
   accountId: string;
@@ -60,6 +83,8 @@ interface JiraIssue {
     parent?: { id: string; key: string } | null;
     labels?: string[] | null;
     assignee?: JiraUser | null;
+    /** The sprint custom field, under whatever id this site gave it. */
+    [custom: string]: unknown;
   };
 }
 
@@ -99,8 +124,13 @@ export function createJiraTransport(opts: JiraTransportOptions): IssuesTransport
   const doFetch = opts.fetchImpl ?? fetch;
   const authorization = `Basic ${Buffer.from(`${opts.email}:${opts.apiToken}`).toString('base64')}`;
 
-  async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const response = await doFetch(`${site}${API_PREFIX}${path}`, {
+  async function call<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    prefix: string = API_PREFIX,
+  ): Promise<T> {
+    const response = await doFetch(`${site}${prefix}${path}`, {
       method,
       headers: {
         authorization,
@@ -120,7 +150,35 @@ export function createJiraTransport(opts: JiraTransportOptions): IssuesTransport
     return (text.length > 0 ? JSON.parse(text) : undefined) as T;
   }
 
-  const toNative = (issue: JiraIssue): NativeIssue => ({
+  const agile = <T>(method: string, path: string, body?: unknown): Promise<T> =>
+    call<T>(method, path, body, AGILE_PREFIX);
+
+  // The sprint field's id differs per site (customfield_10020 on one, another number elsewhere),
+  // so it is discovered once from the field catalogue by its schema type and cached for the life
+  // of the transport. Undefined when the site has no Jira Software at all.
+  let sprintFieldId: Promise<string | undefined> | undefined;
+  const sprintField = (): Promise<string | undefined> => {
+    sprintFieldId ??= call<Array<{ id: string; schema?: { custom?: string } }>>(
+      'GET',
+      '/field',
+    ).then((fields) => fields.find((f) => f.schema?.custom === SPRINT_FIELD_SCHEMA)?.id);
+    return sprintFieldId;
+  };
+
+  /** The sprint the issue is in now: the last entry, since Jira keeps the ones it was carried over from. */
+  const currentSprintName = (issue: JiraIssue, field: string | undefined): string | undefined => {
+    if (field === undefined) return undefined;
+    const value = issue.fields[field];
+    if (!Array.isArray(value) || value.length === 0) return undefined;
+    const last: unknown = value[value.length - 1];
+    if (typeof last === 'object' && last !== null && 'name' in last) {
+      return String((last as { name: unknown }).name);
+    }
+    // Older payloads serialise the sprint as "…Sprint@1a2b[id=1,…,name=Sprint 1,…]".
+    return typeof last === 'string' ? /name=([^,\]]+)/.exec(last)?.[1] : undefined;
+  };
+
+  const toNative = (issue: JiraIssue, field?: string): NativeIssue => ({
     id: issue.key,
     key: issue.key,
     title: issue.fields.summary,
@@ -133,11 +191,69 @@ export function createJiraTransport(opts: JiraTransportOptions): IssuesTransport
     // display name is the only handle a person would recognise.
     assignee:
       issue.fields.assignee?.emailAddress ?? issue.fields.assignee?.displayName ?? undefined,
+    iteration: currentSprintName(issue, field),
     url: `${site}/browse/${issue.key}`,
   });
 
-  const fetchIssue = (key: string): Promise<JiraIssue> =>
-    call<JiraIssue>('GET', `/issue/${encodeURIComponent(key)}?fields=${ISSUE_FIELDS}`);
+  const issueFields = async (): Promise<string[]> => {
+    const field = await sprintField();
+    return field === undefined ? ISSUE_FIELDS.split(',') : [...ISSUE_FIELDS.split(','), field];
+  };
+
+  const fetchIssue = async (key: string): Promise<NativeIssue> => {
+    const fields = await issueFields();
+    const issue = await call<JiraIssue>(
+      'GET',
+      `/issue/${encodeURIComponent(key)}?fields=${fields.join(',')}`,
+    );
+    return toNative(issue, await sprintField());
+  };
+
+  // Resolved once: by id or name when configured, else the project's first Scrum board. A project
+  // with no Scrum board has no sprints, which is an honest empty rather than an error.
+  let boardId: Promise<number | undefined> | undefined;
+  const scrumBoard = (): Promise<number | undefined> => {
+    boardId ??= agile<{ values: Array<{ id: number; name: string }> }>(
+      'GET',
+      `/board?projectKeyOrId=${encodeURIComponent(opts.project)}&type=scrum`,
+    ).then(({ values }) => {
+      const wanted = opts.board;
+      if (wanted === undefined || wanted.length === 0) return values[0]?.id;
+      return values.find((b) => String(b.id) === wanted || b.name === wanted)?.id;
+    });
+    return boardId;
+  };
+
+  const sprints = async (): Promise<readonly JiraSprint[]> => {
+    const board = await scrumBoard();
+    if (board === undefined) return [];
+    return (await agile<{ values: JiraSprint[] }>('GET', `/board/${board}/sprint?maxResults=100`))
+      .values;
+  };
+
+  const toIteration = (sprint: JiraSprint): Iteration => ({
+    id: String(sprint.id),
+    name: sprint.name,
+    // The name is the path: it is what a person calls the sprint and what JQL accepts.
+    path: sprint.name,
+    ...(sprint.startDate !== undefined ? { startDate: sprint.startDate } : {}),
+    ...(sprint.endDate !== undefined ? { finishDate: sprint.endDate } : {}),
+    current: sprint.state === SPRINT_ACTIVE,
+  });
+
+  /** A sprint by its path (name) or id, or a refusal that names the ones that exist. */
+  const findSprint = async (iterationPath: string): Promise<JiraSprint> => {
+    const known = await sprints();
+    const found = known.find((s) => s.name === iterationPath || String(s.id) === iterationPath);
+    if (found === undefined) {
+      throw new BaronError(
+        `Jira has no sprint '${iterationPath}' on the project's Scrum board` +
+          `${known.length > 0 ? ` (it has: ${known.map((s) => s.name).join(', ')})` : ' (it has none)'}.`,
+        ERROR_CODE,
+      );
+    }
+    return found;
+  };
 
   const transitions = (key: string, withFields: boolean): Promise<JiraTransition[]> =>
     call<{ transitions: JiraTransition[] }>(
@@ -194,11 +310,11 @@ export function createJiraTransport(opts: JiraTransportOptions): IssuesTransport
         },
       });
       // The create response carries only id/key/self, so the issue is read back for its fields.
-      return toNative(await fetchIssue(created.key));
+      return fetchIssue(created.key);
     },
 
     async getIssue(id: string): Promise<NativeIssue> {
-      return toNative(await fetchIssue(id));
+      return fetchIssue(id);
     },
 
     async applyTarget(
@@ -224,7 +340,7 @@ export function createJiraTransport(opts: JiraTransportOptions): IssuesTransport
         // Jira's business (invariant 4). The core only checked the required ones were present.
         ...(fields !== undefined && Object.keys(fields).length > 0 ? { fields } : {}),
       });
-      return toNative(await fetchIssue(id));
+      return fetchIssue(id);
     },
 
     async availableTargets(id: string): Promise<readonly NativeTarget[]> {
@@ -302,12 +418,18 @@ export function createJiraTransport(opts: JiraTransportOptions): IssuesTransport
           query.assignee === ME ? 'assignee = currentUser()' : `assignee = ${jql(query.assignee)}`,
         );
       }
+      if (query.iterationPath !== undefined) {
+        // By id, not name: a name is unique on a board, not across a site, and the id is what the
+        // board answered when the path was resolved from it.
+        clauses.push(`sprint = ${(await findSprint(query.iterationPath)).id}`);
+      }
       const data = await call<{ issues: JiraIssue[] }>('POST', '/search/jql', {
         jql: `${clauses.join(' AND ')} ORDER BY updated DESC`,
         maxResults: query.limit ?? 50,
-        fields: ISSUE_FIELDS.split(','),
+        fields: await issueFields(),
       });
-      return data.issues.map(toNative);
+      const field = await sprintField();
+      return data.issues.map((issue) => toNative(issue, field));
     },
 
     async updateIssue(id: string, update: NativeUpdateInput): Promise<NativeIssue> {
@@ -317,14 +439,14 @@ export function createJiraTransport(opts: JiraTransportOptions): IssuesTransport
           ...(update.body !== undefined ? { description: update.body } : {}),
         },
       });
-      return toNative(await fetchIssue(id));
+      return fetchIssue(id);
     },
 
     async assignIssue(id: string, assignee: string): Promise<NativeIssue> {
       await call<void>('PUT', `/issue/${encodeURIComponent(id)}/assignee`, {
         accountId: await accountId(assignee),
       });
-      return toNative(await fetchIssue(id));
+      return fetchIssue(id);
     },
 
     async currentUser(): Promise<string> {
@@ -333,21 +455,16 @@ export function createJiraTransport(opts: JiraTransportOptions): IssuesTransport
       return me.emailAddress ?? me.displayName ?? me.accountId;
     },
 
-    // Sprints live in the Jira Software (agile) API, on boards rather than projects, and the
-    // manifest declares `sprints: false`, so the core degrades or errors by policy before reaching
-    // these. They exist because the contract requires them; reaching one is a core bug.
     async listIterations(): Promise<readonly Iteration[]> {
-      throw new BaronError(
-        'Jira sprints are not supported by this adapter yet (the manifest declares sprints: false).',
-        ERROR_CODE,
-      );
+      return (await sprints()).map(toIteration);
     },
 
-    async setIteration(): Promise<NativeIssue> {
-      throw new BaronError(
-        'Jira sprints are not supported by this adapter yet (the manifest declares sprints: false).',
-        ERROR_CODE,
-      );
+    async setIteration(id: string, iterationPath: string): Promise<NativeIssue> {
+      const sprint = await findSprint(iterationPath);
+      // Moving an issue INTO a sprint is a sprint operation on the agile API, not an issue edit:
+      // the sprint field is not writable through the platform API.
+      await agile<void>('POST', `/sprint/${sprint.id}/issue`, { issues: [id] });
+      return fetchIssue(id);
     },
   };
 }

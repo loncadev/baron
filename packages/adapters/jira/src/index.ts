@@ -26,10 +26,10 @@ export const jiraManifest: CapabilityManifest = {
     subIssues: true,
     // Boards derive their columns from statuses; there is no second axis to set.
     separateBoardColumn: false,
-    // Sprints exist, but on the Jira Software agile API, keyed by board rather than project. Left
-    // out of this first cut and declared so, which makes the core degrade (or error) by policy
-    // rather than pretend.
-    sprints: false,
+    // Sprints live on the Jira Software agile API and belong to a Scrum BOARD, not the project;
+    // the transport resolves the project's board (or JIRA_BOARD) and reads its sprints. A project
+    // with no Scrum board reports no iterations, which the core treats as "none active".
+    sprints: true,
     arbitraryStates: true,
     nativeLabels: true,
     // Issue types are real and chosen at create time (Epic, Story, Task, Bug, Sub-task).

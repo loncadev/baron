@@ -16,6 +16,13 @@ interface Sent {
   headers: Record<string, string>;
 }
 
+/** The sprint field as this fake site's catalogue names it; the id is what real sites vary. */
+const SPRINT_FIELD = 'customfield_10020';
+const FIELD_CATALOGUE = [
+  { id: 'summary', schema: { type: 'string' } },
+  { id: SPRINT_FIELD, name: 'Sprint', schema: { custom: 'com.pyxis.greenhopper.jira:gh-sprint' } },
+];
+
 function fakeFetch(queue: Array<{ status?: number; body?: unknown }>) {
   const sent: Sent[] = [];
   const fetchImpl = (async (url: string, init?: RequestInit) => {
@@ -25,6 +32,11 @@ function fakeFetch(queue: Array<{ status?: number; body?: unknown }>) {
       headers: (init?.headers as Record<string, string>) ?? {},
       ...(typeof init?.body === 'string' ? { body: JSON.parse(init.body) } : {}),
     });
+    // The field catalogue is read once per transport to find the sprint field's id. Answered by
+    // route rather than from the queue, so a test scripts only the calls it is about.
+    if (/\/rest\/api\/2\/field$/.test(url)) {
+      return { ok: true, status: 200, text: async () => JSON.stringify(FIELD_CATALOGUE) };
+    }
     const next = queue.shift() ?? { status: 200, body: {} };
     const status = next.status ?? 200;
     return {
@@ -65,10 +77,13 @@ describe('the Jira transport speaks REST v2 the way Jira expects', () => {
   it('authenticates with Basic email:token, on the site root without its trailing slash', async () => {
     const { t, sent } = transport([{ body: issue('PROJ-1', 'To Do') }]);
     await t.getIssue('PROJ-1');
-    expect(sent[0]?.url).toBe(
-      'https://acme.atlassian.net/rest/api/2/issue/PROJ-1?fields=summary,description,status,issuetype,parent,labels,assignee',
+    // The catalogue read comes first (once), then the issue, asking for the sprint field by the
+    // id the catalogue gave it.
+    const read = sent.find((s) => s.url.includes('/issue/'));
+    expect(read?.url).toBe(
+      `https://acme.atlassian.net/rest/api/2/issue/PROJ-1?fields=summary,description,status,issuetype,parent,labels,assignee,${SPRINT_FIELD}`,
     );
-    expect(sent[0]?.headers.authorization).toBe(
+    expect(read?.headers.authorization).toBe(
       `Basic ${Buffer.from('dev@acme.test:tok').toString('base64')}`,
     );
   });
@@ -175,9 +190,9 @@ describe('the Jira transport speaks REST v2 the way Jira expects', () => {
       assignee: '@me',
       limit: 7,
     });
-    expect(sent[0]?.method).toBe('POST');
-    expect(sent[0]?.url).toMatch(/\/search\/jql$/);
-    expect(sent[0]?.body).toMatchObject({
+    const search = sent.find((s) => s.url.endsWith('/search/jql'));
+    expect(search?.method).toBe('POST');
+    expect(search?.body).toMatchObject({
       jql: 'project = "PROJ" AND status in ("In Progress", "In Review") AND issuetype = "Bug" AND assignee = currentUser() ORDER BY updated DESC',
       maxResults: 7,
     });
@@ -186,7 +201,8 @@ describe('the Jira transport speaks REST v2 the way Jira expects', () => {
   it('escapes a status name that would otherwise break out of its JQL literal', async () => {
     const { t, sent } = transport([{ body: { issues: [] } }]);
     await t.queryIssues({ targets: [{ [JIRA_STATE_KEY]: 'Won\'t "Do" \\ ever' }] });
-    expect((sent[0]?.body as { jql: string }).jql).toContain(
+    const search = sent.find((s) => s.url.endsWith('/search/jql'));
+    expect((search?.body as { jql: string }).jql).toContain(
       'status in ("Won\'t \\"Do\\" \\\\ ever")',
     );
   });
@@ -244,6 +260,131 @@ describe('the Jira transport speaks REST v2 the way Jira expects', () => {
     await expect(t.getIssue('PROJ-1')).rejects.toThrow(
       /HTTP 400 — Transition failed; resolution: Resolution is required\./,
     );
+  });
+});
+
+describe('sprints, which belong to a Scrum board rather than to the project', () => {
+  const boards = { values: [{ id: 3, name: 'PROJ scrum', type: 'scrum' }] };
+  const sprints = {
+    values: [
+      {
+        id: 1,
+        name: 'Sprint 1',
+        state: 'active',
+        startDate: '2026-09-01T00:00:00.000Z',
+        endDate: '2026-09-14T00:00:00.000Z',
+      },
+      { id: 2, name: 'Sprint 2', state: 'future' },
+      { id: 0, name: 'Sprint 0', state: 'closed' },
+    ],
+  };
+
+  it("lists the board's sprints as iterations, the active one current", async () => {
+    const { t, sent } = transport([{ body: boards }, { body: sprints }]);
+    const iterations = await t.listIterations();
+    expect(sent[0]?.url).toBe(
+      'https://acme.atlassian.net/rest/agile/1.0/board?projectKeyOrId=PROJ&type=scrum',
+    );
+    expect(sent[1]?.url).toMatch(/\/rest\/agile\/1\.0\/board\/3\/sprint/);
+    expect(iterations.map((i) => `${i.name}:${i.current}`)).toEqual([
+      'Sprint 1:true',
+      'Sprint 2:false',
+      'Sprint 0:false',
+    ]);
+    expect(iterations[0]).toMatchObject({
+      id: '1',
+      path: 'Sprint 1',
+      startDate: '2026-09-01T00:00:00.000Z',
+      finishDate: '2026-09-14T00:00:00.000Z',
+    });
+  });
+
+  it('has no iterations on a project without a Scrum board, and says so on assignment', async () => {
+    const { t } = transport([{ body: { values: [] } }]);
+    expect(await t.listIterations()).toEqual([]);
+    await expect(t.setIteration('PROJ-1', 'Sprint 9')).rejects.toThrow(
+      /no sprint 'Sprint 9'.*none/,
+    );
+  });
+
+  it('moves an issue into a sprint through the agile API, by the path the board answered', async () => {
+    const { t, sent } = transport([
+      { body: boards },
+      { body: sprints },
+      { status: 204 },
+      {
+        body: issue('PROJ-1', 'To Do', {
+          [SPRINT_FIELD]: [{ id: 1, name: 'Sprint 1', state: 'active' }],
+        }),
+      },
+    ]);
+    const moved = await t.setIteration('PROJ-1', 'Sprint 1');
+    const post = sent.find((s) => s.method === 'POST');
+    expect(post?.url).toBe('https://acme.atlassian.net/rest/agile/1.0/sprint/1/issue');
+    expect(post?.body).toEqual({ issues: ['PROJ-1'] });
+    expect(moved.iteration).toBe('Sprint 1');
+  });
+
+  it('refuses a sprint the board does not have, naming the ones it does', async () => {
+    const { t } = transport([{ body: boards }, { body: sprints }]);
+    await expect(t.setIteration('PROJ-1', 'Sprint 7')).rejects.toThrow(
+      /no sprint 'Sprint 7'.*Sprint 1, Sprint 2, Sprint 0/,
+    );
+  });
+
+  it('filters a query by sprint id, not name', async () => {
+    const { t, sent } = transport([{ body: boards }, { body: sprints }, { body: { issues: [] } }]);
+    await t.queryIssues({ iterationPath: 'Sprint 2' });
+    const search = sent.find((s) => s.url.endsWith('/search/jql'));
+    expect((search?.body as { jql: string }).jql).toContain('sprint = 2');
+  });
+
+  it('reads the sprint an issue is in from the last entry of the sprint field, in either shape', async () => {
+    const asObjects = await transport([
+      {
+        body: issue('PROJ-1', 'To Do', {
+          [SPRINT_FIELD]: [
+            { id: 0, name: 'Sprint 0', state: 'closed' },
+            { id: 1, name: 'Sprint 1', state: 'active' },
+          ],
+        }),
+      },
+    ]).t.getIssue('PROJ-1');
+    expect(asObjects.iteration).toBe('Sprint 1');
+    const asStrings = await transport([
+      {
+        body: issue('PROJ-1', 'To Do', {
+          [SPRINT_FIELD]: [
+            'com.atlassian.greenhopper.service.sprint.Sprint@1a[id=1,rapidViewId=3,state=ACTIVE,name=Sprint 1,goal=]',
+          ],
+        }),
+      },
+    ]).t.getIssue('PROJ-1');
+    expect(asStrings.iteration).toBe('Sprint 1');
+    const none = await transport([
+      { body: issue('PROJ-1', 'To Do', { [SPRINT_FIELD]: null }) },
+    ]).t.getIssue('PROJ-1');
+    expect(none.iteration).toBeUndefined();
+  });
+
+  it('picks the configured board by id or name', async () => {
+    const two = {
+      values: [
+        { id: 3, name: 'PROJ scrum' },
+        { id: 4, name: 'Platform' },
+      ],
+    };
+    const fake = fakeFetch([{ body: two }, { body: sprints }]);
+    const t = createJiraTransport({
+      site: 'https://acme.atlassian.net',
+      email: 'dev@acme.test',
+      apiToken: 'tok',
+      project: 'PROJ',
+      board: 'Platform',
+      fetchImpl: fake.fetchImpl,
+    });
+    await t.listIterations();
+    expect(fake.sent[1]?.url).toMatch(/\/board\/4\/sprint/);
   });
 });
 
