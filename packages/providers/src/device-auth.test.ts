@@ -29,13 +29,13 @@ describe('GitHub device flow availability', () => {
 describe('Linear browser sign-in availability', () => {
   const linear = () => getProviderDescriptor(LINEAR_PROVIDER);
 
-  it('is opt-in: Baron ships no Linear application id yet', () => {
-    expect(linear().createDeviceAuth?.({})).toBeUndefined();
-    expect(linear().createDeviceAuth?.({ BARON_LINEAR_CLIENT_ID: '' })).toBeUndefined();
+  it('is offered on a bare install: Baron ships its own public application id', () => {
+    expect(linear().createDeviceAuth?.({})).toBeDefined();
   });
 
-  it('is offered once an installation names its application', () => {
+  it('honours an override, and treats an empty id as opting out', () => {
     expect(linear().createDeviceAuth?.({ BARON_LINEAR_CLIENT_ID: 'cid' })).toBeDefined();
+    expect(linear().createDeviceAuth?.({ BARON_LINEAR_CLIENT_ID: '' })).toBeUndefined();
   });
 
   it('lets the callback port be moved, since Linear matches the registered redirect URI exactly', () => {
