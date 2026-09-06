@@ -1,3 +1,5 @@
+import { KNOWN_PROVIDERS, getProviderDescriptor } from '@lonca/baron-providers';
+import { BUILTIN_RECIPE_NAMES } from '@lonca/baron-recipes';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
@@ -15,11 +17,16 @@ export const SERVER_INFO = { name: 'baron', version: OWN_PACKAGE.version } as co
  * without listing tools. Clients truncate instructions along with tool descriptions at ~2KB; keep
  * this well under that and let the tool schemas carry the detail.
  */
-export const SERVER_INSTRUCTIONS = `Baron normalizes work tracking and delivery across providers (Azure DevOps, GitHub, Slack) behind one contract, so the same calls work whatever the stack.
+const PROVIDER_NAMES = KNOWN_PROVIDERS.map((id) => getProviderDescriptor(id).displayName).join(
+  ', ',
+);
+const RECIPE_NAMES = BUILTIN_RECIPE_NAMES.join(', ');
+
+export const SERVER_INSTRUCTIONS = `Baron normalizes work tracking and delivery across providers (${PROVIDER_NAMES}) behind one contract, so the same calls work whatever the stack.
 
 Speak in ROLES, never a vendor's native states: backlog, ready, in_progress, in_review, done. Blocking is ORTHOGONAL, not a role: use baron_issue_move op=block (id + a required reason) and baron_issue_move op=unblock — a blocked item keeps the role it is blocked in, so unblocking returns it to where the work actually was. Item types are roles too: initiative, epic, story, task, bug, subtask. Baron maps a role to the provider's real state, column or label using a mapping the human confirmed at \`baron init\` — do not guess native state names, and do not try to set them directly.
 
-Prefer \`baron_recipe_run\` over hand-composing primitives. Recipes (task-new, task-start, task-finish, task-land, ship) run a whole workflow in one call with guards that stop before mutating anything, so the order and rules are enforced rather than improvised. Reach for individual primitives only when no recipe covers the task.
+Prefer \`baron_recipe_run\` over hand-composing primitives. Recipes (${RECIPE_NAMES}) run a whole workflow in one call with guards that stop before mutating anything, so the order and rules are enforced rather than improvised. Reach for individual primitives only when no recipe covers the task.
 
 Each item's branch name is derived by Baron from its type role — use the name Baron returns verbatim, never invent one. Containers (epic, initiative) have no branch by design.
 

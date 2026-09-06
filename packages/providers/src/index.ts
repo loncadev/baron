@@ -134,6 +134,8 @@ export interface TransportHooks {
  */
 export interface ProviderDescriptor {
   readonly id: string;
+  /** The name a person knows the provider by, for prose that lists what Baron speaks to. */
+  readonly displayName: string;
   /**
    * Human onboarding help shown by `baron init` before it asks for a token: where to create one and
    * exactly which permissions it needs. Provider-specific, so each provider owns its own guidance —
@@ -187,6 +189,7 @@ export interface ProviderDescriptor {
 const DESCRIPTORS: Record<string, ProviderDescriptor> = {
   [JIRA_PROVIDER]: {
     id: JIRA_PROVIDER,
+    displayName: 'Jira',
     credentialsHelp: [
       'Jira Cloud needs an API token, the email it belongs to, the site, and a project key.',
       '  1. Create the token at: https://id.atlassian.com/manage-profile/security/api-tokens',
@@ -237,6 +240,7 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
   },
   [LINEAR_PROVIDER]: {
     id: LINEAR_PROVIDER,
+    displayName: 'Linear',
     credentialsHelp: [
       'Linear needs a personal API key and the team new issues are created in.',
       '  1. Create the key at: Settings -> Security & access -> Personal API keys',
@@ -301,6 +305,7 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
   },
   [AZURE_DEVOPS_PROVIDER]: {
     id: AZURE_DEVOPS_PROVIDER,
+    displayName: 'Azure DevOps',
     credentialsHelp: [
       'Azure DevOps needs a Personal Access Token (PAT).',
       '  1. Create one at: https://dev.azure.com/{your-org}/_usersSettings/tokens',
@@ -373,6 +378,7 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
   },
   [GITHUB_PROVIDER]: {
     id: GITHUB_PROVIDER,
+    displayName: 'GitHub',
     credentialsHelp: [
       'Set BARON_GITHUB_CLIENT_ID to an OAuth/GitHub App id and `baron init` offers browser sign-in',
       'instead of any of this. Without it, or if you want the narrower credential:',
@@ -462,6 +468,7 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
   },
   [SLACK_PROVIDER]: {
     id: SLACK_PROVIDER,
+    displayName: 'Slack',
     // Slack is notify-only: no issues/scm/ci groups.
     notifyManifest: slackNotifyManifest,
     notifyCredentialEnvKeys: ['SLACK_BOT_TOKEN', 'SLACK_CHANNEL'],
