@@ -18,6 +18,7 @@ export const MCP_TOOL_NAMES = {
   iterations: 'baron_issue_iterations',
   setIteration: 'baron_issue_set_iteration',
   query: 'baron_issue_query',
+  trace: 'baron_issue_trace',
 } as const;
 
 export const SCM_TOOL_NAMES = {

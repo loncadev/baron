@@ -22,7 +22,7 @@ policy.
 
 | Tool | Port | Ops |
 | --- | --- | --- |
-| `baron_issue_read` | issues | `get` · `query` · `iterations` |
+| `baron_issue_read` | issues | `get` · `query` · `iterations` · `classify` · `trace` (issue → branch → PR + checks → CI runs → deployment in one read; unfilled parts are `null` and explained in `missing`) |
 | `baron_issue_write` | issues | `create` · `update` · `comment` · `assign` · `link` · `set_iteration` |
 | `baron_issue_move` | issues | `transition` · `reconcile` · `block` · `unblock` — the semantic role layer, plus the orthogonal blocked flag |
 | `baron_scm_read` | scm | `pr_status` · `pr_for_branch` |

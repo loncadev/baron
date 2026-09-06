@@ -20,3 +20,4 @@ export * from './scm.js';
 export * from './ci.js';
 export * from './notify.js';
 export * from './deploy.js';
+export * from './trace.js';

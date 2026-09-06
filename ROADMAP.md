@@ -96,6 +96,12 @@ completed steps are replayed from the journal rather than done again, so a `ship
 CI does not open a second pull request when it is run again (#20, decision #22). Compensation
 stays deferred until a real half-completed run gives it a shape.
 
+And the one candidate port worth pulling forward turned out not to be a port: `trace` (#21) — issue,
+branch, pull request and checks, CI runs, deployment in one read — is a read model composed from
+the ports Baron already binds, keyed on the canonical branch name, with every part it cannot fill
+named and explained rather than left out (decision #23). `actor` and `review` stay parked until
+someone asks for them.
+
 Gate 3's contract work is done. What remains of the gate is its second half: first users. The
 closest thing to one so far is the user-journey pass run before each release — the whole path from
 `init` to `task-land`, driven by the CLI, the MCP server, a headless Claude Code session with the

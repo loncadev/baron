@@ -21,6 +21,7 @@ export const RECIPE_OPS = {
   issueIterations: 'issue.iterations',
   issueSetIteration: 'issue.set-iteration',
   issueQuery: 'issue.query',
+  issueTrace: 'issue.trace',
   scmBranchCreate: 'scm.branch.create',
   scmPrCreate: 'scm.pr.create',
   scmPrThread: 'scm.pr.thread',

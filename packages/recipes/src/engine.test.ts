@@ -1004,3 +1004,27 @@ steps:
     ).rejects.toThrow(/expected a list/);
   });
 });
+
+describe('issue.trace', () => {
+  it('reads across the bound ports and names the unbound ones', async () => {
+    const asker = scriptedAsker(['Traced']);
+    const { context } = await runRecipe(
+      loadRecipe(`
+name: trace
+steps:
+  - ask: { as: title, type: text, message: "Title?" }
+  - do: issue.create
+    as: issue
+    with: { title: "\${title}", typeRole: task }
+  - do: issue.trace
+    as: trace
+    with: { id: "\${issue.id}" }
+`),
+      { ports: { issues: issuesPort() }, asker },
+    );
+    const trace = context.trace as { branch: string; missing: Record<string, string> };
+    expect(trace.branch).toMatch(/^task\//);
+    expect(trace.missing.pullRequest).toContain('scm port');
+    expect(trace.missing.runs).toContain('ci port');
+  });
+});
