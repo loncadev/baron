@@ -258,9 +258,14 @@ assign `@me`, `in_progress` → `in_review` → `done` through Jira's transition
 role, delete. The gated smoke test repeats the transport-level half whenever `JIRA_SITE`,
 `JIRA_EMAIL`, `JIRA_API_TOKEN` and `JIRA_PROJECT` are present in the environment.
 
-Two things were **not** exercised live, and are covered by tests that assert what the transport
-sends instead: a transition **screen** (the default team-managed workflow attaches none, so
-`TRANSITION_FIELDS_REQUIRED` and the `fields` reply are proven against Jira's documented
-`transitions` shape rather than a real screen), and a workflow that refuses a hop (the default
-workflow permits every status from every other). Sprints are not supported yet. See
-[providers.md](./providers.md) for the full capability table.
+The gate itself was proven on a second, **company-managed** project on the same site, put on
+Jira's classic `jira` workflow (Open / In Progress / Reopened / Resolved / Closed), whose "Resolve
+Issue" transition carries a screen requiring `resolution` and whose Closed status reaches only
+Reopened. Driven through the MCP server: Resolve without fields was refused with
+`TRANSITION_FIELDS_REQUIRED` naming `resolution` and its accepted values (Done, Won't Do, Duplicate,
+Cannot Reproduce) with nothing written; the retry with `fields: { resolution: { name: "Done" } }`
+landed on Resolved; Close landed on Closed; and a move from Closed to `in_progress` was refused with
+`TRANSITION_NOT_PERMITTED` naming Reopened as the only hop the workflow permits. Nine checks, nine
+passes, no code change needed.
+
+Sprints are not supported yet. See [providers.md](./providers.md) for the full capability table.

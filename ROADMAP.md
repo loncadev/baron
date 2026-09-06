@@ -86,9 +86,15 @@ The fourth was shaped by a provider Baron has no adapter for yet, and is now als
   values), and the caller passes them back as `fields`. The core checks presence and nothing else;
   what a field means stays the provider's. Both halves are pinned by conformance against an
   in-memory provider that refuses the way Jira does. The Jira adapter is built on it — the first
-  consumer of both halves — and its live validation waits on a Jira Cloud site.
+  consumer of both halves — and both halves were proven live on a real site: a team-managed project
+  for the everyday path, and a company-managed one on the classic `jira` workflow for the screen
+  and the refused hop.
 
-Gate 3's contract work is done. What remains of the gate is its second half: first users.
+Gate 3's contract work is done. What remains of the gate is its second half: first users. The
+closest thing to one so far is the user-journey pass run before each release — the whole path from
+`init` to `task-land`, driven by the CLI, the MCP server, a headless Claude Code session with the
+plugin skills, and the Docker image, on a fresh project against real providers — which is how
+0.38.0's four last defects were found. A stranger's project is still the test that counts.
 
 ## What Baron will not do
 
