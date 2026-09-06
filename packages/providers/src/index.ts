@@ -173,6 +173,8 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
       '  4. JIRA_PROJECT is the project KEY, the prefix on its issue keys (PROJ in PROJ-123).',
       '  The token needs Browse Projects, Create Issues, Edit Issues, Transition Issues, Add',
       '  Comments and Link Issues on that project — the defaults for a project member.',
+      '  Sprints come from the project’s first Scrum board; set JIRA_BOARD (id or name) to pick',
+      '  another. Optional — a project with no Scrum board simply has no sprints.',
     ],
     manifest: jiraManifest,
     credentialEnvKeys: ['JIRA_SITE', 'JIRA_EMAIL', 'JIRA_API_TOKEN', 'JIRA_PROJECT'],
@@ -183,6 +185,8 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
         email: env.JIRA_EMAIL ?? '',
         apiToken: env.JIRA_API_TOKEN ?? '',
         project: env.JIRA_PROJECT ?? '',
+        // Sprints belong to a Scrum board; optional, defaults to the project's first one.
+        ...(env.JIRA_BOARD ? { board: env.JIRA_BOARD } : {}),
       });
     },
     createIntrospector(env) {
