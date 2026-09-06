@@ -19,8 +19,23 @@ const AUTHORIZE_URL = 'https://linear.app/oauth/authorize';
 const TOKEN_URL = LINEAR_TOKEN_URL;
 /** Read and write on the user's behalf: what the task-* recipes need and nothing broader. */
 const DEFAULT_SCOPE = 'read,write';
-/** The callback path the local listener answers on; Linear only checks the whole URI matches. */
+/** The callback path the local listener answers on. */
 const CALLBACK_PATH = '/callback';
+/**
+ * The loopback port the listener binds by default. Linear checks the redirect URI against the
+ * application's registered list by exact match — port included — so a port of the system's
+ * choosing cannot be registered in advance (proven live: "Invalid redirect_uri parameter for the
+ * application"). The port is therefore fixed and documented for registration; an installation
+ * whose port is taken overrides it, and registers that one instead.
+ */
+export const LINEAR_CALLBACK_PORT = 41765;
+/** The env var that overrides {@link LINEAR_CALLBACK_PORT}. */
+export const LINEAR_CALLBACK_PORT_ENV = 'BARON_LINEAR_CALLBACK_PORT';
+
+/** The redirect URI a Linear OAuth application must list for Baron's sign-in on `port`. */
+export function linearCallbackUri(port: number = LINEAR_CALLBACK_PORT): string {
+  return `http://127.0.0.1:${port}${CALLBACK_PATH}`;
+}
 /** How long the browser has to come back before the listener gives up. */
 const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
 const ERROR_CODE = 'LINEAR_AUTH';
@@ -37,6 +52,11 @@ export interface LinearPkceAuthOptions {
   readonly fetchImpl?: typeof fetch | undefined;
   /** How long to wait for the browser to come back. Defaults to ten minutes. */
   readonly timeoutMs?: number | undefined;
+  /**
+   * The loopback port to listen on. Defaults to {@link LINEAR_CALLBACK_PORT}; whatever it is, the
+   * matching {@link linearCallbackUri} must be on the application's redirect list.
+   */
+  readonly port?: number | undefined;
 }
 
 /** What the provider's browser hop hands back on the callback. */
@@ -52,9 +72,9 @@ const base64url = (bytes: Buffer): string => bytes.toString('base64url');
  * The OAuth authorization-code flow with PKCE, against a listener on localhost.
  *
  * Linear has no device flow, so the GitHub shape cannot be copied: there is no code for the user
- * to type. Instead Baron opens a loopback listener on a port of the system's choosing, sends the
- * user to Linear's authorization page with that port in the redirect URI and a PKCE challenge, and
- * waits for Linear to send the browser back with a one-time code. The code is exchanged for a
+ * to type. Instead Baron opens a loopback listener on a fixed, registered port, sends the user to
+ * Linear's authorization page with that redirect URI and a PKCE challenge, and waits for Linear to
+ * send the browser back with a one-time code. The code is exchanged for a
  * token with the PKCE verifier — proof the exchange comes from the process that started the flow —
  * which is why no client secret is shipped or needed. The `state` value refuses a callback this
  * flow did not start.
@@ -66,6 +86,7 @@ export function createLinearPkceAuth(options: LinearPkceAuthOptions): DeviceAuth
   const doFetch = options.fetchImpl ?? fetch;
   const scope = options.scope ?? DEFAULT_SCOPE;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const wantedPort = options.port ?? LINEAR_CALLBACK_PORT;
 
   return {
     async authorize(onPrompt: (prompt: DeviceCodePrompt) => void): Promise<AuthorizedCredential> {
@@ -73,8 +94,8 @@ export function createLinearPkceAuth(options: LinearPkceAuthOptions): DeviceAuth
       const challenge = base64url(createHash('sha256').update(verifier).digest());
       const state = base64url(randomBytes(16));
 
-      const { server, port, callback } = await listen(timeoutMs);
-      const redirectUri = `http://127.0.0.1:${port}${CALLBACK_PATH}`;
+      const { server, port, callback } = await listen(wantedPort, timeoutMs);
+      const redirectUri = linearCallbackUri(port);
       try {
         const url = new URL(AUTHORIZE_URL);
         url.searchParams.set('client_id', options.clientId);
@@ -158,11 +179,15 @@ export function createLinearPkceAuth(options: LinearPkceAuthOptions): DeviceAuth
 }
 
 /**
- * A one-shot loopback listener. Bound to 127.0.0.1 on an ephemeral port so nothing on the network
- * can reach it, and answered once: the first request to the callback path settles the flow and
- * the page it returns tells the user to go back to the terminal.
+ * A one-shot loopback listener. Bound to 127.0.0.1 so nothing on the network can reach it, and
+ * answered once: the first request to the callback path settles the flow and the page it returns
+ * tells the user to go back to the terminal. A port already in use is reported with the way out,
+ * because "listen EADDRINUSE" says nothing about registering a different redirect URI.
  */
-function listen(timeoutMs: number): Promise<{
+function listen(
+  wantedPort: number,
+  timeoutMs: number,
+): Promise<{
   server: Server;
   port: number;
   callback: Promise<Callback>;
@@ -204,8 +229,18 @@ function listen(timeoutMs: number): Promise<{
       server.close();
     }, timeoutMs);
     timer.unref();
-    server.once('error', rejectListen);
-    server.listen(0, '127.0.0.1', () => {
+    server.once('error', (error: NodeJS.ErrnoException) => {
+      clearTimeout(timer);
+      rejectListen(
+        error.code === 'EADDRINUSE'
+          ? new BaronError(
+              `Port ${wantedPort} on 127.0.0.1 is in use, so the Linear sign-in cannot listen for its callback. Free it, or set ${LINEAR_CALLBACK_PORT_ENV} to a free port and add http://127.0.0.1:<that port>${CALLBACK_PATH} to the OAuth application's redirect URIs in Linear.`,
+              ERROR_CODE,
+            )
+          : error,
+      );
+    });
+    server.listen(wantedPort, '127.0.0.1', () => {
       const address = server.address();
       if (address === null || typeof address === 'string') {
         rejectListen(
