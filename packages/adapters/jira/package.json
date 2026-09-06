@@ -1,6 +1,6 @@
 {
   "name": "@lonca/baron-adapter-jira",
-  "version": "0.39.0",
+  "version": "0.40.0",
   "type": "module",
   "license": "Apache-2.0",
   "main": "./src/index.ts",
