@@ -19,7 +19,7 @@ import { runDoctor } from './doctor.js';
 import { runInit } from './init.js';
 import { policyPath } from './paths.js';
 import type { FileSystem, Prompter } from './ports.js';
-import { runRecipeFile } from './run.js';
+import { cliRunJournal, runRecipeFile } from './run.js';
 
 export interface CliPorts {
   readonly fs: FileSystem;
@@ -256,12 +256,18 @@ async function cmdRun(flags: Record<string, string>, ports: CliPorts): Promise<n
       result.replayed !== undefined && result.replayed > 0
         ? ` (${result.replayed} step(s) replayed from the journal)`
         : '';
-    ports.out(`Recipe ${recipePath ?? runId} finished${replayed}. Run id: ${runId}`);
+    ports.out(
+      resume === undefined
+        ? `Recipe ${recipePath} finished. Run id: ${runId}`
+        : `Run ${runId} finished${replayed}.`,
+    );
     return 0;
   } catch (error) {
     // The one line that turns a half-completed run from a cleanup job into a retry: the steps that
     // already ran are in the journal, and resuming replays them rather than doing them again.
-    const step = runStep(error);
+    // A provider's own error (a 422 from GitHub) is not a BaronError and carries no details, but
+    // the journal knows where the run stopped either way.
+    const step = runStep(error) ?? lastJournaledStep(ports, root, runId);
     ports.err(
       `Run ${runId} stopped${step === undefined ? '' : ` at step ${step}`}. Fix the cause, then ` +
         `continue it — completed steps will not be repeated:\n  baron run --resume ${runId}` +
@@ -274,7 +280,22 @@ async function cmdRun(flags: Record<string, string>, ports: CliPorts): Promise<n
 /** `op@path` of the step a journaled run stopped at, when the error carries it. */
 function runStep(error: unknown): string | undefined {
   if (!(error instanceof BaronError)) return undefined;
-  const run = error.details?.run as { step?: string; op?: string } | undefined;
+  return describeStep(error.details?.run as { step?: string; op?: string } | undefined);
+}
+
+/** The same, read from the journal's last error entry. */
+function lastJournaledStep(ports: CliPorts, root: string, runId: string): string | undefined {
+  try {
+    const last = (cliRunJournal(ports.fs, root).read(runId) ?? []).at(-1);
+    return last?.kind === 'error' ? describeStep({ step: last.path, op: last.op }) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function describeStep(
+  run: { step?: string | undefined; op?: string | undefined } | undefined,
+): string | undefined {
   return run?.op === undefined
     ? undefined
     : `${run.op}${run.step === undefined ? '' : ` (${run.step})`}`;

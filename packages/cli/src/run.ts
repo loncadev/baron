@@ -49,6 +49,9 @@ export function cliRunJournal(fs: FileSystem, root: string): RunJournalStore {
   return createFileRunJournal(root, {
     read: (path) => fs.read(path),
     append(path, text) {
+      // The real file port does not create parents: the first line of the first journal in a
+      // project would fail with ENOENT — found by the first live run, not by the memory fs.
+      fs.mkdirp(path.slice(0, path.lastIndexOf('/')));
       fs.write(path, `${fs.read(path) ?? ''}${text}`);
     },
   });

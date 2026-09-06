@@ -46,6 +46,10 @@ against different instructions is worse than starting over), `RUN_JOURNAL_CORRUP
 cannot be read). A journal is append-only: a crash while writing loses at most its last line, which
 means at worst one completed step runs twice — never the whole run.
 
+Run live while it was built: a recipe that created an issue, commented on it and then opened a
+pull request from a branch that did not exist stopped at the PR twice (no branch, then no commits)
+and was resumed twice; GitHub ended up with one issue, one comment and one pull request.
+
 Not covered yet: **compensation**. A run that cannot be completed stays half-done; undoing what it
 did (`undo:` on a mutating step) is deferred until a real failure gives it a shape.
 
