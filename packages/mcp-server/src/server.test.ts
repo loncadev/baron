@@ -7,6 +7,8 @@ import {
 } from '@lonca/baron-adapter-github';
 import { createMemoryScmTransport, createMemoryTransport } from '@lonca/baron-conformance';
 import type { IssuesPort, ScmPort } from '@lonca/baron-core';
+import { KNOWN_PROVIDERS, getProviderDescriptor } from '@lonca/baron-providers';
+import { BUILTIN_RECIPE_NAMES } from '@lonca/baron-recipes';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { describe, expect, it } from 'vitest';
@@ -165,6 +167,15 @@ describe('server instructions', () => {
       expect(SERVER_INSTRUCTIONS).toContain(role);
     }
     expect(SERVER_INSTRUCTIONS).toContain('baron_recipe_run');
+  });
+
+  it('names every provider and every built-in recipe, from the registries rather than by hand', () => {
+    // The 0.40.0 handshake still said "Azure DevOps, GitHub, Slack" and five recipes — two providers
+    // and three recipes after they shipped. Derived lists cannot go stale that way.
+    for (const id of KNOWN_PROVIDERS) {
+      expect(SERVER_INSTRUCTIONS).toContain(getProviderDescriptor(id).displayName);
+    }
+    for (const name of BUILTIN_RECIPE_NAMES) expect(SERVER_INSTRUCTIONS).toContain(name);
   });
 });
 
