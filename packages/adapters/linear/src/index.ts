@@ -95,6 +95,7 @@ export function defineLinearIssuesAdapter(
 
 export { LINEAR_PROVIDER, LINEAR_STATE_KEY } from './provider.js';
 export {
+  BARON_LINEAR_CLIENT_ID,
   LINEAR_CALLBACK_PORT,
   LINEAR_CALLBACK_PORT_ENV,
   createLinearPkceAuth,

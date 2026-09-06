@@ -41,6 +41,7 @@ import {
   jiraManifest,
 } from '@lonca/baron-adapter-jira';
 import {
+  BARON_LINEAR_CLIENT_ID,
   LINEAR_CALLBACK_PORT_ENV,
   LINEAR_OAUTH_CLIENT_ID_KEY,
   LINEAR_PROVIDER,
@@ -244,10 +245,11 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
       'Note the header, because the failure is misleading: a personal API key is sent as a bare',
       '`Authorization: <key>`. `Bearer` is for OAuth access tokens only, and using it with a',
       'personal key fails as "authentication required", which reads like a bad key.',
-      'With BARON_LINEAR_CLIENT_ID set to a Linear OAuth application’s client id, `baron init`',
-      'offers a browser sign-in (PKCE, no secret) instead; the token it stores lasts 24 hours.',
-      `That application must list ${linearCallbackUri()} as a redirect URI — Linear matches it`,
-      `exactly, port included (${LINEAR_CALLBACK_PORT_ENV} moves the port if it is taken).`,
+      'Or skip the key: `baron init` offers a browser sign-in (PKCE, no secret) through Baron’s own',
+      'Linear application; the token it stores lasts 24 hours and is renewed on its own. Set',
+      'BARON_LINEAR_CLIENT_ID to use a different application (it must list',
+      `${linearCallbackUri()} as a redirect URI — Linear matches it exactly, port included;`,
+      `${LINEAR_CALLBACK_PORT_ENV} moves the port if it is taken), or to empty to opt out.`,
     ],
     manifest: linearManifest,
     credentialEnvKeys: ['LINEAR_API_KEY', 'LINEAR_TEAM'],
@@ -256,7 +258,8 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
       // A refresh token beside the key means the key is a browser-issued access token: sent as
       // Bearer, renewed before it expires, and the rotated pair written back through the hook.
       const refreshToken = env[LINEAR_REFRESH_TOKEN_KEY];
-      const clientId = env[LINEAR_OAUTH_CLIENT_ID_KEY] ?? env.BARON_LINEAR_CLIENT_ID;
+      const clientId =
+        env[LINEAR_OAUTH_CLIENT_ID_KEY] ?? env.BARON_LINEAR_CLIENT_ID ?? BARON_LINEAR_CLIENT_ID;
       const oauth =
         refreshToken !== undefined && refreshToken.length > 0 && clientId !== undefined
           ? {
@@ -282,12 +285,12 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
       });
     },
     createDeviceAuth(env) {
-      // No default id yet: Baron has no registered Linear OAuth application, so the browser
-      // sign-in is offered only to an installation that names one. Linear has no device flow;
-      // this is the authorization-code flow with PKCE and a loopback callback, and the token it
-      // returns lasts 24 hours — refresh is the next piece, so until it lands this stays opt-in.
-      const clientId = env.BARON_LINEAR_CLIENT_ID;
-      if (clientId === undefined || clientId.length === 0) return undefined;
+      // Offered on a bare install through Baron's own public application, as GitHub is: a client
+      // id grants nothing by itself. Linear has no device flow; this is the authorization-code
+      // flow with PKCE and a loopback callback. Set BARON_LINEAR_CLIENT_ID to use a different
+      // application, or to empty to opt out (a personal key is narrower than any OAuth scope).
+      const clientId = env.BARON_LINEAR_CLIENT_ID ?? BARON_LINEAR_CLIENT_ID;
+      if (clientId.length === 0) return undefined;
       const port = env[LINEAR_CALLBACK_PORT_ENV];
       return createLinearPkceAuth({
         clientId,

@@ -45,38 +45,43 @@ version.
 
 ---
 
-## 2. Create a Linear API key
+## 2. Credentials: sign in, or create a Linear API key
 
-Settings → **Security & access** → **Personal API keys** → create one, and copy it.
+The default is to sign in through the browser during `init` — see the next section — and then
+there is nothing to create here. If you would rather hold a personal key (narrower than any OAuth
+scope, and the right choice for a CI account): Settings → **Security & access** → **Personal API
+keys** → create one, and copy it.
 
 > **The one trap worth naming.** A personal API key is sent as a bare `Authorization: <key>` header.
 > `Bearer` is for OAuth access tokens only, and using it with a personal key fails as
 > *"authentication required"* — which reads exactly like a bad key. Baron gets this right; you only
 > meet it if you call the API yourself.
 
-You do not have to create the key before running `init` — it will ask for the key (hidden) and the
-team, and write them to the gitignored credentials file. Creating it first just means you have it
-ready to paste.
+You do not have to create the key before running `init` — decline the browser sign-in and it asks
+for the key (hidden) and the team, and writes them to the gitignored credentials file. Creating it
+first just means you have it ready to paste.
 
 ---
 
-### Browser sign-in instead of a key (optional)
+### Browser sign-in instead of a key
 
-Linear supports the OAuth authorization-code flow with PKCE, so `baron init` can sign you in
-through the browser instead of asking for a key — when it knows which OAuth application to use.
-Set `BARON_LINEAR_CLIENT_ID` to your Linear OAuth application's client id (Settings → API → OAuth
-applications) and `init` offers:
+Linear supports the OAuth authorization-code flow with PKCE, so `baron init` signs you in through
+the browser instead of asking for a key, through Baron's own public Linear application ("Baron",
+by Lonca). Nothing to register: `init` offers
 
 ```
 Sign in to linear in your browser instead of pasting a token? (Y/n)
   Open https://linear.app/oauth/authorize?… and approve — Baron is listening for the answer.
 ```
 
-The application's redirect URI must be **exactly** `http://127.0.0.1:41765/callback`. Linear matches
-the redirect URI against the registered list character for character, port included — a
+Baron listens on the fixed port `41765`, because Linear matches the redirect URI against the
+application's registered list character for character, port included. To use your own OAuth
+application instead (Settings → API → OAuth applications), set `BARON_LINEAR_CLIENT_ID` to its
+client id and register **exactly** `http://127.0.0.1:41765/callback` as its redirect URI — a
 port-less `http://127.0.0.1/callback` is refused with *"Invalid redirect_uri parameter for the
-application"* — so Baron listens on that fixed port. If it is taken on your machine, set
-`BARON_LINEAR_CALLBACK_PORT` to a free one and register `http://127.0.0.1:<port>/callback` as well.
+application"*. If that port is taken on your machine, set `BARON_LINEAR_CALLBACK_PORT` to a free
+one; with your own application, register `http://127.0.0.1:<port>/callback` as well. Set
+`BARON_LINEAR_CLIENT_ID` to empty to turn the offer off and always paste a key.
 
 No client secret is involved: PKCE binds the token exchange to the process that started the flow.
 The access token Linear issues lasts 24 hours; the refresh token, its expiry and the client id are
@@ -84,7 +89,6 @@ stored beside it in `.baron/credentials`, and the transport renews the token bef
 when Linear refuses it) and writes the rotated pair back — so a sign-in outlasts the day. When
 Linear will not renew (revoked in Linear's settings), the error says to run `init` again.
 
-Baron does not ship a Linear application id yet, so this stays opt-in.
 
 ## 3. `baron init` — introspect and confirm the mapping
 

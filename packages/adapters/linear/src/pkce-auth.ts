@@ -7,6 +7,7 @@ import {
   type DeviceCodePrompt,
 } from '@lonca/baron-core';
 
+import { refusedPage, signedInPage } from './callback-page.js';
 import {
   LINEAR_OAUTH_CLIENT_ID_KEY,
   LINEAR_REFRESH_TOKEN_KEY,
@@ -31,6 +32,14 @@ const CALLBACK_PATH = '/callback';
 export const LINEAR_CALLBACK_PORT = 41765;
 /** The env var that overrides {@link LINEAR_CALLBACK_PORT}. */
 export const LINEAR_CALLBACK_PORT_ENV = 'BARON_LINEAR_CALLBACK_PORT';
+
+/**
+ * The client id of Baron's own public Linear OAuth application ("Baron", by Lonca), so a bare
+ * install gets the browser sign-in without registering anything. Public by design: a client id
+ * grants nothing on its own, and PKCE binds each sign-in to the process that started it.
+ * `BARON_LINEAR_CLIENT_ID` overrides it; setting that to empty opts out of the offer entirely.
+ */
+export const BARON_LINEAR_CLIENT_ID = '018d8c4351a9b9ccde97c4f4c28fde6e';
 
 /** The redirect URI a Linear OAuth application must list for Baron's sign-in on `port`. */
 export function linearCallbackUri(port: number = LINEAR_CALLBACK_PORT): string {
@@ -208,11 +217,7 @@ function listen(
       const error = url.searchParams.get('error');
       res
         .writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
-        .end(
-          error === null
-            ? '<!doctype html><title>Baron</title><p>Signed in. You can close this tab and go back to the terminal.</p>'
-            : `<!doctype html><title>Baron</title><p>Linear did not authorize Baron (${error}). Go back to the terminal.</p>`,
-        );
+        .end(error === null ? signedInPage() : refusedPage(error));
       settle?.({
         code: url.searchParams.get('code') ?? undefined,
         state: url.searchParams.get('state') ?? undefined,
