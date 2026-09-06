@@ -11,7 +11,7 @@ import {
   mergeCredentials,
   policyPath,
 } from '@lonca/baron-providers';
-import { createRecipeService } from '@lonca/baron-recipes';
+import { createFileRunJournal, createRecipeService } from '@lonca/baron-recipes';
 import type { McpPorts, NativeAccess } from './tools.js';
 
 function readIfPresent(path: string): string | undefined {
@@ -55,7 +55,11 @@ export function loadPorts(root: string, env: Env): McpPorts {
   const knowledge = createLocalKnowledgeLoop(knowledgeDir(root));
   // The recipe runner drives the SAME bound ports the agent uses, deterministically (the engine
   // enforces order/rules); built-ins resolve by name, project recipes from <root>/.baron/recipes.
-  const recipes = createRecipeService({ ...bound, knowledge }, root);
+  // Journaled under <root>/.baron/runs so a run that stops halfway can be resumed by a later call
+  // — or a later server process.
+  const recipes = createRecipeService({ ...bound, knowledge }, root, {
+    journal: createFileRunJournal(root),
+  });
   return {
     ...bound,
     knowledge,

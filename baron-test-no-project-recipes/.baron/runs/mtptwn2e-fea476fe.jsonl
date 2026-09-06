@@ -1,0 +1,6 @@
+{"kind":"start","at":"2026-09-06T13:09:44.006Z","recipe":"task-new","fingerprint":"172caecca4a460916164225ffdd42d8fb9091a880b656c8c140859fd7639a4cb","inputs":{"title":"Merged already","typeRole":"task"}}
+{"kind":"ask","at":"2026-09-06T13:09:44.006Z","as":"body","value":null}
+{"kind":"ask","at":"2026-09-06T13:09:44.007Z","as":"parentId","value":null}
+{"kind":"do","at":"2026-09-06T13:09:44.007Z","path":"4","op":"issue.create","key":"5bfc2ee5ab00404d4a6d0a4110f8ece271f60dfb7a2f5d9202d9d7b718e06c7c","as":"issue","result":{"id":"mem-1","key":"#1","title":"Merged already","nativeType":"issue","typeRole":"task","blocked":false,"nativeState":"open","labels":["type:task"],"branchName":"task/mem-1-merged-already","url":"mem://mem-1","provider":"github"}}
+{"kind":"note","at":"2026-09-06T13:09:44.007Z","text":"Created #1 (issue): Merged already"}
+{"kind":"end","at":"2026-09-06T13:09:44.008Z","replayed":0}

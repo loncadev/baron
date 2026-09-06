@@ -3,6 +3,12 @@ import { BaronError } from '@lonca/baron-core';
 import type { RecipeAsker } from './ask.js';
 import { BUILTIN_RECIPE_NAMES, isBuiltinRecipe, loadBuiltinRecipe } from './builtins.js';
 import { type RecipePorts, type RunRecipeResult, runRecipe } from './engine.js';
+import {
+  RUN_NOT_FOUND,
+  type RunJournalStore,
+  createMemoryRunJournal,
+  newRunId,
+} from './journal.js';
 import { type Recipe, type RecipeInput, loadRecipe, recipeInputs } from './recipe.js';
 
 export interface RecipeSummary {
@@ -25,6 +31,21 @@ export interface RecipeService {
    * warning on the MCP path.
    */
   run(name: string, inputs: Record<string, unknown>): Promise<RunRecipeResult>;
+  /**
+   * Continue a run that stopped: same recipe, inputs and answers restored from its journal, every
+   * step it completed replayed rather than executed. `RUN_NOT_FOUND` for an id with no journal or
+   * one that already finished; `RUN_RECIPE_CHANGED` when the recipe is no longer what it ran.
+   */
+  resume(runId: string): Promise<RunRecipeResult>;
+}
+
+export interface RecipeServiceOptions {
+  /**
+   * Where runs are journaled. A harness that owns a project root passes `createFileRunJournal(root)`
+   * so a run outlives the process; the default keeps journals in memory, resumable only for as long
+   * as this service lives — enough for tests and embedded callers, and it writes nothing to disk.
+   */
+  readonly journal?: RunJournalStore;
 }
 
 const RECIPE_DIR_REL = '.baron/recipes';
@@ -84,7 +105,12 @@ function summarize(name: string, recipe: Recipe): RecipeSummary {
   };
 }
 
-export function createRecipeService(ports: RecipePorts, root: string): RecipeService {
+export function createRecipeService(
+  ports: RecipePorts,
+  root: string,
+  options: RecipeServiceOptions = {},
+): RecipeService {
+  const journal = options.journal ?? createMemoryRunJournal();
   return {
     list() {
       const builtins = BUILTIN_RECIPE_NAMES.map((name) => summarize(name, loadBuiltinRecipe(name)));
@@ -113,7 +139,29 @@ export function createRecipeService(ports: RecipePorts, root: string): RecipeSer
           'RECIPE_INPUT_MISSING',
         );
       }
-      return runRecipe(recipe, { ports, asker: nonInteractiveAsker, inputs });
+      return runRecipe(recipe, {
+        ports,
+        asker: nonInteractiveAsker,
+        inputs,
+        run: { id: newRunId(), journal },
+      });
+    },
+
+    async resume(runId) {
+      const start = journal.read(runId)?.find((e) => e.kind === 'start');
+      if (start === undefined) {
+        throw new BaronError(
+          `No run '${runId}' to resume: no journal was written for it.`,
+          RUN_NOT_FOUND,
+        );
+      }
+      // Asks are restored from the journal, so the non-interactive asker is never reached for
+      // them; reaching it now means the journal lacks an answer, which is a missing input.
+      return runRecipe(resolveRecipeByName(start.recipe, root), {
+        ports,
+        asker: nonInteractiveAsker,
+        run: { id: runId, journal, resume: true },
+      });
     },
   };
 }

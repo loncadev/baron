@@ -1,0 +1,6 @@
+{"kind":"start","at":"2026-09-06T13:09:44.085Z","recipe":"task-new","fingerprint":"172caecca4a460916164225ffdd42d8fb9091a880b656c8c140859fd7639a4cb","inputs":{"title":"Still open","typeRole":"task"}}
+{"kind":"ask","at":"2026-09-06T13:09:44.086Z","as":"body","value":null}
+{"kind":"ask","at":"2026-09-06T13:09:44.086Z","as":"parentId","value":null}
+{"kind":"do","at":"2026-09-06T13:09:44.087Z","path":"4","op":"issue.create","key":"618c4525f103e3c9f71c7b034c00f262169625e2a519f7a87f44352730a99eae","as":"issue","result":{"id":"mem-1","key":"#1","title":"Still open","nativeType":"issue","typeRole":"task","blocked":false,"nativeState":"open","labels":["type:task"],"branchName":"task/mem-1-still-open","url":"mem://mem-1","provider":"github"}}
+{"kind":"note","at":"2026-09-06T13:09:44.087Z","text":"Created #1 (issue): Still open"}
+{"kind":"end","at":"2026-09-06T13:09:44.088Z","replayed":0}

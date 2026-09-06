@@ -18,6 +18,41 @@ the caller. Three surfaces, same engine:
   `/baron:run-recipe` (for any other recipe). Each gathers the inputs and makes the single
   `baron_recipe_run` call; also discoverable by natural language.
 
+## When a run fails halfway
+
+`ship` and `task-finish` mutate several providers in sequence. If the third step fails — CI refuses
+the trigger, the network drops — the first two have already happened, and running the recipe again
+from the top would do them again: the concrete case is a **second pull request**.
+
+So every run is **journaled**. `.baron/runs/<runId>.jsonl` (gitignored; `init` adds it) gets one
+line per event: the inputs the run started with, each `ask` answer, each `do` step with an
+idempotency key and the result it bound, each message, and the error or the end. The run id is
+reported on success (`Run id: …` on the CLI, `runId` in the MCP context) and on failure (the CLI
+prints the resume command; the MCP error carries `details.run = { id, step, op }`).
+
+**Resuming** — `baron run --resume <runId>` or `baron_recipe_run { resume: "<runId>" }` — restores
+the inputs and answers from the journal (nothing is asked again), **replays** every completed `do`
+step from its journaled result instead of executing it, and carries on from the step that failed.
+Each replay is said out loud in the messages (`Replayed scm.pr.create from run …`), and the result
+reports how many steps were replayed.
+
+What decides "already done" is the step's key: the run, the step's position (inside a `for_each`,
+per element), its op, and its **fully interpolated parameters**. A step whose parameters would now
+differ gets a new key and runs — a result produced under other conditions is never reused.
+
+Three refusals, all loud: `RUN_NOT_FOUND` (no journal for that id, or the run already finished),
+`RUN_RECIPE_CHANGED` (the recipe's steps are not what the run started with — replaying results
+against different instructions is worse than starting over), `RUN_JOURNAL_CORRUPT` (a line that
+cannot be read). A journal is append-only: a crash while writing loses at most its last line, which
+means at worst one completed step runs twice — never the whole run.
+
+Run live while it was built: a recipe that created an issue, commented on it and then opened a
+pull request from a branch that did not exist stopped at the PR twice (no branch, then no commits)
+and was resumed twice; GitHub ended up with one issue, one comment and one pull request.
+
+Not covered yet: **compensation**. A run that cannot be completed stays half-done; undoing what it
+did (`undo:` on a mutating step) is deferred until a real failure gives it a shape.
+
 ## Anatomy
 
 ```yaml

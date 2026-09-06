@@ -25,3 +25,4 @@ mcp-publisher.exe
 # people's emails, org/repo names). They live here so the project under test never sees them, and
 # they stay out of this public repo.
 dogfood/
+.baron/runs/

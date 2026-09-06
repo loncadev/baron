@@ -8,6 +8,7 @@ or from a clone of this repo with `pnpm baron …` (a `tsx` runner is wired up).
 baron init --provider <id> [--root <dir>] [--force]
 baron doctor [--root <dir>]
 baron run --recipe <name-or-path> [--root <dir>]
+baron run --resume <runId> [--root <dir>]
 baron help
 ```
 
@@ -68,9 +69,12 @@ recipe, and execute it. `ask` steps prompt on stdin; `message` steps print to st
 | Flag | Meaning |
 | --- | --- |
 | `--recipe <name-or-path>` | **Required.** A built-in or project recipe **name** (`task-start`), or a **path** to a YAML file. A value containing a separator or ending in `.yaml`/`.yml` is treated as a path, so a mistyped path is reported as a missing file rather than an unknown recipe. Names resolve exactly as they do over MCP. |
+| `--resume <runId>` | Continue a run that stopped, from its journal under `.baron/runs/`: inputs and answers are restored, completed steps are replayed rather than repeated. `--recipe` is not needed — the journal names the recipe. |
 | `--root <dir>` | Project root (default `.`). |
 
-Missing `--recipe` exits `2`. See [Recipes](./recipes.md).
+Every run is journaled and reports its id (`Run id: …`); a failed run prints the exact `--resume`
+command. Missing both `--recipe` and `--resume` exits `2`. See
+[Recipes — when a run fails halfway](./recipes.md#when-a-run-fails-halfway).
 
 ## Exit codes & errors
 

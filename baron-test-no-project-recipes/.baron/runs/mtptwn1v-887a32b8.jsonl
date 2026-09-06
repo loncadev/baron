@@ -1,0 +1,6 @@
+{"kind":"start","at":"2026-09-06T13:09:43.987Z","recipe":"task-new","fingerprint":"172caecca4a460916164225ffdd42d8fb9091a880b656c8c140859fd7639a4cb","inputs":{"title":"Rejected work","typeRole":"task"}}
+{"kind":"ask","at":"2026-09-06T13:09:43.988Z","as":"body","value":null}
+{"kind":"ask","at":"2026-09-06T13:09:43.988Z","as":"parentId","value":null}
+{"kind":"do","at":"2026-09-06T13:09:43.989Z","path":"4","op":"issue.create","key":"c3530036a79ca2f9cb0df474644169b819d196ad63c2a1cb1e36a7620b951e67","as":"issue","result":{"id":"mem-1","key":"#1","title":"Rejected work","nativeType":"issue","typeRole":"task","blocked":false,"nativeState":"open","labels":["type:task"],"branchName":"task/mem-1-rejected-work","url":"mem://mem-1","provider":"github"}}
+{"kind":"note","at":"2026-09-06T13:09:43.989Z","text":"Created #1 (issue): Rejected work"}
+{"kind":"end","at":"2026-09-06T13:09:43.989Z","replayed":0}

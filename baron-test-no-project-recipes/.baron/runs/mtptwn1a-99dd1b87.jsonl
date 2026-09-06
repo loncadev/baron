@@ -1,0 +1,6 @@
+{"kind":"start","at":"2026-09-06T13:09:43.967Z","recipe":"task-new","fingerprint":"172caecca4a460916164225ffdd42d8fb9091a880b656c8c140859fd7639a4cb","inputs":{"title":"Wire it","typeRole":"task"}}
+{"kind":"ask","at":"2026-09-06T13:09:43.970Z","as":"body","value":null}
+{"kind":"ask","at":"2026-09-06T13:09:43.971Z","as":"parentId","value":null}
+{"kind":"do","at":"2026-09-06T13:09:43.972Z","path":"4","op":"issue.create","key":"304e55f568d8b1b3c75896d5e5fb06d8c6d0407363a5a4177a02d8419475f7ee","as":"issue","result":{"id":"mem-1","key":"#1","title":"Wire it","nativeType":"issue","typeRole":"task","blocked":false,"nativeState":"open","labels":["type:task"],"branchName":"task/mem-1-wire-it","url":"mem://mem-1","provider":"github"}}
+{"kind":"note","at":"2026-09-06T13:09:43.973Z","text":"Created #1 (issue): Wire it"}
+{"kind":"end","at":"2026-09-06T13:09:43.973Z","replayed":0}

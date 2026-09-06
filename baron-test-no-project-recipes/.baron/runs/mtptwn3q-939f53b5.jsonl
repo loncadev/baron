@@ -1,0 +1,6 @@
+{"kind":"start","at":"2026-09-06T13:09:44.054Z","recipe":"task-new","fingerprint":"172caecca4a460916164225ffdd42d8fb9091a880b656c8c140859fd7639a4cb","inputs":{"title":"Under review","typeRole":"task"}}
+{"kind":"ask","at":"2026-09-06T13:09:44.054Z","as":"body","value":null}
+{"kind":"ask","at":"2026-09-06T13:09:44.055Z","as":"parentId","value":null}
+{"kind":"do","at":"2026-09-06T13:09:44.055Z","path":"4","op":"issue.create","key":"9e0550dd55a4a69deefca78957385e77f1330cbe5c92721c6daf46d7cb62dcf0","as":"issue","result":{"id":"mem-2","key":"#2","title":"Under review","nativeType":"issue","typeRole":"task","blocked":false,"nativeState":"open","labels":["type:task"],"branchName":"task/mem-2-under-review","url":"mem://mem-2","provider":"github"}}
+{"kind":"note","at":"2026-09-06T13:09:44.055Z","text":"Created #2 (issue): Under review"}
+{"kind":"end","at":"2026-09-06T13:09:44.056Z","replayed":0}

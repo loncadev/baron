@@ -30,7 +30,11 @@ import {
   WORK_ITEM_TYPE_ROLES,
 } from '@lonca/baron-core';
 import { KnowledgeLoop, createMemoryKnowledgeStore } from '@lonca/baron-knowledge-loop';
-import { type RecipeService, createRecipeService } from '@lonca/baron-recipes';
+import {
+  type RecipeService,
+  createMemoryRunJournal,
+  createRecipeService,
+} from '@lonca/baron-recipes';
 import { describe, expect, it } from 'vitest';
 import { OP_ROUTES, TOOL_NAMES } from './consolidated.js';
 import {
@@ -752,6 +756,35 @@ describe('callRecipeTool', () => {
     });
     expect(result.isError).toBe(true);
     expect(result.structuredContent?.code).toBe('INVALID_ARGS');
+  });
+
+  it('reports the run id beside the context, and resumes a stopped run by it', async () => {
+    const journal = createMemoryRunJournal();
+    // One issues port for both services, as one provider is for two processes.
+    const issues = githubPort();
+    const half = createRecipeService({ issues }, RECIPE_ROOT, { journal });
+    const created = await callRecipeTool(half, RECIPE_TOOL_NAMES.run, {
+      name: 'task-new',
+      inputs: { title: 'Resumable', typeRole: 'task' },
+    });
+    const context = parse(created.content[0]?.text ?? '{}');
+    expect(typeof context.runId).toBe('string');
+
+    // task-start needs scm; without it the run stops after moving the item.
+    const stopped = await callRecipeTool(half, RECIPE_TOOL_NAMES.run, {
+      name: 'task-start',
+      inputs: { issueId: (context.issue as { id: string }).id },
+    });
+    expect(stopped.isError).toBe(true);
+    const run = (stopped.structuredContent?.details as { run: { id: string; op: string } }).run;
+    expect(run.op).toBe('scm.branch.create');
+
+    const whole = createRecipeService({ issues, scm: scmPort() }, RECIPE_ROOT, { journal });
+    const resumed = await callRecipeTool(whole, RECIPE_TOOL_NAMES.run, { resume: run.id });
+    expect(resumed.isError).toBeUndefined();
+    expect(parse(resumed.content[0]?.text ?? '{}').runId).toBe(run.id);
+    // The replay is said out loud in the notes block, so the agent knows nothing was repeated.
+    expect(resumed.content[1]?.text).toContain('Replayed');
   });
 
   it('rejects a missing recipe name as INVALID_ARGS', async () => {

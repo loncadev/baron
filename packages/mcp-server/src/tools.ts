@@ -749,18 +749,31 @@ export const RECIPE_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
       'you — enforces the step order). Supply all required inputs (from baron_recipe_list) in ' +
       '`inputs`; a missing required input errors rather than prompting. Prefer this over composing the ' +
       'individual issue/scm/ci tools yourself for a packaged workflow. Returns the run context as ' +
-      'JSON, and — when the recipe had anything to say — a SECOND text block with its messages. ' +
-      'Read that block: it is where a recipe reports what it could not verify (task-land warns there ' +
-      'when it merged past checks it could not see).',
+      'JSON (with its `runId`), and — when the recipe had anything to say — a SECOND text block ' +
+      'with its messages. Read that block: it is where a recipe reports what it could not verify ' +
+      '(task-land warns there when it merged past checks it could not see). Every run is journaled: ' +
+      'if one fails partway, do NOT run it again from scratch (that repeats the steps that already ' +
+      'mutated the provider — a second PR). Call this with `resume: <runId>` from the error instead: ' +
+      'completed steps are replayed from the journal and the run carries on from where it stopped.',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
-      required: ['name'],
       properties: {
-        name: { type: 'string', minLength: 1, description: 'Recipe name (e.g. task-start).' },
+        name: {
+          type: 'string',
+          minLength: 1,
+          description: 'Recipe name (e.g. task-start). Required unless `resume` is given.',
+        },
         inputs: {
           type: 'object',
           description: "Values for the recipe's `ask` inputs, keyed by input name.",
+        },
+        resume: {
+          type: 'string',
+          minLength: 1,
+          description:
+            'The `runId` of a run that stopped (from its error, under details.run.id): continue it ' +
+            'instead of starting a new one. Its inputs and answers are restored from the journal.',
         },
       },
     },
@@ -981,9 +994,18 @@ function toDraft(args: Record<string, unknown> | undefined): IssueDraft {
  */
 function recipeNotes(result: unknown): { payload: unknown; notes: readonly string[] } {
   if (typeof result !== 'object' || result === null) return { payload: result, notes: [] };
-  const { context, notes } = result as { context?: unknown; notes?: unknown };
+  const { context, notes, runId } = result as {
+    context?: unknown;
+    notes?: unknown;
+    runId?: unknown;
+  };
   if (context === undefined) return { payload: result, notes: [] };
-  return { payload: context, notes: Array.isArray(notes) ? (notes as string[]) : [] };
+  // The run id rides beside the context so a caller can resume without parsing the error text.
+  const payload =
+    typeof runId === 'string' && typeof context === 'object' && context !== null
+      ? { ...(context as Record<string, unknown>), runId }
+      : context;
+  return { payload, notes: Array.isArray(notes) ? (notes as string[]) : [] };
 }
 
 async function run(
@@ -1433,6 +1455,8 @@ export function callRecipeTool(
       return run(async () => service.list());
     case RECIPE_TOOL_NAMES.run:
       return run(() => {
+        const resume = optionalString(args, 'resume');
+        if (resume !== undefined) return service.resume(resume);
         const inputs = args?.inputs;
         if (
           inputs !== undefined &&

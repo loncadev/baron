@@ -32,7 +32,7 @@ policy.
 | `baron_deploy_read` | deploy | `environments` · `deployments` |
 | `baron_notify_send` | notify | Send a message (`text`, optional `channel`, `threadKey`). |
 | `baron_recipe_list` | recipes | The runnable recipes and the `inputs` each declares. |
-| `baron_recipe_run` | recipes | Run a named recipe end-to-end as ONE deterministic, rule-enforced call. Returns the run context as JSON plus, when the recipe said anything, a second text block carrying its messages — read it, that is where a recipe reports what it could not verify. |
+| `baron_recipe_run` | recipes | Run a named recipe end-to-end as ONE deterministic, rule-enforced call. Returns the run context as JSON (with its `runId`) plus, when the recipe said anything, a second text block carrying its messages — read it, that is where a recipe reports what it could not verify. Every run is journaled: pass `resume: <runId>` (from a failed call's `details.run.id`) to continue a run that stopped, with its completed steps replayed rather than repeated. |
 | `baron_memory_append` | loop | `learning` · `followup` — Baron's own store, not a provider's. |
 | `baron_memory_query` | loop | `learning` · `followup` |
 | `baron_native_request` | — | **Escape hatch (last resort).** A non-portable raw authenticated provider REST call; only reaches providers the policy binds. Prefer the normalized tools above. |
