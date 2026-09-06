@@ -138,18 +138,45 @@ describe('the Linear PKCE flow', () => {
     expect(calls).toHaveLength(0);
   });
 
-  it("reports Linear's own refusal instead of a missing code", async () => {
+  it("reports Linear's own refusal instead of a missing code, on the page and in the terminal", async () => {
     const { fetchImpl } = fakeFetch([]);
     const auth = createLinearPkceAuth({ clientId: 'cid', fetchImpl, port: 0 });
+    let page: Promise<string> | undefined;
     const token = auth.authorize((prompt) => {
       setTimeout(() => {
-        void approve(prompt.verificationUri, (q) => ({
-          error: 'access_denied',
+        page = approve(prompt.verificationUri, (q) => ({
+          error: 'access_denied<b>',
           state: q.get('state') as string,
         }));
       }, 10);
     });
     await expect(token).rejects.toThrow(/did not authorize Baron: access_denied/);
+    // The browser is told the same thing — by name, with the reason, and with the reason escaped,
+    // since it arrives on the query string.
+    const html = await (page as Promise<string>);
+    expect(html).toContain('Linear did not authorize Baron');
+    expect(html).toContain('access_denied&lt;b&gt;');
+    expect(html).not.toContain('access_denied<b>');
+  });
+
+  it('answers the browser with a page that says who signed in and what to do next', async () => {
+    const { fetchImpl } = fakeFetch([{ access_token: 'lin_oauth_x' }]);
+    const auth = createLinearPkceAuth({ clientId: 'cid', fetchImpl, port: 0 });
+    let page: Promise<string> | undefined;
+    const token = auth.authorize((prompt) => {
+      setTimeout(() => {
+        page = approve(prompt.verificationUri, (q) => ({
+          code: 'auth-code',
+          state: q.get('state') as string,
+        }));
+      }, 10);
+    });
+    await token;
+    const html = await (page as Promise<string>);
+    expect(html).toContain('Signed in to Linear');
+    expect(html).toContain('go back to the terminal');
+    // Self-contained: the listener is gone the moment this is served.
+    expect(html).not.toMatch(/src=|href=|@import|url\(/);
   });
 
   it('gives up when nobody comes back, naming how long it waited', async () => {

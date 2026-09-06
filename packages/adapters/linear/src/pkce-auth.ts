@@ -7,6 +7,7 @@ import {
   type DeviceCodePrompt,
 } from '@lonca/baron-core';
 
+import { refusedPage, signedInPage } from './callback-page.js';
 import {
   LINEAR_OAUTH_CLIENT_ID_KEY,
   LINEAR_REFRESH_TOKEN_KEY,
@@ -216,11 +217,7 @@ function listen(
       const error = url.searchParams.get('error');
       res
         .writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
-        .end(
-          error === null
-            ? '<!doctype html><title>Baron</title><p>Signed in. You can close this tab and go back to the terminal.</p>'
-            : `<!doctype html><title>Baron</title><p>Linear did not authorize Baron (${error}). Go back to the terminal.</p>`,
-        );
+        .end(error === null ? signedInPage() : refusedPage(error));
       settle?.({
         code: url.searchParams.get('code') ?? undefined,
         state: url.searchParams.get('state') ?? undefined,
