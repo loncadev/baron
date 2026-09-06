@@ -1,4 +1,9 @@
-import { BaronError, type DeviceAuth, type DeviceCodePrompt } from '@lonca/baron-core';
+import {
+  type AuthorizedCredential,
+  BaronError,
+  type DeviceAuth,
+  type DeviceCodePrompt,
+} from '@lonca/baron-core';
 
 // The contract moved to the core once a second provider (Linear, with a local callback) needed
 // it; re-exported here so existing imports keep resolving.
@@ -85,7 +90,7 @@ export function createGithubDeviceAuth(options: GithubDeviceAuthOptions): Device
   }
 
   return {
-    async authorize(onPrompt): Promise<string> {
+    async authorize(onPrompt): Promise<AuthorizedCredential> {
       const started = await post<DeviceCodeResponse>(DEVICE_CODE_URL, {
         client_id: options.clientId,
         scope: options.scope ?? DEFAULT_SCOPE,
@@ -120,7 +125,8 @@ export function createGithubDeviceAuth(options: GithubDeviceAuthOptions): Device
           grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
         });
         if (typeof token.access_token === 'string' && token.access_token.length > 0) {
-          return token.access_token;
+          // A GitHub OAuth-app token stands on its own: nothing to refresh, nothing to keep beside it.
+          return { token: token.access_token };
         }
         if (token.error === 'authorization_pending') continue;
         if (token.error === 'slow_down') {

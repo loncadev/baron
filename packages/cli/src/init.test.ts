@@ -222,6 +222,41 @@ describe('runInit', () => {
     expect(said).toMatch(/gitignored|never committed/i);
   });
 
+  it('stores what a sign-in hands over beside the token, under the keys the provider chose', async () => {
+    // A browser-issued token comes with a refresh token and an expiry; init does not know what
+    // they mean, only that the provider that wrote them will read them back.
+    const fs = memoryFileSystem({
+      [gitConfigPath(ROOT)]: '[remote "origin"]\n\turl = git@github.com:acme/widgets.git\n',
+    });
+    // confirms: sign in via browser? yes; write policy? yes.
+    const prompter = scriptedPrompter([true, true]);
+    const result = await runInit({
+      root: ROOT,
+      issuesProvider: 'github',
+      fs,
+      env: {},
+      prompter,
+      introspector: createMemoryIntrospector(githubIntrospectionFixture),
+      deviceAuth: {
+        async authorize(onPrompt) {
+          onPrompt({ verificationUri: 'https://example.test/approve', expiresInSeconds: 600 });
+          return {
+            token: 'tok',
+            extras: { X_REFRESH_TOKEN: 'r1', X_TOKEN_EXPIRES_AT: '2026-09-07T00:00:00.000Z' },
+          };
+        },
+      },
+    });
+    expect(result.written).toBe(true);
+    const saved = fs.read(credentialsPath(ROOT)) as string;
+    expect(saved).toContain('GITHUB_TOKEN=tok');
+    expect(saved).toContain('X_REFRESH_TOKEN=r1');
+    expect(saved).toContain('X_TOKEN_EXPIRES_AT=2026-09-07T00:00:00.000Z');
+    // A callback flow has no code to show: the note says to approve, not to type.
+    expect(prompter.notes.join('\n')).toContain('and approve');
+    expect(prompter.notes.join('\n')).not.toContain('enter:');
+  });
+
   it('never offers the browser sign-in on a --force run', async () => {
     // --force means "do not ask me". The device flow is nothing but asking: it waits up to fifteen
     // minutes for a human to approve a code, so offering it where nobody can answer hangs the run

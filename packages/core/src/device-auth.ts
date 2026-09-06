@@ -29,11 +29,24 @@ export interface DeviceCodePrompt {
   readonly expiresInSeconds: number;
 }
 
+/** What a sign-in produced: the credential itself, and anything that has to be kept beside it. */
+export interface AuthorizedCredential {
+  /** The value that goes into the provider's token key (GITHUB_TOKEN, LINEAR_API_KEY). */
+  readonly token: string;
+  /**
+   * Further credential entries to persist alongside, keyed by the env names the provider's
+   * transport will read them back under — a refresh token, when it expires, the client id that can
+   * renew it. Absent for a token that stands on its own. The caller stores them without knowing
+   * what they mean; the provider that wrote them is the one that reads them.
+   */
+  readonly extras?: Readonly<Record<string, string>> | undefined;
+}
+
 export interface DeviceAuth {
   /**
    * Run the whole flow: hand what the user must see to `onPrompt`, wait for their approval, and
-   * return the token. Rejects with an actionable BaronError on denial or expiry — never returns an
-   * empty string.
+   * return the credential. Rejects with an actionable BaronError on denial or expiry — never
+   * resolves with an empty token.
    */
-  authorize(onPrompt: (prompt: DeviceCodePrompt) => void): Promise<string>;
+  authorize(onPrompt: (prompt: DeviceCodePrompt) => void): Promise<AuthorizedCredential>;
 }

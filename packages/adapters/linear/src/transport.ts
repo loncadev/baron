@@ -10,6 +10,13 @@ import type {
   NativeTarget,
   NativeUpdateInput,
 } from '@lonca/baron-core';
+import {
+  LINEAR_REFRESH_TOKEN_KEY,
+  LINEAR_TOKEN_EXPIRES_AT_KEY,
+  type LinearOAuthSession,
+  isExpired,
+  refreshLinearToken,
+} from './oauth.js';
 import { LINEAR_STATE_KEY } from './provider.js';
 
 const ENDPOINT = 'https://api.linear.app/graphql';
@@ -24,6 +31,12 @@ export interface LinearTransportOptions {
   readonly apiKey: string;
   /** Team key (e.g. `BAR`) new issues are created in. Linear requires a team on every create. */
   readonly team: string;
+  /**
+   * Present when `apiKey` is a browser-issued OAuth access token rather than a personal key: it is
+   * then sent as `Bearer`, renewed with the refresh token before it expires (or when Linear
+   * refuses it), and the rotated pair is written back through `persist`.
+   */
+  readonly oauth?: LinearOAuthSession | undefined;
   readonly endpoint?: string | undefined;
   readonly fetchImpl?: typeof fetch | undefined;
 }
@@ -70,13 +83,49 @@ export function createLinearTransport(opts: LinearTransportOptions): IssuesTrans
   const endpoint = opts.endpoint ?? ENDPOINT;
   const doFetch = opts.fetchImpl ?? fetch;
 
-  async function gql<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
+  // The credential as currently held. A personal key never changes; a browser-issued token is
+  // replaced by every renewal, and the replacement must reach both the next request and the file
+  // `baron init` wrote, or the sign-in is good for exactly one process.
+  let accessToken = opts.apiKey;
+  let session = opts.oauth;
+  const authorization = (): string =>
+    session === undefined ? accessToken : `Bearer ${accessToken}`;
+
+  async function renew(): Promise<void> {
+    if (session === undefined) return;
+    const next = await refreshLinearToken(doFetch, session);
+    accessToken = next.accessToken;
+    session = { ...session, refreshToken: next.refreshToken, expiresAt: next.expiresAt };
+    await session.persist?.({
+      LINEAR_API_KEY: next.accessToken,
+      [LINEAR_REFRESH_TOKEN_KEY]: next.refreshToken,
+      ...(next.expiresAt !== undefined ? { [LINEAR_TOKEN_EXPIRES_AT_KEY]: next.expiresAt } : {}),
+    });
+  }
+
+  async function post<T>(query: string, variables?: Record<string, unknown>) {
     const response = await doFetch(endpoint, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: opts.apiKey },
+      headers: { 'content-type': 'application/json', authorization: authorization() },
       body: JSON.stringify({ query, ...(variables !== undefined ? { variables } : {}) }),
     });
-    const payload = (await response.json()) as { data?: T; errors?: Array<{ message: string }> };
+    return (await response.json()) as { data?: T; errors?: Array<{ message: string }> };
+  }
+
+  /** What Linear answers to a token it no longer honours — the one failure a renewal can fix. */
+  const refused = (errors: Array<{ message: string }> | undefined): boolean =>
+    errors?.some((e) => /authentication required|unauthenticated/i.test(e.message)) === true;
+
+  async function gql<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
+    // Renew ahead of a token known to be expiring rather than after the refusal it would earn:
+    // a mutation that fails halfway is not something to retry blindly.
+    if (session !== undefined && isExpired(session.expiresAt)) await renew();
+    let payload = await post<T>(query, variables);
+    if (session !== undefined && refused(payload.errors)) {
+      // Expiry unknown or wrong, and Linear said so: renew once and try again, then take the answer.
+      await renew();
+      payload = await post<T>(query, variables);
+    }
     if (payload.errors !== undefined && payload.errors.length > 0) {
       // Every message, not the first: Linear reports each invalid field separately, and showing one
       // sends you round the loop once per field.

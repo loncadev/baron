@@ -41,7 +41,10 @@ import {
   jiraManifest,
 } from '@lonca/baron-adapter-jira';
 import {
+  LINEAR_OAUTH_CLIENT_ID_KEY,
   LINEAR_PROVIDER,
+  LINEAR_REFRESH_TOKEN_KEY,
+  LINEAR_TOKEN_EXPIRES_AT_KEY,
   createLinearCredentialProbe,
   createLinearIntrospector,
   createLinearPkceAuth,
@@ -99,10 +102,25 @@ import {
 
 export * from './paths.js';
 export * from './credentials.js';
+export * from './credentials-file.js';
 export * from './native.js';
 
 /** A read-only view of process environment (credentials live here, never in committed policy). */
 export type Env = Record<string, string | undefined>;
+
+/**
+ * What a live installation lends its transports beyond credentials.
+ *
+ * `persistCredentials` is how a credential that changes while Baron runs — a browser-issued token
+ * renewed with a rotating refresh token — gets written back to wherever the installation keeps
+ * credentials, keyed by the same env names it was read under. Absent in a test, or in a process
+ * that holds credentials only in its environment, where a renewal lives and dies with it.
+ */
+export interface TransportHooks {
+  readonly persistCredentials?:
+    | ((patch: Readonly<Record<string, string>>) => void | Promise<void>)
+    | undefined;
+}
 
 /**
  * Everything Baron's entrypoints (CLI, MCP server) need to bind a provider id to live behavior: its
@@ -126,7 +144,7 @@ export interface ProviderDescriptor {
   readonly credentialEnvKeys?: readonly string[];
   /** Fixed abstract→native link types (provider knowledge, not policy); see {@link buildIssuesPort}. */
   readonly linkMap?: LinkMap;
-  createTransport?(env: Env): IssuesTransport;
+  createTransport?(env: Env, hooks?: TransportHooks): IssuesTransport;
   createIntrospector?(env: Env): Introspector;
   /**
    * Asks the provider what this credential may actually do. Optional: a provider with no way to
@@ -230,10 +248,24 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
     manifest: linearManifest,
     credentialEnvKeys: ['LINEAR_API_KEY', 'LINEAR_TEAM'],
     linkMap: exampleLinearLinkMap,
-    createTransport(env) {
+    createTransport(env, hooks) {
+      // A refresh token beside the key means the key is a browser-issued access token: sent as
+      // Bearer, renewed before it expires, and the rotated pair written back through the hook.
+      const refreshToken = env[LINEAR_REFRESH_TOKEN_KEY];
+      const clientId = env[LINEAR_OAUTH_CLIENT_ID_KEY] ?? env.BARON_LINEAR_CLIENT_ID;
+      const oauth =
+        refreshToken !== undefined && refreshToken.length > 0 && clientId !== undefined
+          ? {
+              refreshToken,
+              clientId,
+              expiresAt: env[LINEAR_TOKEN_EXPIRES_AT_KEY],
+              persist: hooks?.persistCredentials,
+            }
+          : undefined;
       return createLinearTransport({
         apiKey: env.LINEAR_API_KEY ?? '',
         team: env.LINEAR_TEAM ?? '',
+        ...(oauth !== undefined ? { oauth } : {}),
       });
     },
     createIntrospector(env) {
@@ -466,6 +498,7 @@ export function buildIssuesPort(
   config: IssuesProviderConfig,
   env: Env,
   logger?: Logger,
+  hooks?: TransportHooks,
 ): IssuesPort {
   const descriptor = getProviderDescriptor(config.provider);
   if (descriptor.manifest === undefined || descriptor.createTransport === undefined) {
@@ -483,7 +516,7 @@ export function buildIssuesPort(
   return new BaseIssuesAdapter(
     descriptor.manifest,
     resolved,
-    descriptor.createTransport(env),
+    descriptor.createTransport(env, hooks),
     logger,
   );
 }
@@ -625,10 +658,15 @@ export interface BoundPorts {
  * by the MCP server and the CLI's `run` so both turn a `policy.json` into live ports identically;
  * neither port is built unless `providers` binds it.
  */
-export function buildPorts(policy: BaronPolicyFile, env: Env, logger?: Logger): BoundPorts {
+export function buildPorts(
+  policy: BaronPolicyFile,
+  env: Env,
+  logger?: Logger,
+  hooks?: TransportHooks,
+): BoundPorts {
   const ports: BoundPorts = {};
   if (policy.providers.issues !== undefined) {
-    ports.issues = buildIssuesPort(resolveIssuesConfig(policy), env, logger);
+    ports.issues = buildIssuesPort(resolveIssuesConfig(policy), env, logger, hooks);
   }
   const scmProvider = policy.providers.scm;
   if (scmProvider !== undefined) {

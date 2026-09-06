@@ -60,6 +60,28 @@ ready to paste.
 
 ---
 
+### Browser sign-in instead of a key (optional)
+
+Linear supports the OAuth authorization-code flow with PKCE, so `baron init` can sign you in
+through the browser instead of asking for a key — when it knows which OAuth application to use.
+Set `BARON_LINEAR_CLIENT_ID` to your Linear OAuth application's client id (Settings → API → OAuth
+applications; the application's callback URL must be `http://127.0.0.1/callback` — Baron listens
+on a port of the system's choosing, and Linear accepts any port on a loopback redirect) and `init`
+offers:
+
+```
+Sign in to linear in your browser instead of pasting a token? (Y/n)
+  Open https://linear.app/oauth/authorize?… and approve — Baron is listening for the answer.
+```
+
+No client secret is involved: PKCE binds the token exchange to the process that started the flow.
+The access token Linear issues lasts 24 hours; the refresh token, its expiry and the client id are
+stored beside it in `.baron/credentials`, and the transport renews the token before it expires (or
+when Linear refuses it) and writes the rotated pair back — so a sign-in outlasts the day. When
+Linear will not renew (revoked in Linear's settings), the error says to run `init` again.
+
+Baron does not ship a Linear application id yet, so this stays opt-in.
+
 ## 3. `baron init` — introspect and confirm the mapping
 
 From your project root:

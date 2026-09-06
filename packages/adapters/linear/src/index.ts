@@ -95,6 +95,12 @@ export function defineLinearIssuesAdapter(
 
 export { LINEAR_PROVIDER, LINEAR_STATE_KEY } from './provider.js';
 export { createLinearPkceAuth, type LinearPkceAuthOptions } from './pkce-auth.js';
+export {
+  LINEAR_OAUTH_CLIENT_ID_KEY,
+  LINEAR_REFRESH_TOKEN_KEY,
+  LINEAR_TOKEN_EXPIRES_AT_KEY,
+  type LinearOAuthSession,
+} from './oauth.js';
 export { createLinearTransport, type LinearTransportOptions } from './transport.js';
 export { createLinearIntrospector, type LinearIntrospectorOptions } from './introspector.js';
 export {
