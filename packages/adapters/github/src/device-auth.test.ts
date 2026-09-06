@@ -37,7 +37,7 @@ describe('github device flow', () => {
     const { device } = auth([CODE, { error: 'authorization_pending' }, { access_token: 'gho_x' }]);
     const prompt = vi.fn();
 
-    expect(await device.authorize(prompt)).toBe('gho_x');
+    expect(await device.authorize(prompt)).toEqual({ token: 'gho_x' });
     expect(prompt).toHaveBeenCalledWith(
       expect.objectContaining({ userCode: 'ABCD-1234', verificationUri: CODE.verification_uri }),
     );

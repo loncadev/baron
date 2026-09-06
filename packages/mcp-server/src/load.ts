@@ -4,6 +4,7 @@ import { createLocalKnowledgeLoop } from '@lonca/baron-knowledge-loop';
 import {
   type Env,
   buildPorts,
+  createCredentialsFileHooks,
   credentialsPath,
   executeNativeRequest,
   knowledgeDir,
@@ -48,7 +49,9 @@ export function loadPorts(root: string, env: Env): McpPorts {
     }
     return executeNativeRequest(provider, effectiveEnv, request);
   };
-  const bound = buildPorts(policy, effectiveEnv);
+  // Rotated tokens go back into this project's credentials file, or a browser sign-in whose
+  // refresh token rotates on use would be good for exactly one server process.
+  const bound = buildPorts(policy, effectiveEnv, undefined, createCredentialsFileHooks(root));
   const knowledge = createLocalKnowledgeLoop(knowledgeDir(root));
   // The recipe runner drives the SAME bound ports the agent uses, deterministically (the engine
   // enforces order/rules); built-ins resolve by name, project recipes from <root>/.baron/recipes.

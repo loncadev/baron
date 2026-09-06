@@ -1,6 +1,8 @@
 import {
+  type AuthorizedCredential,
   BaronError,
   type BaronPolicyFile,
+  type DeviceAuth,
   type Introspector,
   type NativeTarget,
   type ProviderIntrospection,
@@ -44,6 +46,8 @@ export interface InitOptions {
   readonly force?: boolean;
   /** Injected browser opener (tests). Returns whether an attempt was made. */
   readonly openBrowser?: (url: string) => boolean;
+  /** Injected sign-in flow (tests), used in place of the provider's own when the token is missing. */
+  readonly deviceAuth?: DeviceAuth;
   /**
    * Work the caller must finish before init signs off — provisioning the provider's workflow labels,
    * today. A callback rather than something the caller runs after `runInit` returns, because the
@@ -187,6 +191,7 @@ async function ensureCredentials(
    * up with half a setup.
    */
   scmDescriptor?: ProviderDescriptor,
+  injectedDeviceAuth?: DeviceAuth,
 ): Promise<Env> {
   // Which provider each key belongs to, so the guidance shown and the browser sign-in offered are
   // the ones for the provider actually being asked about.
@@ -235,8 +240,10 @@ async function ensureCredentials(
   // code in a browser, so offering it where nobody can answer does not degrade — it hangs.
   const tokenKey = missing.find((key) => SECRET_KEY.test(key) && detected[key] === undefined);
   const tokenOwner = tokenKey === undefined ? undefined : ownerOf.get(tokenKey);
-  const deviceAuth = nonInteractive ? undefined : tokenOwner?.createDeviceAuth?.(env);
-  let authorized: string | undefined;
+  const deviceAuth = nonInteractive
+    ? undefined
+    : (injectedDeviceAuth ?? tokenOwner?.createDeviceAuth?.(env));
+  let authorized: AuthorizedCredential | undefined;
   if (deviceAuth !== undefined && tokenKey !== undefined) {
     const useIt = await prompter.confirm(
       `Sign in to ${tokenOwner?.id} in your browser instead of pasting a token?`,
@@ -276,7 +283,7 @@ async function ensureCredentials(
       continue;
     }
     if (key === tokenKey && authorized !== undefined) {
-      fileValues[key] = authorized;
+      fileValues[key] = authorized.token;
       continue;
     }
     const secret = SECRET_KEY.test(key);
@@ -286,6 +293,11 @@ async function ensureCredentials(
     );
     fileValues[key] = answer.trim();
   }
+
+  // What the sign-in handed over beside the token — a refresh token, its expiry, the client id
+  // that renews it — is stored under the keys the provider chose, without this code knowing what
+  // they mean. The provider that wrote them is the one that reads them.
+  if (authorized?.extras !== undefined) Object.assign(fileValues, authorized.extras);
 
   // The .baron dir may not exist yet on a fresh project — create it before writing the credentials
   // file (the policy write later does its own mkdirp, but that runs after this).
@@ -730,6 +742,7 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
     options.force === true,
     options.openBrowser ?? openInBrowser,
     scmProvider === undefined ? undefined : getProviderDescriptor(scmProvider),
+    options.deviceAuth,
   );
 
   // Built INSIDE the try: an adapter may refuse a malformed credential when it is constructed

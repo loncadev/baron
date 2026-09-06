@@ -47,7 +47,17 @@ describe('the Linear PKCE flow', () => {
         }));
       }, 10);
     });
-    await expect(token).resolves.toBe('lin_oauth_x');
+    // The refresh token, its expiry and the client id ride along, under the env keys the transport
+    // reads them back from — that is what makes the sign-in outlast the 24-hour access token.
+    const credential = await token;
+    expect(credential.token).toBe('lin_oauth_x');
+    expect(credential.extras).toMatchObject({
+      LINEAR_REFRESH_TOKEN: 'r',
+      LINEAR_OAUTH_CLIENT_ID: 'cid',
+    });
+    expect(Date.parse(credential.extras?.LINEAR_TOKEN_EXPIRES_AT as string)).toBeGreaterThan(
+      Date.now() + 80_000_000,
+    );
 
     const authorize = new URL(shown as string);
     expect(authorize.origin + authorize.pathname).toBe('https://linear.app/oauth/authorize');

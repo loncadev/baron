@@ -1,9 +1,22 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { type Server, createServer } from 'node:http';
-import { BaronError, type DeviceAuth, type DeviceCodePrompt } from '@lonca/baron-core';
+import {
+  type AuthorizedCredential,
+  BaronError,
+  type DeviceAuth,
+  type DeviceCodePrompt,
+} from '@lonca/baron-core';
+
+import {
+  LINEAR_OAUTH_CLIENT_ID_KEY,
+  LINEAR_REFRESH_TOKEN_KEY,
+  LINEAR_TOKEN_EXPIRES_AT_KEY,
+  LINEAR_TOKEN_URL,
+  expiresAt,
+} from './oauth.js';
 
 const AUTHORIZE_URL = 'https://linear.app/oauth/authorize';
-const TOKEN_URL = 'https://api.linear.app/oauth/token';
+const TOKEN_URL = LINEAR_TOKEN_URL;
 /** Read and write on the user's behalf: what the task-* recipes need and nothing broader. */
 const DEFAULT_SCOPE = 'read,write';
 /** The callback path the local listener answers on; Linear only checks the whole URI matches. */
@@ -55,7 +68,7 @@ export function createLinearPkceAuth(options: LinearPkceAuthOptions): DeviceAuth
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
   return {
-    async authorize(onPrompt: (prompt: DeviceCodePrompt) => void): Promise<string> {
+    async authorize(onPrompt: (prompt: DeviceCodePrompt) => void): Promise<AuthorizedCredential> {
       const verifier = base64url(randomBytes(32));
       const challenge = base64url(createHash('sha256').update(verifier).digest());
       const state = base64url(randomBytes(16));
@@ -111,6 +124,8 @@ export function createLinearPkceAuth(options: LinearPkceAuthOptions): DeviceAuth
         });
         const token = (await response.json()) as {
           access_token?: string;
+          refresh_token?: string;
+          expires_in?: number;
           error?: string;
           error_description?: string;
         };
@@ -120,7 +135,21 @@ export function createLinearPkceAuth(options: LinearPkceAuthOptions): DeviceAuth
             ERROR_CODE,
           );
         }
-        return token.access_token;
+        // The access token lasts a day; what makes the sign-in outlast it is the refresh token,
+        // kept beside it with the moment it expires and the client id that can renew it — the
+        // three things the transport needs to refresh without asking anyone.
+        return {
+          token: token.access_token,
+          extras: {
+            ...(token.refresh_token !== undefined
+              ? { [LINEAR_REFRESH_TOKEN_KEY]: token.refresh_token }
+              : {}),
+            ...(token.expires_in !== undefined
+              ? { [LINEAR_TOKEN_EXPIRES_AT_KEY]: expiresAt(token.expires_in) }
+              : {}),
+            [LINEAR_OAUTH_CLIENT_ID_KEY]: options.clientId,
+          },
+        };
       } finally {
         server.close();
       }

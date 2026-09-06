@@ -1,6 +1,12 @@
 import { BaronError, parsePolicyJson } from '@lonca/baron-core';
 import { createLocalKnowledgeLoop } from '@lonca/baron-knowledge-loop';
-import { type Env, buildPorts, knowledgeDir } from '@lonca/baron-providers';
+import {
+  type Env,
+  buildPorts,
+  credentialsPath,
+  knowledgeDir,
+  upsertCredentials,
+} from '@lonca/baron-providers';
 import {
   type RecipeAsker,
   type RecipeContext,
@@ -57,7 +63,14 @@ export async function runRecipeFile(options: RunRecipeFileOptions): Promise<RunR
     );
   }
   const ports = {
-    ...buildPorts(parsePolicyJson(policyRaw), options.env),
+    ...buildPorts(parsePolicyJson(policyRaw), options.env, undefined, {
+      // Through the CLI's own file system, so a test sees the write and a rotated token lands in
+      // the same credentials file the recipe's env was read from.
+      persistCredentials: (patch) => {
+        const path = credentialsPath(options.root);
+        options.fs.write(path, upsertCredentials(options.fs.read(path) ?? '', patch));
+      },
+    }),
     knowledge: createLocalKnowledgeLoop(knowledgeDir(options.root)),
   };
 
