@@ -311,6 +311,7 @@ describe('TOOL_DEFINITIONS', () => {
     expect(TOOL_DEFINITIONS.map((t) => t.name)).toEqual([
       MCP_TOOL_NAMES.create,
       MCP_TOOL_NAMES.get,
+      MCP_TOOL_NAMES.trace,
       MCP_TOOL_NAMES.update,
       MCP_TOOL_NAMES.transition,
       MCP_TOOL_NAMES.reconcile,
@@ -705,6 +706,28 @@ const RECIPE_ROOT = 'baron-test-no-project-recipes';
 function recipesService(): RecipeService {
   return createRecipeService({ issues: githubPort(), scm: scmPort() }, RECIPE_ROOT);
 }
+
+describe('baron_issue_read op=trace', () => {
+  it('returns the trace with every unbound port named in missing', async () => {
+    const issues = githubPort();
+    const made = await issues.create({ title: 'Trace', typeRole: 'task' });
+    const result = await dispatchTool({ issues, scm: scmPort() }, TOOL_NAMES.issueRead, {
+      op: 'trace',
+      id: made.id,
+    });
+    expect(result.isError).toBeUndefined();
+    const trace = parse(result.content[0]?.text ?? '{}') as {
+      branch: string;
+      pullRequest: unknown;
+      missing: Record<string, string>;
+    };
+    expect(trace.branch).toBe(made.branchName);
+    expect(trace.pullRequest).toBeNull();
+    expect(trace.missing.pullRequest).toContain(made.branchName as string);
+    expect(trace.missing.runs).toBe('The ci port is not bound.');
+    expect(trace.missing.deployment).toBe('The deploy port is not bound.');
+  });
+});
 
 describe('callRecipeTool', () => {
   it('lists built-in recipes with their declared inputs', async () => {

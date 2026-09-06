@@ -23,6 +23,7 @@ import {
   isPrStateFilter,
   isWorkItemTypeRole,
   isWorkflowRole,
+  traceIssue,
 } from '@lonca/baron-core';
 import {
   type FollowupStatus,
@@ -330,6 +331,9 @@ async function dispatchOp(ports: RecipePorts, op: RecipeOp, params: Params): Pro
       });
     case RECIPE_OPS.issueGet:
       return issues(ports, op).get(reqStr(params, 'id', op));
+    case RECIPE_OPS.issueTrace:
+      // A read model over whatever ports are bound: each part it cannot fill is named in `missing`.
+      return traceIssue(ports, reqStr(params, 'id', op));
     case RECIPE_OPS.issueUpdate: {
       const title = optStr(params, 'title', op);
       const body = optStr(params, 'body', op);

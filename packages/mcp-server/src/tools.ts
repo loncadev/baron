@@ -34,6 +34,7 @@ import {
   isRunStatus,
   isWorkItemTypeRole,
   isWorkflowRole,
+  traceIssue,
 } from '@lonca/baron-core';
 import {
   FOLLOWUP_STATUSES,
@@ -155,6 +156,23 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
     name: MCP_TOOL_NAMES.get,
     mutatesProvider: false,
     description: 'Fetch a normalized issue by id.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['id'],
+      properties: { id: { type: 'string', minLength: 1 } },
+    },
+  },
+  {
+    name: MCP_TOOL_NAMES.trace,
+    mutatesProvider: false,
+    description:
+      'Where one item is, end to end, in ONE read: the issue, its canonical branch, the most recent ' +
+      'pull request from that branch (any state) with its review/checks status, the latest CI runs ' +
+      'on the branch, and the most recent deployment whose ref is the branch. A part that could not ' +
+      'be filled is null AND named in `missing` with the reason (port not bound, or the item has not ' +
+      'reached that hop) — read `missing` before concluding anything is absent. Prefer this over ' +
+      'chaining get + pr_for_branch + pr_status + runs + deployments yourself.',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -1634,6 +1652,10 @@ function dispatchPrimitive(
   name: string,
   args: Record<string, unknown> | undefined,
 ): Promise<ToolResult> {
+  // The one issue primitive that reads across ports: it takes them all, and says which were absent.
+  if (name === MCP_TOOL_NAMES.trace) {
+    return run(() => traceIssue(ports, requireString(args, 'id')));
+  }
   if (name.startsWith('baron_issue_')) {
     if (ports.issues === undefined) {
       return run(() => {

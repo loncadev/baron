@@ -196,6 +196,7 @@ to text.
 | --- | --- | --- |
 | `issue.create` | `title`, `typeRole`, `body?`, `parentId?`, `labels?`, `initialRole?` | the issue |
 | `issue.get` | `id` | the issue (incl. `branchName`, the canonical `<prefix>/<id>-<slug>`) |
+| `issue.trace` | `id` | where the item is end to end: `{ issue, branch, pullRequest, checks, runs, deployment, missing }` — each part `null` when a port is unbound or the item has not reached that hop, with the reason under `missing` |
 | `issue.transition` | `id`, `role`, optional `fields` (answers for a gated provider's transition screen, keyed by its native field names) | the issue |
 | `issue.classify` | `id`, `role` | `{ kind: advance \| regress \| reopen \| noop, from, to }` — judge a move BEFORE making it |
 | `issue.reconcile` | `id` | the issue, with any role label Baron itself wrote cleared once the provider's own state contradicts it |
