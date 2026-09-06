@@ -1,0 +1,6 @@
+{"kind":"start","at":"2026-09-06T13:09:43.981Z","recipe":"task-new","fingerprint":"172caecca4a460916164225ffdd42d8fb9091a880b656c8c140859fd7639a4cb","inputs":{"title":"Talk to me","typeRole":"task"}}
+{"kind":"ask","at":"2026-09-06T13:09:43.981Z","as":"body","value":null}
+{"kind":"ask","at":"2026-09-06T13:09:43.982Z","as":"parentId","value":null}
+{"kind":"do","at":"2026-09-06T13:09:43.982Z","path":"4","op":"issue.create","key":"975919a65159988a0a02b99789476b015b02177ee3ce2b72447d6a750cb2d88b","as":"issue","result":{"id":"mem-1","key":"#1","title":"Talk to me","nativeType":"issue","typeRole":"task","blocked":false,"nativeState":"open","labels":["type:task"],"branchName":"task/mem-1-talk-to-me","url":"mem://mem-1","provider":"github"}}
+{"kind":"note","at":"2026-09-06T13:09:43.983Z","text":"Created #1 (issue): Talk to me"}
+{"kind":"end","at":"2026-09-06T13:09:43.983Z","replayed":0}

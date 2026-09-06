@@ -8,6 +8,7 @@ import {
 import { createMemoryScmTransport, createMemoryTransport } from '@lonca/baron-conformance';
 import { describe, expect, it } from 'vitest';
 import type { RecipePorts } from './engine.js';
+import { createMemoryRunJournal } from './journal.js';
 import { createRecipeService } from './service.js';
 
 function ports(): RecipePorts {
@@ -227,5 +228,38 @@ describe('task-reconcile', () => {
     await expect(service.run('task-reconcile', { issueId })).rejects.toThrow(
       /there is no provider/,
     );
+  });
+});
+
+describe('RecipeService runs are journaled', () => {
+  it('returns the run id, and resumes a stopped run from it without re-asking anything', async () => {
+    const journal = createMemoryRunJournal();
+    const shared = ports();
+    // No scm port: task-start stops at the branch, after the item was moved. The same issues port
+    // serves both services, as one provider does across two processes.
+    const half = createRecipeService(
+      { ...(shared.issues !== undefined ? { issues: shared.issues } : {}) },
+      ROOT,
+      { journal },
+    );
+    const created = await half.run('task-new', { title: 'Resume me', typeRole: 'task' });
+    expect(typeof created.runId).toBe('string');
+    const issueId = (created.context.issue as { id: string }).id;
+    const failed = half.run('task-start', { issueId });
+    await expect(failed).rejects.toMatchObject({ code: 'PORT_UNBOUND' });
+    const stopped = [...journal.runs.keys()].find((id) => id !== created.runId) as string;
+    expect(journal.read(stopped)?.at(-1)).toMatchObject({ kind: 'error', op: 'scm.branch.create' });
+
+    // With the scm port bound, the same run finishes; the transition it already made is replayed.
+    const whole = createRecipeService(shared, ROOT, { journal });
+    const resumed = await whole.resume(stopped);
+    expect(resumed.runId).toBe(stopped);
+    expect(resumed.replayed).toBeGreaterThan(0);
+    expect(journal.read(stopped)?.at(-1)).toMatchObject({ kind: 'end' });
+  });
+
+  it('refuses to resume a run it never journaled', async () => {
+    const service = createRecipeService(ports(), ROOT, { journal: createMemoryRunJournal() });
+    await expect(service.resume('never')).rejects.toMatchObject({ code: 'RUN_NOT_FOUND' });
   });
 });

@@ -20,3 +20,5 @@ export function gitConfigPath(root: string): string {
 
 /** The credentials file that must never be committed; scaffolding ensures it is gitignored. */
 export const CREDENTIALS_IGNORE_ENTRY = `${BARON_DIR}/credentials`;
+/** Run journals hold a run's answers (PR bodies, titles) and are per machine: never committed. */
+export const RUNS_IGNORE_ENTRY = `${BARON_DIR}/runs/`;

@@ -111,3 +111,31 @@ describe('--help on a subcommand', () => {
     expect(out.join('\n')).toContain('--recipe <name-or-path>');
   });
 });
+
+describe('baron run reports the run id and how to resume', () => {
+  const policy =
+    '{"version":1,"providers":{"issues":"github"},"roleMap":{"github":{"stateKey":"label","states":{"done":{"state":"closed","label":"done"}}}},"typeMap":{"github":{"task":"issue"}}}';
+  const recipe =
+    'name: half\nsteps:\n  - message: "before"\n  - do: notify.send\n    with: { text: "x" }\n';
+
+  it('prints the exact --resume command when a run stops, and exits 1', async () => {
+    const { ports, err } = harness({ [policyPath('/repo')]: policy, '/repo/r.yaml': recipe });
+    ports.env.GITHUB_OWNER = 'o';
+    ports.env.GITHUB_REPO = 'r';
+    ports.env.GITHUB_TOKEN = 't';
+    expect(await runCli(['run', '--recipe', '/repo/r.yaml', '--root', '/repo'], ports)).toBe(1);
+    const text = err.join('\n');
+    expect(text).toContain('PORT_UNBOUND');
+    expect(text).toMatch(/Run [a-z0-9]+-[0-9a-f]{8} stopped at step notify\.send/);
+    expect(text).toMatch(/baron run --resume [a-z0-9]+-[0-9a-f]{8} --root \/repo/);
+  });
+
+  it('accepts --resume without --recipe, and neither is a usage error', async () => {
+    const { ports, err } = harness({ [policyPath('/repo')]: policy });
+    expect(await runCli(['run', '--root', '/repo'], ports)).toBe(2);
+    expect(err.join('\n')).toContain('--resume');
+    // A resume of a run nobody journaled is a coded error, not a usage error.
+    expect(await runCli(['run', '--resume', 'ghost', '--root', '/repo'], ports)).toBe(1);
+    expect(err.join('\n')).toContain('RUN_NOT_FOUND');
+  });
+});

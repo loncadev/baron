@@ -32,6 +32,14 @@ import {
 import type { RecipeAsker } from './ask.js';
 import { type RecipeContext, interpolate } from './interpolate.js';
 import {
+  type JournalEntry,
+  RUN_NOT_FOUND,
+  RUN_RECIPE_CHANGED,
+  type RunJournalStore,
+  recipeFingerprint,
+  stepKey,
+} from './journal.js';
+import {
   RECIPE_OPS,
   type Recipe,
   type RecipeOp,
@@ -53,16 +61,36 @@ export interface RecipePorts {
   readonly knowledge?: KnowledgeLoop;
 }
 
+/** Journal this run, and optionally continue one that stopped. */
+export interface RunJournalOptions {
+  readonly id: string;
+  readonly journal: RunJournalStore;
+  /** How the caller referred to the recipe (a path, say), kept so a resume can load the same one. */
+  readonly source?: string | undefined;
+  /**
+   * Continue run `id` from its journal: inputs and answers are restored, every `do` step whose key
+   * the journal holds is replayed from it rather than executed, and the recipe must be the one the
+   * run started with (RUN_RECIPE_CHANGED otherwise).
+   */
+  readonly resume?: boolean;
+}
+
 export interface RunRecipeOptions {
   readonly ports: RecipePorts;
   readonly asker: RecipeAsker;
   /** Pre-seed context variables; an `ask` whose variable is already set is skipped. */
   readonly inputs?: RecipeContext;
+  /** Absent: the run leaves no journal and cannot be resumed (tests, embedded callers). */
+  readonly run?: RunJournalOptions;
 }
 
 export interface RunRecipeResult {
   /** Final run context: seeded inputs + each `ask`/`do` step's bound variable. */
   readonly context: RecipeContext;
+  /** The journal this run wrote, when it wrote one — what `resume` takes. */
+  readonly runId?: string;
+  /** How many `do` steps a resumed run took from the journal instead of executing. */
+  readonly replayed?: number;
   /**
    * Every `message` step the run emitted, in order.
    *
@@ -558,8 +586,115 @@ export async function runRecipe(
 ): Promise<RunRecipeResult> {
   const context: RecipeContext = { ...options.inputs };
   const notes: string[] = [];
-  await runSteps(recipe.steps, context, notes, options);
-  return { context, notes };
+  const run = options.run;
+  if (run === undefined) {
+    await runSteps(recipe.steps, context, notes, options, undefined, '');
+    return { context, notes };
+  }
+
+  const state = openJournal(recipe, run, context);
+  try {
+    await runSteps(recipe.steps, context, notes, options, state, '');
+  } catch (error) {
+    const at = state.current;
+    state.journal.append(run.id, {
+      kind: 'error',
+      at: now(),
+      ...(at !== undefined ? { path: at.path, op: at.op } : {}),
+      ...(error instanceof BaronError ? { code: error.code } : {}),
+      message: error instanceof Error ? error.message : String(error),
+    });
+    throw withRun(error, run.id, at);
+  }
+  state.journal.append(run.id, { kind: 'end', at: now(), replayed: state.replayed });
+  return { context, notes, runId: run.id, replayed: state.replayed };
+}
+
+const now = (): string => new Date().toISOString();
+
+type DoEntry = Extract<JournalEntry, { kind: 'do' }>;
+
+/** What the engine carries through a journaled run. */
+interface JournalState {
+  readonly id: string;
+  readonly journal: RunJournalStore;
+  /** Completed `do` steps of the run being resumed, by idempotency key. */
+  readonly done: ReadonlyMap<string, DoEntry>;
+  replayed: number;
+  /** The step executing right now, so an error entry can say where the run stopped. */
+  current?: { readonly path: string; readonly op: string } | undefined;
+}
+
+/**
+ * Write the start entry of a fresh run, or load the journal of the run being resumed and restore
+ * what it answered. A resumed run must be the same recipe: replaying step results against changed
+ * instructions would bind values produced by different steps, which is worse than starting over.
+ */
+function openJournal(recipe: Recipe, run: RunJournalOptions, context: RecipeContext): JournalState {
+  const fingerprint = recipeFingerprint(recipe);
+  const done = new Map<string, DoEntry>();
+  if (run.resume !== true) {
+    run.journal.append(run.id, {
+      kind: 'start',
+      at: now(),
+      recipe: recipe.name,
+      ...(run.source !== undefined ? { source: run.source } : {}),
+      fingerprint,
+      inputs: { ...context },
+    });
+    return { id: run.id, journal: run.journal, done, replayed: 0 };
+  }
+
+  const entries = run.journal.read(run.id);
+  const start = entries?.find(
+    (e): e is Extract<JournalEntry, { kind: 'start' }> => e.kind === 'start',
+  );
+  if (entries === undefined || start === undefined) {
+    throw new BaronError(
+      `No run '${run.id}' to resume: no journal was written for it.`,
+      RUN_NOT_FOUND,
+    );
+  }
+  if (start.recipe !== recipe.name || start.fingerprint !== fingerprint) {
+    throw new BaronError(
+      `Run '${run.id}' started with recipe '${start.recipe}' as it was then; the recipe has changed since, so its completed steps cannot be replayed safely. Start a new run.`,
+      RUN_RECIPE_CHANGED,
+    );
+  }
+  if (entries.some((e) => e.kind === 'end')) {
+    throw new BaronError(
+      `Run '${run.id}' already finished; there is nothing to resume.`,
+      RUN_NOT_FOUND,
+    );
+  }
+  // Inputs first, then the answers given along the way; an ask restored here is not asked again.
+  Object.assign(context, start.inputs);
+  for (const entry of entries) {
+    if (entry.kind === 'ask') context[entry.as] = entry.value;
+    if (entry.kind === 'do') done.set(entry.key, entry);
+  }
+  run.journal.append(run.id, { kind: 'resume', at: now() });
+  return { id: run.id, journal: run.journal, done, replayed: 0 };
+}
+
+/**
+ * Attach the run to the error a caller sees, without changing its class or message: `details.run`
+ * names the run id and the step it stopped at, which is what the resume hint is built from.
+ */
+function withRun(
+  error: unknown,
+  runId: string,
+  at: { readonly path: string; readonly op: string } | undefined,
+): unknown {
+  if (!(error instanceof BaronError)) return error;
+  const run = { id: runId, ...(at !== undefined ? { step: at.path, op: at.op } : {}) };
+  Object.defineProperty(error, 'details', {
+    value: { ...error.details, run },
+    enumerable: true,
+    configurable: true,
+    writable: false,
+  });
+  return error;
 }
 
 /**
@@ -572,8 +707,11 @@ async function runSteps(
   context: RecipeContext,
   notes: string[],
   options: RunRecipeOptions,
+  state: JournalState | undefined,
+  /** Journal path prefix of these steps: '' at the top level, `3[1]/` inside a for_each. */
+  path: string,
 ): Promise<void> {
-  for (const step of steps) {
+  for (const [index, step] of steps.entries()) {
     if (isAskStep(step)) {
       const { as, type, message, choices, optional } = step.ask;
       if (context[as] !== undefined) continue; // pre-seeded; don't re-ask
@@ -584,6 +722,8 @@ async function runSteps(
       } else {
         context[as] = await options.asker.text(message, optional === true);
       }
+      // Journaled even when the answer is nothing: a resumed run must not ask again.
+      state?.journal.append(state.id, { kind: 'ask', at: now(), as, value: context[as] ?? null });
       continue;
     }
 
@@ -604,14 +744,44 @@ async function runSteps(
       const note = String(interpolate(step.message, context));
       notes.push(note);
       options.asker.note(note);
+      state?.journal.append(state.id, { kind: 'note', at: now(), text: note });
       continue;
     }
 
     if (isDoStep(step)) {
       if (step.when !== undefined && !evalCondition(step.when, context)) continue;
       const params = (interpolate(step.with ?? {}, context) ?? {}) as Params;
+      if (state === undefined) {
+        const result = await dispatchOp(options.ports, step.do, params);
+        if (step.as !== undefined) context[step.as] = result;
+        continue;
+      }
+      const stepPath = `${path}${index}`;
+      const key = stepKey(state.id, stepPath, step.do, params);
+      const earlier = state.done.get(key);
+      if (earlier !== undefined) {
+        // Already done before the run stopped: the provider was mutated then, and doing it again is
+        // the duplicate PR this journal exists to prevent. Its result is bound as if it had run.
+        if (step.as !== undefined) context[step.as] = earlier.result;
+        state.replayed += 1;
+        const note = `Replayed ${step.do} from run ${state.id} (already done at ${earlier.at}).`;
+        notes.push(note);
+        options.asker.note(note);
+        continue;
+      }
+      state.current = { path: stepPath, op: step.do };
       const result = await dispatchOp(options.ports, step.do, params);
+      state.current = undefined;
       if (step.as !== undefined) context[step.as] = result;
+      state.journal.append(state.id, {
+        kind: 'do',
+        at: now(),
+        path: stepPath,
+        op: step.do,
+        key,
+        ...(step.as !== undefined ? { as: step.as } : {}),
+        ...(result !== undefined ? { result } : {}),
+      });
       continue;
     }
 
@@ -628,11 +798,11 @@ async function runSteps(
         );
       }
       const collected: unknown[] = [];
-      for (const element of list) {
+      for (const [position, element] of list.entries()) {
         // One scope per iteration. Bindings made inside must not leak: otherwise the last element
         // silently wins for anything read after the loop, which looks like data rather than a bug.
         const scope: RecipeContext = { ...context, [step.as]: element };
-        await runSteps(step.steps, scope, notes, options);
+        await runSteps(step.steps, scope, notes, options, state, `${path}${index}[${position}]/`);
         if (step.collect !== undefined) {
           const gate = step.collect.when;
           if (gate !== undefined && !evalCondition(gate, scope)) continue;

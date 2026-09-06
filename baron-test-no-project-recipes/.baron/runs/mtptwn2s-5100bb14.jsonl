@@ -1,0 +1,6 @@
+{"kind":"start","at":"2026-09-06T13:09:44.020Z","recipe":"task-new","fingerprint":"172caecca4a460916164225ffdd42d8fb9091a880b656c8c140859fd7639a4cb","inputs":{"title":"Still working","typeRole":"task"}}
+{"kind":"ask","at":"2026-09-06T13:09:44.020Z","as":"body","value":null}
+{"kind":"ask","at":"2026-09-06T13:09:44.020Z","as":"parentId","value":null}
+{"kind":"do","at":"2026-09-06T13:09:44.021Z","path":"4","op":"issue.create","key":"f3cea7a14abc940210689c70353b603056c40cdc3fcd6af3ee95b4a20aac96a5","as":"issue","result":{"id":"mem-2","key":"#2","title":"Still working","nativeType":"issue","typeRole":"task","blocked":false,"nativeState":"open","labels":["type:task"],"branchName":"task/mem-2-still-working","url":"mem://mem-2","provider":"github"}}
+{"kind":"note","at":"2026-09-06T13:09:44.021Z","text":"Created #2 (issue): Still working"}
+{"kind":"end","at":"2026-09-06T13:09:44.021Z","replayed":0}

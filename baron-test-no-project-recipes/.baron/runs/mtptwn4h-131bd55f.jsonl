@@ -1,0 +1,7 @@
+{"kind":"start","at":"2026-09-06T13:09:44.082Z","recipe":"task-sync-report","fingerprint":"2e39bebc177c1a37f8dee7bc967e0f28787b5108176485dc54edaab0c01d7507","inputs":{"scope":"all"}}
+{"kind":"do","at":"2026-09-06T13:09:44.082Z","path":"1","op":"issue.query","key":"7104c648cf596c2539a044370da406322fd9bbbd2af2e628712f1c110a45e239","as":"inProgress","result":[]}
+{"kind":"do","at":"2026-09-06T13:09:44.083Z","path":"3","op":"issue.query","key":"244982c342a3adccf7a619797aeae9b3b2e3ee57104845ca204ae731d71df1fd","as":"inReview","result":[]}
+{"kind":"note","at":"2026-09-06T13:09:44.083Z","text":"Swept 0 in progress and 0 in review."}
+{"kind":"note","at":"2026-09-06T13:09:44.083Z","text":"Nothing merged is still in progress."}
+{"kind":"note","at":"2026-09-06T13:09:44.084Z","text":"Nothing merged is still in review."}
+{"kind":"end","at":"2026-09-06T13:09:44.084Z","replayed":0}

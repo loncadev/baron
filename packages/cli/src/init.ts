@@ -25,6 +25,7 @@ import { openInBrowser } from './open-browser.js';
 import {
   BARON_DIR,
   CREDENTIALS_IGNORE_ENTRY,
+  RUNS_IGNORE_ENTRY,
   credentialsExamplePath,
   credentialsPath,
   gitConfigPath,
@@ -114,15 +115,20 @@ function credentialsTemplate(
   return `${header}${lines}\n`;
 }
 
-/** Add the credentials file to .gitignore if it isn't already — a secret must never be committed. */
+/**
+ * Add the credentials file and the run journals to .gitignore if they aren't already — a secret
+ * must never be committed, and a journal is a machine's own record of what it answered.
+ */
 function ensureGitignored(fs: FileSystem, root: string): void {
   const ignorePath = gitignorePath(root);
-  const current = fs.read(ignorePath) ?? '';
-  const lines = current.split('\n').map((l) => l.trim());
-  if (!lines.includes(CREDENTIALS_IGNORE_ENTRY)) {
+  let current = fs.read(ignorePath) ?? '';
+  for (const entry of [CREDENTIALS_IGNORE_ENTRY, RUNS_IGNORE_ENTRY]) {
+    const lines = current.split('\n').map((l) => l.trim());
+    if (lines.includes(entry)) continue;
     const prefix = current.length === 0 || current.endsWith('\n') ? current : `${current}\n`;
-    fs.write(ignorePath, `${prefix}${CREDENTIALS_IGNORE_ENTRY}\n`);
+    current = `${prefix}${entry}\n`;
   }
+  if (current !== (fs.read(ignorePath) ?? '')) fs.write(ignorePath, current);
 }
 
 /** Scaffold a credentials template (if absent) and ensure the real credentials file is gitignored. */

@@ -1,0 +1,6 @@
+{"kind":"start","at":"2026-09-06T13:09:44.036Z","recipe":"task-new","fingerprint":"172caecca4a460916164225ffdd42d8fb9091a880b656c8c140859fd7639a4cb","inputs":{"title":"Landed, still in review","typeRole":"task"}}
+{"kind":"ask","at":"2026-09-06T13:09:44.037Z","as":"body","value":null}
+{"kind":"ask","at":"2026-09-06T13:09:44.037Z","as":"parentId","value":null}
+{"kind":"do","at":"2026-09-06T13:09:44.037Z","path":"4","op":"issue.create","key":"a9ce53adcf0816601b409703e534cbc4d31259c963074a035abcafaec123fe2d","as":"issue","result":{"id":"mem-1","key":"#1","title":"Landed, still in review","nativeType":"issue","typeRole":"task","blocked":false,"nativeState":"open","labels":["type:task"],"branchName":"task/mem-1-landed-still-in-review","url":"mem://mem-1","provider":"github"}}
+{"kind":"note","at":"2026-09-06T13:09:44.038Z","text":"Created #1 (issue): Landed, still in review"}
+{"kind":"end","at":"2026-09-06T13:09:44.038Z","replayed":0}

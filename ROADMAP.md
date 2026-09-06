@@ -90,6 +90,12 @@ The fourth was shaped by a provider Baron has no adapter for yet, and is now als
   for the everyday path, and a company-managed one on the classic `jira` workflow for the screen
   and the refused hop.
 
+A fifth piece was pulled forward from "after the first user" because it is the first hard question a
+reader asks: what happens when a recipe fails halfway. Every run is now journaled and resumable —
+completed steps are replayed from the journal rather than done again, so a `ship` that stopped at
+CI does not open a second pull request when it is run again (#20, decision #22). Compensation
+stays deferred until a real half-completed run gives it a shape.
+
 Gate 3's contract work is done. What remains of the gate is its second half: first users. The
 closest thing to one so far is the user-journey pass run before each release — the whole path from
 `init` to `task-land`, driven by the CLI, the MCP server, a headless Claude Code session with the

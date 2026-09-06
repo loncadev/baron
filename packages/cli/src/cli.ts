@@ -14,7 +14,7 @@ import {
   credentialsPath,
   mergeCredentials,
 } from '@lonca/baron-providers';
-import type { RecipeAsker } from '@lonca/baron-recipes';
+import { type RecipeAsker, newRunId } from '@lonca/baron-recipes';
 import { runDoctor } from './doctor.js';
 import { runInit } from './init.js';
 import { policyPath } from './paths.js';
@@ -37,6 +37,7 @@ Usage:
   baron init [--provider <id>] [--root <dir>] [--force]
   baron doctor [--root <dir>]
   baron run --recipe <name-or-path> [--root <dir>]
+  baron run --resume <runId> [--root <dir>]
 
 Commands:
   init     Set up Baron for a project: gather credentials, propose a role map, write .baron/policy.json
@@ -233,21 +234,50 @@ async function cmdDoctor(flags: Record<string, string>, ports: CliPorts): Promis
 
 async function cmdRun(flags: Record<string, string>, ports: CliPorts): Promise<number> {
   const recipePath = flags.recipe;
-  if (recipePath === undefined) {
-    ports.err('run requires --recipe <path>.');
+  const resume = flags.resume;
+  if (recipePath === undefined && resume === undefined) {
+    ports.err('run requires --recipe <path> (or --resume <runId>).');
     ports.err(USAGE);
     return 2;
   }
   const root = flags.root ?? '.';
-  await runRecipeFile({
-    root,
-    recipePath,
-    fs: ports.fs,
-    asker: ports.asker,
-    env: effectiveEnv(ports, root),
-  });
-  ports.out(`Recipe ${recipePath} finished.`);
-  return 0;
+  const runId = resume ?? newRunId();
+  try {
+    const result = await runRecipeFile({
+      root,
+      recipePath,
+      fs: ports.fs,
+      asker: ports.asker,
+      env: effectiveEnv(ports, root),
+      runId,
+      resume,
+    });
+    const replayed =
+      result.replayed !== undefined && result.replayed > 0
+        ? ` (${result.replayed} step(s) replayed from the journal)`
+        : '';
+    ports.out(`Recipe ${recipePath ?? runId} finished${replayed}. Run id: ${runId}`);
+    return 0;
+  } catch (error) {
+    // The one line that turns a half-completed run from a cleanup job into a retry: the steps that
+    // already ran are in the journal, and resuming replays them rather than doing them again.
+    const step = runStep(error);
+    ports.err(
+      `Run ${runId} stopped${step === undefined ? '' : ` at step ${step}`}. Fix the cause, then ` +
+        `continue it — completed steps will not be repeated:\n  baron run --resume ${runId}` +
+        (root === '.' ? '' : ` --root ${root}`),
+    );
+    throw error;
+  }
+}
+
+/** `op@path` of the step a journaled run stopped at, when the error carries it. */
+function runStep(error: unknown): string | undefined {
+  if (!(error instanceof BaronError)) return undefined;
+  const run = error.details?.run as { step?: string; op?: string } | undefined;
+  return run?.op === undefined
+    ? undefined
+    : `${run.op}${run.step === undefined ? '' : ` (${run.step})`}`;
 }
 
 /**

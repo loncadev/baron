@@ -96,3 +96,64 @@ describe('runRecipeFile', () => {
     ).rejects.toThrow(/RECIPE_NOT_FOUND|No recipe/);
   });
 });
+
+describe('runRecipeFile journals every run under .baron/runs and resumes from it', () => {
+  // The policy binds issues only, so `notify.send` stops the run with PORT_UNBOUND — offline, and
+  // after the ask and the message have already happened, which is the half-done shape that matters.
+  const recipe = `
+name: half
+steps:
+  - ask: { as: title, type: text, message: "Title?" }
+  - message: "hi \${title}"
+  - do: notify.send
+    with: { text: "\${title}" }
+`;
+
+  it('writes the journal, names the failed step on the error, and resumes without asking again', async () => {
+    const fs = seeded(recipe);
+    const first = scriptedAsker(['Once']);
+    const failure = await runRecipeFile({
+      root: ROOT,
+      recipePath: RECIPE,
+      fs,
+      asker: first,
+      env,
+      runId: 'r-1',
+    }).then(
+      () => undefined,
+      (error: unknown) => error,
+    );
+    expect(failure).toBeInstanceOf(BaronError);
+    expect((failure as BaronError).details).toMatchObject({
+      run: { id: 'r-1', step: '2', op: 'notify.send' },
+    });
+    const journalPath = `${ROOT}/.baron/runs/r-1.jsonl`;
+    const lines = (fs.read(journalPath) ?? '')
+      .trim()
+      .split('\n')
+      .map((l) => JSON.parse(l));
+    expect(lines.map((e: { kind: string }) => e.kind)).toEqual(['start', 'ask', 'note', 'error']);
+
+    // Resume with an asker that has NO answers: the title must come from the journal.
+    const second = scriptedAsker([]);
+    const again = await runRecipeFile({ root: ROOT, fs, asker: second, env, resume: 'r-1' }).then(
+      () => undefined,
+      (error: unknown) => error,
+    );
+    // Still no notify port, so it stops at the same step — but it got there on the journaled answer.
+    expect((again as BaronError).details).toMatchObject({ run: { id: 'r-1', op: 'notify.send' } });
+    expect(second.notes).toContain('hi Once');
+    const kinds = (fs.read(journalPath) ?? '')
+      .trim()
+      .split('\n')
+      .map((l) => (JSON.parse(l) as { kind: string }).kind);
+    expect(kinds).toEqual(['start', 'ask', 'note', 'error', 'resume', 'note', 'error']);
+  });
+
+  it('refuses to resume a run that has no journal', async () => {
+    const fs = seeded(recipe);
+    await expect(
+      runRecipeFile({ root: ROOT, fs, asker: scriptedAsker(), env, resume: 'nothing' }),
+    ).rejects.toMatchObject({ code: 'RUN_NOT_FOUND' });
+  });
+});
