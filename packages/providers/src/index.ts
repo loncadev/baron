@@ -44,6 +44,7 @@ import {
   LINEAR_PROVIDER,
   createLinearCredentialProbe,
   createLinearIntrospector,
+  createLinearPkceAuth,
   createLinearTransport,
   exampleLinearLinkMap,
   linearManifest,
@@ -223,6 +224,8 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
       'Note the header, because the failure is misleading: a personal API key is sent as a bare',
       '`Authorization: <key>`. `Bearer` is for OAuth access tokens only, and using it with a',
       'personal key fails as "authentication required", which reads like a bad key.',
+      'With BARON_LINEAR_CLIENT_ID set to a Linear OAuth application’s client id, `baron init`',
+      'offers a browser sign-in (PKCE, no secret) instead; the token it stores lasts 24 hours.',
     ],
     manifest: linearManifest,
     credentialEnvKeys: ['LINEAR_API_KEY', 'LINEAR_TEAM'],
@@ -240,6 +243,18 @@ const DESCRIPTORS: Record<string, ProviderDescriptor> = {
       return createLinearCredentialProbe({
         apiKey: env.LINEAR_API_KEY ?? '',
         team: env.LINEAR_TEAM ?? '',
+      });
+    },
+    createDeviceAuth(env) {
+      // No default id yet: Baron has no registered Linear OAuth application, so the browser
+      // sign-in is offered only to an installation that names one. Linear has no device flow;
+      // this is the authorization-code flow with PKCE and a loopback callback, and the token it
+      // returns lasts 24 hours — refresh is the next piece, so until it lands this stays opt-in.
+      const clientId = env.BARON_LINEAR_CLIENT_ID;
+      if (clientId === undefined || clientId.length === 0) return undefined;
+      return createLinearPkceAuth({
+        clientId,
+        ...(env.BARON_LINEAR_SCOPE !== undefined ? { scope: env.BARON_LINEAR_SCOPE } : {}),
       });
     },
   },

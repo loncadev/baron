@@ -1,37 +1,8 @@
-import { BaronError } from '@lonca/baron-core';
+import { BaronError, type DeviceAuth, type DeviceCodePrompt } from '@lonca/baron-core';
 
-/** What the user has to be shown to complete the flow, and how long they have to do it. */
-export interface DeviceCodePrompt {
-  /** The short code the user types into the browser. */
-  readonly userCode: string;
-  /** Where to type it. */
-  readonly verificationUri: string;
-  /**
-   * The same page with the code already in the query string, when the provider offers one. Always
-   * present it alongside `verificationUri` rather than instead of it: it is optional in the spec, it
-   * is the wrong thing to read aloud or copy into another machine, and a browser that opens it still
-   * asks the user to confirm the code shown on screen matches.
-   */
-  readonly verificationUriComplete?: string;
-  readonly expiresInSeconds: number;
-}
-
-/**
- * Interactive credential acquisition for a provider that supports it.
- *
- * Onboarding otherwise means reading a list of permissions, creating a token by hand, ticking the
- * right boxes and pasting it — every step a place to get it wrong, and until `baron doctor` learned
- * to probe (#24) the only feedback was a command failing halfway through a run. Catching a bad
- * manual step is not the same as removing it.
- */
-export interface DeviceAuth {
-  /**
-   * Run the whole flow: request a code, hand it to `onPrompt` for display, poll until the user
-   * approves, and return the token. Rejects with an actionable {@link BaronError} on denial or
-   * expiry — never returns an empty string.
-   */
-  authorize(onPrompt: (prompt: DeviceCodePrompt) => void): Promise<string>;
-}
+// The contract moved to the core once a second provider (Linear, with a local callback) needed
+// it; re-exported here so existing imports keep resolving.
+export type { DeviceAuth, DeviceCodePrompt };
 
 export interface GithubDeviceAuthOptions {
   /**
