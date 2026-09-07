@@ -38,7 +38,10 @@ export interface IssueTrace {
   readonly pullRequest: PullRequest | null;
   /** That pull request's review decision, mergeability and checks. */
   readonly checks: PullRequestStatus | null;
-  /** The most recent CI runs on the branch, newest first as the provider lists them. */
+  /**
+   * The most recent CI runs for the item: those on the branch, then those that validate its pull
+   * request (providers build a PR on a ref of their own, so a branch query alone misses them).
+   */
   readonly runs: readonly Run[] | null;
   /** The most recent deployment whose ref is the branch. */
   readonly deployment: Deployment | null;
@@ -101,9 +104,29 @@ export async function traceIssue(ports: TracePorts, id: string): Promise<IssueTr
   if (ports.ci === undefined) {
     missing.runs = CI_UNBOUND;
   } else {
-    const found = await ports.ci.runs({ branch, limit: TRACE_RUN_LIMIT });
-    if (found.length === 0) missing.runs = `No CI run has been recorded for ${branch}.`;
-    else runs = found;
+    const onBranch = await ports.ci.runs({ branch, limit: TRACE_RUN_LIMIT });
+    // Found live on Azure DevOps: the builds a reader most wants — the PR validation builds — run on
+    // refs/pull/<n>/merge, which a branch query can never see.
+    const prId = pullRequest === null ? undefined : (pullRequest.number ?? pullRequest.id);
+    const onPullRequest =
+      prId === undefined
+        ? []
+        : await ports.ci.runs({ pullRequestId: prId, limit: TRACE_RUN_LIMIT });
+    const seen = new Set<string>();
+    const found: Run[] = [];
+    for (const run of [...onBranch, ...onPullRequest]) {
+      if (seen.has(run.id)) continue;
+      seen.add(run.id);
+      found.push(run);
+    }
+    if (found.length === 0) {
+      missing.runs =
+        prId === undefined
+          ? `No CI run has been recorded for ${branch}.`
+          : `No CI run has been recorded for ${branch}, nor for pull request ${prId}.`;
+    } else {
+      runs = found;
+    }
   }
 
   let deployment: Deployment | null = null;

@@ -41,6 +41,17 @@ const DEFAULT_RUNS: readonly NativeRun[] = [
     number: '2',
     url: 'mem://run/2',
   },
+  // A pull-request validation build: on the provider's PR ref, so it has no source branch.
+  {
+    id: '3',
+    pipelineId: 'p1',
+    pipelineName: 'CI',
+    status: 'completed',
+    result: 'succeeded',
+    pullRequestId: '41',
+    number: '3',
+    url: 'mem://run/3',
+  },
 ];
 
 /**
@@ -65,6 +76,9 @@ export function createMemoryCiTransport(options: MemoryCiOptions = {}): CiTransp
       }
       if (query.branch !== undefined) {
         result = result.filter((r) => r.branch === query.branch);
+      }
+      if (query.pullRequestId !== undefined) {
+        result = result.filter((r) => r.pullRequestId === query.pullRequestId);
       }
       return query.limit !== undefined ? result.slice(0, query.limit) : result;
     },

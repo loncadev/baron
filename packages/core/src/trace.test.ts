@@ -47,19 +47,27 @@ function scmPort(prs: PullRequest[]): ScmPort & { calls: string[] } {
   } as unknown as ScmPort & { calls: string[] };
 }
 
-function ciPort(runsByBranch: Record<string, string[]>): CiPort & { queries: unknown[] } {
+function ciPort(
+  runsByBranch: Record<string, string[]>,
+  runsByPullRequest: Record<string, string[]> = {},
+): CiPort & { queries: unknown[] } {
   const queries: unknown[] = [];
   return {
     queries,
     manifest: { provider: 'mem' } as CiPort['manifest'],
     async runs(query?: RunQuery) {
       queries.push(query);
-      return (runsByBranch[query?.branch ?? ''] ?? []).map((id) => ({
+      const ids =
+        query?.pullRequestId !== undefined
+          ? (runsByPullRequest[query.pullRequestId] ?? [])
+          : (runsByBranch[query?.branch ?? ''] ?? []);
+      return ids.map((id) => ({
         id,
         pipelineId: 'p',
         status: 'succeeded' as const,
         nativeStatus: 'ok',
-        branch: query?.branch,
+        branch: query?.pullRequestId === undefined ? query?.branch : undefined,
+        pullRequestId: query?.pullRequestId,
       }));
     },
   } as unknown as CiPort & { queries: unknown[] };
@@ -143,6 +151,42 @@ describe('traceIssue', () => {
     expect(cold.missing.runs).toContain(BRANCH);
     expect(cold.deployment).toBeNull();
     expect(cold.missing.deployment).toContain('1 deployment(s)');
+  });
+
+  it("also finds the pull request's own validation builds, which no branch query can", async () => {
+    // Found live on Azure DevOps: PR builds run on refs/pull/<n>/merge, and the post-merge build on
+    // the target branch — a trace that asked only by branch reported "no CI run" for a merged item.
+    const issues = issuesPort({});
+    const pr: PullRequest = {
+      id: 'pr-1',
+      number: '1869',
+      title: 'Trace me',
+      sourceBranch: BRANCH,
+      targetBranch: 'main',
+      draft: false,
+      state: 'merged',
+    };
+    const scm = scmPort([pr]);
+    const ci = ciPort({}, { '1869': ['pr-build-1'] });
+    const trace = await traceIssue({ issues, scm, ci }, '7');
+    expect(trace.runs?.map((r) => r.id)).toEqual(['pr-build-1']);
+    expect(trace.missing.runs).toBeUndefined();
+    expect(ci.queries).toEqual([
+      { branch: BRANCH, limit: TRACE_RUN_LIMIT },
+      { pullRequestId: '1869', limit: TRACE_RUN_LIMIT },
+    ]);
+
+    // Both sources, de-duplicated, branch runs first.
+    const both = ciPort({ [BRANCH]: ['b1', 'shared'] }, { '1869': ['shared', 'p1'] });
+    const merged = await traceIssue({ issues, scm, ci: both }, '7');
+    expect(merged.runs?.map((r) => r.id)).toEqual(['b1', 'shared', 'p1']);
+
+    // Neither: the reason names both places it looked.
+    const none = await traceIssue({ issues, scm, ci: ciPort({}) }, '7');
+    expect(none.runs).toBeNull();
+    expect(none.missing.runs).toBe(
+      `No CI run has been recorded for ${BRANCH}, nor for pull request 1869.`,
+    );
   });
 
   it('stops at the branch for a container, and says why', async () => {

@@ -74,6 +74,9 @@ export const azureDevOpsCiStatusMaps: CiStatusMaps = {
 };
 
 const REFS_HEADS = 'refs/heads/';
+/** Where Azure builds a pull request: `refs/pull/<id>/merge`. */
+const PR_REF = /^refs\/pull\/(\d+)\/merge$/;
+const prRef = (pullRequestId: string): string => `refs/pull/${pullRequestId}/merge`;
 const DEFAULT_RUN_LIMIT = 50;
 const DEFAULT_TAIL_LINES = 200;
 
@@ -88,9 +91,15 @@ function toNativeRun(b: Build): NativeRun {
   // status (phase) axis classifies it, instead of mapping a phantom result.
   const result =
     b.result !== undefined && b.result !== BuildResult.None ? BuildResult[b.result] : undefined;
-  const branch = b.sourceBranch?.startsWith(REFS_HEADS)
-    ? b.sourceBranch.slice(REFS_HEADS.length)
-    : b.sourceBranch;
+  // A PR validation build runs on refs/pull/<n>/merge: it validates a pull request, and has no
+  // source branch of its own. Anything else that is not refs/heads/* is reported as Azure names it.
+  const pullRequestId = b.sourceBranch?.match(PR_REF)?.[1];
+  const branch =
+    pullRequestId !== undefined
+      ? undefined
+      : b.sourceBranch?.startsWith(REFS_HEADS)
+        ? b.sourceBranch.slice(REFS_HEADS.length)
+        : b.sourceBranch;
   return {
     id: String(b.id ?? ''),
     pipelineId: String(b.definition?.id ?? ''),
@@ -98,6 +107,7 @@ function toNativeRun(b: Build): NativeRun {
     status,
     result,
     branch,
+    pullRequestId,
     number: b.buildNumber,
     url: b._links?.web?.href as string | undefined,
     createdAt: iso(b.queueTime),
@@ -160,11 +170,18 @@ export function createAzureDevOpsCiTransport(options: AzureDevOpsCiTransportOpti
         undefined,
         undefined,
         BuildQueryOrder.QueueTimeDescending,
-        query.branch !== undefined ? `${REFS_HEADS}${query.branch}` : undefined,
+        query.pullRequestId !== undefined
+          ? prRef(query.pullRequestId)
+          : query.branch !== undefined
+            ? `${REFS_HEADS}${query.branch}`
+            : undefined,
       );
       const runs = builds.map(toNativeRun);
       // The server-side filter is the real one; this only guards against a build whose source
-      // branch Azure reports differently from the ref it was queried by.
+      // Azure reports differently from the ref it was queried by.
+      if (query.pullRequestId !== undefined) {
+        return runs.filter((r) => r.pullRequestId === query.pullRequestId);
+      }
       return query.branch !== undefined ? runs.filter((r) => r.branch === query.branch) : runs;
     },
 

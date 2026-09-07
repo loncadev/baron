@@ -70,6 +70,8 @@ export interface Run {
   /** The raw provider value(s) the status was resolved from (phase[/result]) — never silent. */
   readonly nativeStatus: string;
   readonly branch?: string | undefined;
+  /** The pull request this run validates, when it ran on the provider's PR ref. */
+  readonly pullRequestId?: string | undefined;
   /** Human-facing run number where the provider has one. */
   readonly number?: string | undefined;
   readonly url?: string | undefined;
@@ -103,6 +105,12 @@ export interface PipelineQuery {
 export interface RunQuery {
   readonly pipelineId?: string | undefined;
   readonly branch?: string | undefined;
+  /**
+   * Runs that validate this pull request. Providers build a pull request on a ref of their own
+   * (`refs/pull/<n>/merge` on Azure and GitHub), not on the source branch, so a query by branch
+   * never finds them; the adapter maps the id to that ref.
+   */
+  readonly pullRequestId?: string | undefined;
   readonly status?: RunStatus | undefined;
   readonly limit?: number | undefined;
 }
@@ -141,6 +149,8 @@ export interface NativeRun {
   /** Native result/conclusion once the run has finished (e.g. 'succeeded', 'failure'). */
   readonly result?: string | undefined;
   readonly branch?: string | undefined;
+  /** The pull request this run validates, when it ran on the provider's PR ref rather than a branch. */
+  readonly pullRequestId?: string | undefined;
   readonly number?: string | undefined;
   readonly url?: string | undefined;
   readonly createdAt?: string | undefined;
@@ -232,6 +242,7 @@ export class BaseCiAdapter implements CiPort {
       status,
       nativeStatus,
       branch: n.branch,
+      pullRequestId: n.pullRequestId,
       number: n.number,
       url: n.url,
       createdAt: n.createdAt,

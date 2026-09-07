@@ -50,6 +50,20 @@ export function runCiConformance(target: CiConformanceTarget): void {
       }
     });
 
+    it('finds the runs that validate a pull request, which no branch query can', async () => {
+      // Providers build a PR on a ref of their own (refs/pull/<n>/merge), not on the source branch.
+      // A trace that only asked by branch missed every PR build — found live on Azure DevOps.
+      const { adapter } = target.build();
+      const all = await adapter.runs();
+      const prRuns = all.filter((r) => r.pullRequestId !== undefined);
+      for (const run of prRuns) {
+        const found = await adapter.runs({ pullRequestId: run.pullRequestId });
+        expect(found.map((r) => r.id)).toContain(run.id);
+        for (const f of found) expect(f.pullRequestId).toBe(run.pullRequestId);
+      }
+      expect(await adapter.runs({ pullRequestId: 'no-such-pull-request' })).toEqual([]);
+    });
+
     it('returns run detail with normalized stage statuses', async () => {
       const { adapter } = target.build();
       const runs = await adapter.runs();
