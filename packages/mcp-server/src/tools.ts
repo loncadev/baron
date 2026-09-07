@@ -1053,10 +1053,19 @@ async function run(
     // The code also rides in structuredContent so the agent can branch without parsing prose.
     if (error instanceof BaronError) {
       // `details` rides along so a refusal that names things — the fields a transition wants, the
-      // targets a provider permits — can be acted on without regex over the message.
+      // targets a provider permits — can be acted on without regex over the message. Structured
+      // content is not reliably shown to the model, so what a failed recipe run needs the agent to
+      // know is said in the text too: the run id and how to continue, and the messages the run had
+      // produced before it stopped (its replays included) — found live, when an agent read a
+      // half-completed run as "nothing was replayed" and went looking through the journal by hand.
+      const stopped = runStoppedHint(error.details);
+      const notes = failedRunNotes(error.details);
       return {
         isError: true,
-        content: [{ type: 'text', text: `${error.code}: ${error.message}` }],
+        content: [
+          { type: 'text', text: `${error.code}: ${error.message}${stopped}` },
+          ...(notes !== undefined ? [{ type: 'text' as const, text: notes }] : []),
+        ],
         structuredContent: {
           code: error.code,
           message: error.message,
@@ -1460,6 +1469,28 @@ export function callDeployTool(
         throw new BaronError(`Unknown tool '${name}'.`, 'UNKNOWN_TOOL');
       });
   }
+}
+
+/** The resume hint for an error that carries `details.run`, as a suffix to the error text. */
+function runStoppedHint(details: Readonly<Record<string, unknown>> | undefined): string {
+  const run = details?.run as { id?: string; step?: string; op?: string } | undefined;
+  if (run?.id === undefined) return '';
+  const where =
+    run.op === undefined
+      ? ''
+      : ` at ${run.op}${run.step === undefined ? '' : ` (step ${run.step})`}`;
+  return (
+    `\n\nRun ${run.id} stopped${where}. Continue it with baron_recipe_run { resume: "${run.id}" } — ` +
+    'completed steps are replayed from the journal, not repeated.'
+  );
+}
+
+/** The messages a failed run emitted before it stopped, when it carries them. */
+function failedRunNotes(
+  details: Readonly<Record<string, unknown>> | undefined,
+): string | undefined {
+  const notes = details?.notes;
+  return Array.isArray(notes) && notes.length > 0 ? (notes as string[]).join('\n') : undefined;
 }
 
 /** Dispatch an MCP tool call to the recipe runner. Marshals + shapes errors only. */

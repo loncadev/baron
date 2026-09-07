@@ -200,7 +200,12 @@ steps:
     });
     await expect(first).rejects.toMatchObject({
       code: 'PORT_UNBOUND',
-      details: { run: { id: 'ship-1', step: '4', op: 'notify.send' } },
+      // The messages the run had produced before it stopped travel with the error, so a caller
+      // that only sees the error still learns what happened — including replays on a resume.
+      details: {
+        run: { id: 'ship-1', step: '4', op: 'notify.send' },
+        notes: [expect.stringMatching(/^PR .* open$/)],
+      },
     });
     const stopped = journal.read('ship-1') ?? [];
     expect(stopped.at(-1)).toMatchObject({ kind: 'error', path: '4', op: 'notify.send' });
@@ -244,6 +249,44 @@ steps:
       'note',
       'end',
     ]);
+  });
+
+  it("wraps a provider's own error so it carries the run and the notes too", async () => {
+    const journal = createMemoryRunJournal();
+    const issues = new Proxy(issuesPort(), {
+      get(target, prop, receiver) {
+        const value = Reflect.get(target, prop, receiver);
+        if (prop !== 'comment' || typeof value !== 'function') return value;
+        return () => {
+          throw new Error('Validation Failed: head invalid');
+        };
+      },
+    });
+    const recipe = loadRecipe(`
+name: raw-error
+steps:
+  - do: issue.create
+    as: issue
+    with: { title: "x", typeRole: task }
+  - message: "made \${issue.key}"
+  - do: issue.comment
+    with: { id: "\${issue.id}", body: "b" }
+`);
+    const failure = await runRecipe(recipe, {
+      ports: { issues },
+      asker: asker(),
+      run: { id: 'raw-1', journal },
+    }).then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(failure).toBeInstanceOf(BaronError);
+    expect(failure).toMatchObject({
+      code: 'RECIPE_STEP_FAILED',
+      message: 'Validation Failed: head invalid',
+      details: { run: { id: 'raw-1', step: '2', op: 'issue.comment' }, notes: ['made #1'] },
+    });
+    expect((failure as Error).cause).toBeInstanceOf(Error);
   });
 
   it('refuses to resume a run whose recipe has changed, an unknown run, or a finished one', async () => {
