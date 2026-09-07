@@ -7,7 +7,7 @@ import {
 import { parsePolicy, resolveIssuesConfig } from '@lonca/baron-core';
 import { describe, expect, it } from 'vitest';
 import { memoryFileSystem, scriptedPrompter } from './fakes.js';
-import { runInit } from './init.js';
+import { gitignoreMatches, runInit } from './init.js';
 import {
   CREDENTIALS_IGNORE_ENTRY,
   credentialsExamplePath,
@@ -383,6 +383,37 @@ describe('runInit', () => {
     });
   });
 
+  it('un-ignores the credentials template when a broader pattern would hide it', async () => {
+    // Found live: a hand-written `.baron/credentials.*` also matched credentials.example, so the
+    // file init means to be committed never reached the repository and nobody noticed.
+    const fs = memoryFileSystem({ [gitignorePath(ROOT)]: 'node_modules\n.baron/credentials.*\n' });
+    await runInit({
+      root: ROOT,
+      issuesProvider: 'github',
+      fs,
+      env: GH_ENV,
+      prompter: scriptedPrompter([true]),
+      introspector: createMemoryIntrospector(githubIntrospectionFixture),
+    });
+    const ignore = fs.read(gitignorePath(ROOT)) as string;
+    expect(ignore.split('\n')).toContain('!.baron/credentials.example');
+    expect(gitignoreMatches(ignore, '.baron/credentials.example')).toBe(false);
+    expect(gitignoreMatches(ignore, '.baron/credentials')).toBe(true);
+  });
+
+  it('adds no exception when nothing hides the template', async () => {
+    const fs = memoryFileSystem({ [gitignorePath(ROOT)]: 'node_modules\n' });
+    await runInit({
+      root: ROOT,
+      issuesProvider: 'github',
+      fs,
+      env: GH_ENV,
+      prompter: scriptedPrompter([true]),
+      introspector: createMemoryIntrospector(githubIntrospectionFixture),
+    });
+    expect(fs.read(gitignorePath(ROOT))).not.toContain('!.baron/credentials.example');
+  });
+
   it('does not duplicate the gitignore entry when it already exists', async () => {
     const fs = memoryFileSystem({
       [gitignorePath(ROOT)]: `node_modules\n${CREDENTIALS_IGNORE_ENTRY}\n`,
@@ -617,5 +648,22 @@ describe('where the steering block goes', () => {
     await run(fs, [true, true]);
     expect(fs.read(AGENTS)).toContain(MARKER);
     expect(fs.exists(CLAUDE)).toBe(false);
+  });
+});
+
+describe('gitignoreMatches', () => {
+  const file = '.baron/credentials.example';
+  it('reads the common shapes the way git does', () => {
+    expect(gitignoreMatches('.baron/credentials.*', file)).toBe(true);
+    expect(gitignoreMatches('.baron/credentials*', file)).toBe(true);
+    expect(gitignoreMatches('/.baron/credentials.example', file)).toBe(true);
+    expect(gitignoreMatches('credentials.example', file)).toBe(true); // basename match
+    expect(gitignoreMatches('*.example', file)).toBe(true);
+    expect(gitignoreMatches('**/credentials.example', file)).toBe(true);
+    expect(gitignoreMatches('.baron/credentials', file)).toBe(false); // exact, another file
+    expect(gitignoreMatches('.baron/', file)).toBe(false); // directories only: not a file match
+    expect(gitignoreMatches('# .baron/credentials.*\n', file)).toBe(false);
+    expect(gitignoreMatches('.baron/credentials.*\n!.baron/credentials.example', file)).toBe(false);
+    expect(gitignoreMatches('!.baron/credentials.example\n.baron/credentials.*', file)).toBe(true); // later wins
   });
 });

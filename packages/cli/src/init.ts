@@ -24,6 +24,8 @@ import {
 import { openInBrowser } from './open-browser.js';
 import {
   BARON_DIR,
+  CREDENTIALS_EXAMPLE_KEEP_ENTRY,
+  CREDENTIALS_EXAMPLE_REL,
   CREDENTIALS_IGNORE_ENTRY,
   RUNS_IGNORE_ENTRY,
   credentialsExamplePath,
@@ -122,13 +124,67 @@ function credentialsTemplate(
 function ensureGitignored(fs: FileSystem, root: string): void {
   const ignorePath = gitignorePath(root);
   let current = fs.read(ignorePath) ?? '';
-  for (const entry of [CREDENTIALS_IGNORE_ENTRY, RUNS_IGNORE_ENTRY]) {
-    const lines = current.split('\n').map((l) => l.trim());
-    if (lines.includes(entry)) continue;
+  const append = (entry: string): void => {
     const prefix = current.length === 0 || current.endsWith('\n') ? current : `${current}\n`;
     current = `${prefix}${entry}\n`;
+  };
+  for (const entry of [CREDENTIALS_IGNORE_ENTRY, RUNS_IGNORE_ENTRY]) {
+    const lines = current.split('\n').map((l) => l.trim());
+    if (!lines.includes(entry)) append(entry);
   }
+  // A broader pattern someone wrote by hand — `.baron/credentials.*` was the live case — swallows the
+  // template too, and then the file init means to be committed never reaches the repo and nobody
+  // notices. Un-ignore it explicitly. (A pattern ignoring `.baron/` itself is left alone: that is a
+  // decision, and a negation could not undo it anyway.)
+  if (gitignoreMatches(current, CREDENTIALS_EXAMPLE_REL)) append(CREDENTIALS_EXAMPLE_KEEP_ENTRY);
   if (current !== (fs.read(ignorePath) ?? '')) fs.write(ignorePath, current);
+}
+
+/**
+ * Whether a .gitignore's patterns ignore the given root-relative FILE path, evaluated the way git
+ * does for the common shapes: later rules win, `!` negates, a leading `/` anchors, a pattern with
+ * a `/` inside is root-relative, one without matches the basename, a trailing `/` is directories
+ * only, `*` and `?` stay within one segment, `**` spans segments. Enough for a credentials file;
+ * not a general gitignore engine.
+ */
+export function gitignoreMatches(gitignore: string, filePath: string): boolean {
+  const segments = filePath.split('/');
+  const basename = segments[segments.length - 1] ?? filePath;
+  let ignored = false;
+  for (const raw of gitignore.split('\n')) {
+    const line = raw.trim();
+    if (line.length === 0 || line.startsWith('#')) continue;
+    const negated = line.startsWith('!');
+    let pattern = negated ? line.slice(1) : line;
+    if (pattern.endsWith('/')) continue; // directories only: never matches a file path
+    const anchored = pattern.startsWith('/');
+    if (anchored) pattern = pattern.slice(1);
+    const regex = globToRegExp(pattern);
+    const target = anchored || pattern.includes('/') ? filePath : basename;
+    if (regex.test(target)) ignored = !negated;
+  }
+  return ignored;
+}
+
+function globToRegExp(pattern: string): RegExp {
+  let out = '^';
+  for (let i = 0; i < pattern.length; i += 1) {
+    const ch = pattern[i] as string;
+    if (ch === '*') {
+      if (pattern[i + 1] === '*') {
+        out += '.*';
+        i += 1;
+        if (pattern[i + 1] === '/') i += 1;
+      } else {
+        out += '[^/]*';
+      }
+    } else if (ch === '?') {
+      out += '[^/]';
+    } else {
+      out += ch.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+    }
+  }
+  return new RegExp(`${out}$`);
 }
 
 /** Scaffold a credentials template (if absent) and ensure the real credentials file is gitignored. */
