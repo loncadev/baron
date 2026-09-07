@@ -19,6 +19,7 @@ import {
 import * as azdev from 'azure-devops-node-api';
 import {
   type Build,
+  BuildQueryOrder,
   BuildResult,
   BuildStatus,
   TaskResult,
@@ -135,8 +136,12 @@ export function createAzureDevOpsCiTransport(options: AzureDevOpsCiTransportOpti
       const build = await api();
       const definitions = query.pipelineId !== undefined ? [Number(query.pipelineId)] : undefined;
       const top = query.limit ?? DEFAULT_RUN_LIMIT;
-      // getBuilds is positional; `top` is the 13th parameter (10 undefined filters precede it). Branch
-      // is filtered client-side within the fetched window to avoid an 18-argument positional call.
+      // getBuilds is positional. The branch has to reach Azure as a filter, not be applied here
+      // afterwards: filtering the fetched window client-side meant `top` was spent on other
+      // branches' builds, and a build queued a moment ago on the asked-for branch was invisible
+      // (found live — the same query returned nothing at limit 5 and the build at limit 50). Ordered
+      // by queue time so "the latest runs" includes the ones still queued or running, which the
+      // default finish-time order leaves out.
       const builds = await build.getBuilds(
         project,
         definitions,
@@ -151,8 +156,15 @@ export function createAzureDevOpsCiTransport(options: AzureDevOpsCiTransportOpti
         undefined,
         undefined,
         top,
+        undefined,
+        undefined,
+        undefined,
+        BuildQueryOrder.QueueTimeDescending,
+        query.branch !== undefined ? `${REFS_HEADS}${query.branch}` : undefined,
       );
       const runs = builds.map(toNativeRun);
+      // The server-side filter is the real one; this only guards against a build whose source
+      // branch Azure reports differently from the ref it was queried by.
       return query.branch !== undefined ? runs.filter((r) => r.branch === query.branch) : runs;
     },
 
