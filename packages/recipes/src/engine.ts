@@ -608,7 +608,7 @@ export async function runRecipe(
       ...(error instanceof BaronError ? { code: error.code } : {}),
       message: error instanceof Error ? error.message : String(error),
     });
-    throw withRun(error, run.id, at);
+    throw withRun(error, run.id, at, notes);
   }
   state.journal.append(run.id, { kind: 'end', at: now(), replayed: state.replayed });
   return { context, notes, runId: run.id, replayed: state.replayed };
@@ -681,24 +681,41 @@ function openJournal(recipe: Recipe, run: RunJournalOptions, context: RecipeCont
   return { id: run.id, journal: run.journal, done, replayed: 0 };
 }
 
+/** The code a provider's own error (not a BaronError) is reported under when a step throws it. */
+export const RECIPE_STEP_FAILED = 'RECIPE_STEP_FAILED';
+
 /**
- * Attach the run to the error a caller sees, without changing its class or message: `details.run`
- * names the run id and the step it stopped at, which is what the resume hint is built from.
+ * Attach the run to the error a caller sees: `details.run` names the run id and the step it stopped
+ * at — what the resume hint is built from — and `details.notes` carries every message the run had
+ * emitted before it stopped. Both were lost on the MCP path (found live: a resumed run that had
+ * replayed three steps and then failed was read as "nothing was replayed"). A BaronError keeps its
+ * class and message; a provider's own error is wrapped so it can carry the same details, with the
+ * original kept as `cause`.
  */
 function withRun(
   error: unknown,
   runId: string,
   at: { readonly path: string; readonly op: string } | undefined,
+  notes: readonly string[],
 ): unknown {
-  if (!(error instanceof BaronError)) return error;
   const run = { id: runId, ...(at !== undefined ? { step: at.path, op: at.op } : {}) };
-  Object.defineProperty(error, 'details', {
-    value: { ...error.details, run },
-    enumerable: true,
-    configurable: true,
-    writable: false,
-  });
-  return error;
+  const extra = { run, ...(notes.length > 0 ? { notes: [...notes] } : {}) };
+  if (error instanceof BaronError) {
+    Object.defineProperty(error, 'details', {
+      value: { ...error.details, ...extra },
+      enumerable: true,
+      configurable: true,
+      writable: false,
+    });
+    return error;
+  }
+  const wrapped = new BaronError(
+    error instanceof Error ? error.message : String(error),
+    RECIPE_STEP_FAILED,
+    extra,
+  );
+  wrapped.cause = error;
+  return wrapped;
 }
 
 /**

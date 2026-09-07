@@ -28,7 +28,10 @@ So every run is **journaled**. `.baron/runs/<runId>.jsonl` (gitignored; `init` a
 line per event: the inputs the run started with, each `ask` answer, each `do` step with an
 idempotency key and the result it bound, each message, and the error or the end. The run id is
 reported on success (`Run id: …` on the CLI, `runId` in the MCP context) and on failure (the CLI
-prints the resume command; the MCP error carries `details.run = { id, step, op }`).
+prints the resume command; the MCP error text ends with the run id and the exact `resume` call,
+carries `details.run = { id, step, op }`, and brings the messages the run had emitted before it
+stopped — replays included — as its second text block, so a half-completed resume is never read as
+"nothing happened").
 
 **Resuming** — `baron run --resume <runId>` or `baron_recipe_run { resume: "<runId>" }` — restores
 the inputs and answers from the journal (nothing is asked again), **replays** every completed `do`

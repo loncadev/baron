@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   defineGithubIssuesAdapter,
   defineGithubScmAdapter,
@@ -729,6 +732,32 @@ describe('baron_issue_read op=trace', () => {
   });
 });
 
+describe('a recipe run that fails after saying something', () => {
+  it('brings the messages so far as the second block, exactly as a success would', async () => {
+    // Found live: a resumed run replayed three steps, then failed on the next; the error alone was
+    // returned and the agent concluded nothing had been replayed.
+    const root = mkdtempSync(join(tmpdir(), 'baron-mcp-recipes-'));
+    mkdirSync(join(root, '.baron', 'recipes'), { recursive: true });
+    writeFileSync(
+      join(root, '.baron', 'recipes', 'half.yaml'),
+      'name: half\nsteps:\n  - message: "first half done"\n  - do: notify.send\n    with: { text: "x" }\n',
+    );
+    try {
+      const service = createRecipeService({ issues: githubPort() }, root, {
+        journal: createMemoryRunJournal(),
+      });
+      const result = await callRecipeTool(service, RECIPE_TOOL_NAMES.run, { name: 'half' });
+      expect(result.isError).toBe(true);
+      expect(result.content[0]?.text).toMatch(
+        /^PORT_UNBOUND: .*\n\nRun [a-z0-9]+-[0-9a-f]{8} stopped at notify\.send \(step 1\)/s,
+      );
+      expect(result.content[1]?.text).toBe('first half done');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('callRecipeTool', () => {
   it('lists built-in recipes with their declared inputs', async () => {
     const result = await callRecipeTool(recipesService(), RECIPE_TOOL_NAMES.list, undefined);
@@ -801,6 +830,10 @@ describe('callRecipeTool', () => {
     expect(stopped.isError).toBe(true);
     const run = (stopped.structuredContent?.details as { run: { id: string; op: string } }).run;
     expect(run.op).toBe('scm.branch.create');
+    // Said in the text as well: the model does not reliably see structuredContent, and an agent
+    // without the id went reading the journal by hand.
+    expect(stopped.content[0]?.text).toContain(`Run ${run.id} stopped at scm.branch.create`);
+    expect(stopped.content[0]?.text).toContain(`baron_recipe_run { resume: "${run.id}" }`);
 
     const whole = createRecipeService({ issues, scm: scmPort() }, RECIPE_ROOT, { journal });
     const resumed = await callRecipeTool(whole, RECIPE_TOOL_NAMES.run, { resume: run.id });
