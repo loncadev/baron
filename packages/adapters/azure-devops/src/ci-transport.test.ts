@@ -38,6 +38,18 @@ describe('azure ci listRuns', () => {
     expect(args[17]).toBe('refs/heads/task/2003-x'); // branchName, the server-side filter
   });
 
+  it('maps a pull request to its merge ref, and reads the PR id back off a build on one', async () => {
+    mocks.getBuilds.mockResolvedValue([
+      { id: 4284, status: 32, sourceBranch: 'refs/pull/1869/merge', definition: { id: 59 } },
+    ]);
+    const runs = await transport().listRuns({ pullRequestId: '1869', limit: 5 });
+    expect(runs).toEqual([
+      expect.objectContaining({ id: '4284', pullRequestId: '1869', branch: undefined }),
+    ]);
+    const args = mocks.getBuilds.mock.calls[0] as unknown[];
+    expect(args[17]).toBe('refs/pull/1869/merge');
+  });
+
   it('passes no branch when none was asked for, and keeps the queue-time order', async () => {
     mocks.getBuilds.mockResolvedValue([]);
     await transport().listRuns({ limit: 3 });

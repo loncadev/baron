@@ -574,7 +574,7 @@ export const CI_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
     name: CI_TOOL_NAMES.runs,
     mutatesProvider: false,
     description:
-      'List CI runs (filter by pipeline / branch / normalized status). Returns a lightweight ' +
+      'List CI runs (filter by pipeline / branch / pull request / normalized status). Returns a lightweight ' +
       'projection; status is the provider-agnostic run status.',
     inputSchema: {
       type: 'object',
@@ -582,6 +582,13 @@ export const CI_TOOL_DEFINITIONS: readonly ToolDefinition[] = [
       properties: {
         pipelineId: { type: 'string', minLength: 1, description: 'Restrict to one pipeline.' },
         branch: { type: 'string', minLength: 1, description: 'Restrict to a source branch.' },
+        pullRequestId: {
+          type: 'string',
+          minLength: 1,
+          description:
+            "Restrict to the runs that validate this pull request (built on the provider's PR ref, " +
+            'so a branch filter never finds them).',
+        },
         status: {
           type: 'string',
           enum: RUN_STATUS_ENUM,
@@ -1338,6 +1345,7 @@ export function callLoopTool(
 function toRunQuery(args: Record<string, unknown> | undefined): RunQuery {
   const pipelineId = optionalString(args, 'pipelineId');
   const branch = optionalString(args, 'branch');
+  const pullRequestId = optionalString(args, 'pullRequestId');
   const statusRaw = optionalString(args, 'status');
   if (statusRaw !== undefined && !isRunStatus(statusRaw)) {
     throw new BaronError(
@@ -1352,6 +1360,7 @@ function toRunQuery(args: Record<string, unknown> | undefined): RunQuery {
   return {
     ...(pipelineId !== undefined ? { pipelineId } : {}),
     ...(branch !== undefined ? { branch } : {}),
+    ...(pullRequestId !== undefined ? { pullRequestId } : {}),
     ...(statusRaw !== undefined ? { status: statusRaw as RunStatus } : {}),
     limit: limit !== undefined ? (limit as number) : DEFAULT_QUERY_LIMIT,
   };
