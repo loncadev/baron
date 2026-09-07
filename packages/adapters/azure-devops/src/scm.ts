@@ -43,7 +43,20 @@ export interface AzureDevOpsScmTransportOptions {
    * to the repository's default branch when unset.
    */
   readonly baseBranch?: string | undefined;
+  /**
+   * How long to wait for Azure to finish completing a pull request before calling the merge failed.
+   * Azure answers the completion request with the PR as it was — still Active — and merges
+   * afterwards, usually within a couple of seconds. Defaults to {@link COMPLETION_TIMEOUT_MS}.
+   */
+  readonly completionTimeoutMs?: number | undefined;
+  /** How often to re-read the PR while waiting. Defaults to {@link COMPLETION_POLL_MS}. */
+  readonly completionPollMs?: number | undefined;
+  /** Injected for tests; defaults to a real timer. */
+  readonly sleep?: ((ms: number) => Promise<void>) | undefined;
 }
+
+export const COMPLETION_TIMEOUT_MS = 20_000;
+export const COMPLETION_POLL_MS = 1_000;
 
 /** Azure Repos supports draft PRs and first-class PR comment threads. */
 export const azureDevOpsScmManifest: ScmManifest = {
@@ -112,6 +125,10 @@ export function createAzureDevOpsScmTransport(
   options: AzureDevOpsScmTransportOptions,
 ): ScmTransport {
   const { organization, project, repository, token, baseBranch } = options;
+  const completionTimeoutMs = options.completionTimeoutMs ?? COMPLETION_TIMEOUT_MS;
+  const completionPollMs = options.completionPollMs ?? COMPLETION_POLL_MS;
+  const sleep =
+    options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const orgUrl = `https://dev.azure.com/${organization}`;
 
   const webApi = new azdev.WebApi(orgUrl, azdev.getPersonalAccessTokenHandler(token));
@@ -400,13 +417,33 @@ export function createAzureDevOpsScmTransport(
         Number(pullRequestId),
         project,
       );
-      if (completed.status !== AzurePrStatus.Completed) {
+      // Azure completes asynchronously: the PATCH answers with the PR still Active and the merge
+      // lands a moment later. Reading the response as the verdict reported a real merge as
+      // MERGE_FAILED (found live: status 1 in the answer, Completed 1.6 s later) — and a user who
+      // believed it would have run task-land against an already-merged PR. So wait for Azure to
+      // finish, bounded, and only then decide.
+      let latest = completed;
+      const deadline = Date.now() + completionTimeoutMs;
+      while (
+        latest.status !== AzurePrStatus.Completed &&
+        latest.status !== AzurePrStatus.Abandoned
+      ) {
+        if (Date.now() >= deadline) {
+          throw new BaronError(
+            `Azure has not completed PR ${pullRequestId} after ${Math.round(completionTimeoutMs / 1000)} s (status ${String(latest.status)}). It may still finish; read the PR status before retrying. If it stays open, check branch policies and conflicts.`,
+            'MERGE_FAILED',
+          );
+        }
+        await sleep(completionPollMs);
+        latest = await git.getPullRequestById(Number(pullRequestId), project);
+      }
+      if (latest.status === AzurePrStatus.Abandoned) {
         throw new BaronError(
-          `Azure did not complete PR ${pullRequestId} (status ${String(completed.status)}); check branch policies and conflicts.`,
+          `Azure abandoned PR ${pullRequestId} instead of completing it; check branch policies and conflicts.`,
           'MERGE_FAILED',
         );
       }
-      return { pullRequestId, sha: completed.lastMergeCommit?.commitId };
+      return { pullRequestId, sha: latest.lastMergeCommit?.commitId };
     },
 
     async getPullRequestStatus(pullRequestId: string): Promise<PullRequestStatus> {

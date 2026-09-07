@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   createPullRequest: vi.fn(),
   getPullRequestById: vi.fn(),
+  updatePullRequest: vi.fn(),
   getPolicyEvaluations: vi.fn(),
 }));
 
@@ -14,6 +15,7 @@ vi.mock('azure-devops-node-api', () => ({
     getGitApi: async () => ({
       createPullRequest: mocks.createPullRequest,
       getPullRequestById: mocks.getPullRequestById,
+      updatePullRequest: mocks.updatePullRequest,
     }),
     getPolicyApi: async () => ({ getPolicyEvaluations: mocks.getPolicyEvaluations }),
   })),
@@ -144,5 +146,90 @@ describe('azure scm branch-policy evaluations', () => {
     expect(status.checks.rollup).toBe('unknown');
     expect(status.checks.unreadable).toEqual(['policy-evaluations']);
     expect(status.checks.remedy).toContain('403 Forbidden');
+  });
+});
+
+describe('azure scm mergePullRequest', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const ACTIVE = 1;
+  const ABANDONED = 2;
+  const COMPLETED = 3;
+
+  function patient() {
+    const waits: number[] = [];
+    const t = createAzureDevOpsScmTransport({
+      organization: 'org',
+      project: 'proj',
+      repository: 'repo',
+      token: 'x',
+      completionTimeoutMs: 5000,
+      completionPollMs: 1000,
+      sleep: async (ms) => {
+        waits.push(ms);
+      },
+    });
+    return { t, waits };
+  }
+
+  it('waits for Azure to finish completing the PR instead of judging the PATCH response', async () => {
+    // Found live: the completion PATCH answers with the PR still Active (status 1) and the merge
+    // lands about 1.6 s later. Reading the answer as the verdict reported a real merge as failed.
+    mocks.getPullRequestById
+      .mockResolvedValueOnce({ status: ACTIVE, lastMergeSourceCommit: { commitId: 'src' } })
+      .mockResolvedValueOnce({ status: ACTIVE })
+      .mockResolvedValueOnce({ status: COMPLETED, lastMergeCommit: { commitId: 'merged-sha' } });
+    mocks.updatePullRequest.mockResolvedValue({ status: ACTIVE });
+    const { t, waits } = patient();
+    const result = await t.mergePullRequest('2436', {
+      strategy: 'squash',
+      deleteSourceBranch: true,
+    });
+    expect(result).toEqual({ pullRequestId: '2436', sha: 'merged-sha' });
+    expect(waits).toEqual([1000, 1000]);
+    // One read before the PATCH (for the source commit), two while waiting.
+    expect(mocks.getPullRequestById).toHaveBeenCalledTimes(3);
+  });
+
+  it('returns at once when the PATCH already reports Completed', async () => {
+    mocks.getPullRequestById.mockResolvedValueOnce({ status: ACTIVE });
+    mocks.updatePullRequest.mockResolvedValue({
+      status: COMPLETED,
+      lastMergeCommit: { commitId: 'now' },
+    });
+    const { t, waits } = patient();
+    expect(await t.mergePullRequest('1', {})).toEqual({ pullRequestId: '1', sha: 'now' });
+    expect(waits).toEqual([]);
+  });
+
+  it('gives up after the bounded wait, naming how long it waited and what to do', async () => {
+    mocks.getPullRequestById.mockResolvedValue({ status: ACTIVE });
+    mocks.updatePullRequest.mockResolvedValue({ status: ACTIVE });
+    const t = createAzureDevOpsScmTransport({
+      organization: 'org',
+      project: 'proj',
+      repository: 'repo',
+      token: 'x',
+      completionTimeoutMs: 0,
+      sleep: async () => {},
+    });
+    await expect(t.mergePullRequest('7', {})).rejects.toMatchObject({
+      code: 'MERGE_FAILED',
+      message: expect.stringMatching(
+        /has not completed PR 7 after 0 s .*read the PR status before retrying/,
+      ),
+    });
+  });
+
+  it('reports an abandoned PR as a failed merge', async () => {
+    mocks.getPullRequestById
+      .mockResolvedValueOnce({ status: ACTIVE })
+      .mockResolvedValueOnce({ status: ABANDONED });
+    mocks.updatePullRequest.mockResolvedValue({ status: ACTIVE });
+    const { t } = patient();
+    await expect(t.mergePullRequest('9', {})).rejects.toMatchObject({
+      code: 'MERGE_FAILED',
+      message: expect.stringMatching(/abandoned PR 9/),
+    });
   });
 });
