@@ -22,3 +22,6 @@ export function gitConfigPath(root: string): string {
 export const CREDENTIALS_IGNORE_ENTRY = `${BARON_DIR}/credentials`;
 /** Run journals hold a run's answers (PR bodies, titles) and are per machine: never committed. */
 export const RUNS_IGNORE_ENTRY = `${BARON_DIR}/runs/`;
+/** The template is meant to be committed; this un-ignores it when a broader pattern would hide it. */
+export const CREDENTIALS_EXAMPLE_REL = `${BARON_DIR}/credentials.example`;
+export const CREDENTIALS_EXAMPLE_KEEP_ENTRY = `!${CREDENTIALS_EXAMPLE_REL}`;
