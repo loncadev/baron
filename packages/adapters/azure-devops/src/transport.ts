@@ -61,11 +61,30 @@ const PARENT_REL = 'System.LinkTypes.Hierarchy-Reverse';
 /**
  * NativeTarget keys this transport reads VERBATIM (invariant #4): the role map already turned roles
  * into these in BaseIssuesAdapter. `state` is the workflow state; `boardColumn` is the separate
- * board axis. The board column's backing field is a per-board hidden `WEF_<guid>_Kanban.Column`
- * field, discovered at runtime (System.BoardColumn itself is read-only).
+ * board axis, which lives in one of two places. A backlog-board item carries a per-board hidden
+ * `WEF_<guid>_Kanban.Column` field, discovered at runtime (System.BoardColumn itself is read-only).
+ * A Bug or Task on a sprint has no such field at all: its column is a record of the team's
+ * Taskboard, written through the Work API's taskboard work-item endpoint.
  */
 const TARGET = { STATE: 'state', BOARD_COLUMN: 'boardColumn' } as const;
 const KANBAN_COLUMN_SUFFIX = '_Kanban.Column';
+
+const COLUMN_HOME = {
+  KANBAN: 'kanban',
+  TASKBOARD: 'taskboard',
+  /** An uncustomized Taskboard: its columns ARE the states, so writing the state places the card. */
+  STATE: 'state',
+  NONE: 'none',
+} as const;
+type ColumnHome =
+  | { readonly kind: typeof COLUMN_HOME.KANBAN; readonly field: string }
+  | { readonly kind: typeof COLUMN_HOME.STATE }
+  | {
+      readonly kind: typeof COLUMN_HOME.TASKBOARD;
+      readonly iterationId: string;
+      readonly column: string;
+    }
+  | { readonly kind: typeof COLUMN_HOME.NONE; readonly reason: string };
 /** getWorkItems is server-capped at 200 ids; query results are fetched in batches of this size. */
 const GET_WORK_ITEMS_BATCH = 200;
 
@@ -210,6 +229,83 @@ export function createAzureDevOpsTransport(options: AzureDevOpsTransportOptions)
   const fetch = async (witApi: WitApi, id: number): Promise<WorkItem> =>
     witApi.getWorkItem(id, undefined, undefined, WorkItemExpand.All, project);
 
+  const sameIterationPath = (a: string, b: string): boolean =>
+    a.replace(/\//g, '\\').toLowerCase() === b.replace(/\//g, '\\').toLowerCase();
+  const leafOf = (path: string): string => path.split(/[\\/]/).pop()?.toLowerCase() ?? '';
+
+  /**
+   * Where this item's board column can be written, or why it cannot. Asked by the core before a
+   * transition (to apply the gap policy with nothing written yet) and again by applyTarget (to
+   * write it), so the two can never disagree about the route.
+   */
+  const columnHome = async (item: WorkItem, target: NativeTarget): Promise<ColumnHome> => {
+    const column = target[TARGET.BOARD_COLUMN] ?? '';
+    const fields = item.fields ?? {};
+    const kanbanField = Object.keys(fields).find((key) => key.endsWith(KANBAN_COLUMN_SUFFIX));
+    if (kanbanField !== undefined) return { kind: COLUMN_HOME.KANBAN, field: kanbanField };
+
+    const type = String(fields[FIELD.TYPE] ?? '');
+    const iterationPath = String(fields[FIELD.ITERATION_PATH] ?? '');
+    const workApi = await work();
+    const board = await workApi.getColumns({ project, team });
+    const wanted = column.trim().toLowerCase();
+    const state = target[TARGET.STATE];
+    // Measured on BeeMaster (2026-10-06): a team that never customized its Taskboard gets
+    // `isCustomized: false` and no columns at all — the board shows one column per state.
+    if (board?.isCustomized !== true && (board?.columns ?? []).length === 0) {
+      return state !== undefined && state.trim().toLowerCase() === wanted
+        ? { kind: COLUMN_HOME.STATE }
+        : {
+            kind: COLUMN_HOME.NONE,
+            reason:
+              `it is on no backlog board, and team '${team}''s Taskboard is not customized, so ` +
+              `its columns are the states — '${column}' is not the target state '${state ?? '(none)'}'.`,
+          };
+    }
+    const match = (board?.columns ?? []).find((c) => c.name?.trim().toLowerCase() === wanted);
+    if (match?.name === undefined) {
+      const names = (board?.columns ?? []).map((c) => c.name).filter(Boolean);
+      return {
+        kind: COLUMN_HOME.NONE,
+        reason:
+          `it is on no backlog board, and team '${team}''s Taskboard has no column '${column}' ` +
+          `(it has: ${names.length > 0 ? names.join(', ') : 'none'}).`,
+      };
+    }
+    const mapping = match.mappings?.find((m) => m.workItemType === type);
+    if (mapping === undefined) {
+      return {
+        kind: COLUMN_HOME.NONE,
+        reason: `the Taskboard column '${match.name}' does not take ${type || 'this type of'} items.`,
+      };
+    }
+    // Writing a Taskboard column also sets the state its mapping names, so a pair whose states
+    // disagree would land the item in a state nobody asked for.
+    if (state !== undefined && mapping.state !== undefined && mapping.state !== state) {
+      return {
+        kind: COLUMN_HOME.NONE,
+        reason:
+          `the Taskboard column '${match.name}' holds ${type} items in state '${mapping.state}', ` +
+          `but the role map pairs it with '${state}'.`,
+      };
+    }
+    // Path first, then the leaf name: a team's iteration path and an item's IterationPath have
+    // been seen to differ in their root segment while naming the same sprint.
+    const iterations = (await workApi.getTeamIterations({ project, team })) ?? [];
+    const iteration =
+      iterations.find((it) => it.path !== undefined && sameIterationPath(it.path, iterationPath)) ??
+      iterations.find((it) => it.name?.toLowerCase() === leafOf(iterationPath));
+    if (iteration?.id === undefined) {
+      return {
+        kind: COLUMN_HOME.NONE,
+        reason:
+          `it is on no backlog board, and its iteration '${iterationPath}' is not one of team ` +
+          `'${team}''s sprints, so it is on no Taskboard either.`,
+      };
+    }
+    return { kind: COLUMN_HOME.TASKBOARD, iterationId: iteration.id, column: match.name };
+  };
+
   return {
     async createIssue(input: NativeCreateInput): Promise<NativeIssue> {
       const witApi = await api();
@@ -257,25 +353,47 @@ export function createAzureDevOpsTransport(options: AzureDevOpsTransportOptions)
       if (state !== undefined) {
         ops.push({ op: Operation.Add, path: fieldPath(FIELD.STATE), value: state });
       }
+      let taskboard: { readonly iterationId: string; readonly column: string } | undefined;
       if (column !== undefined) {
-        // The writable board-column field is a per-board hidden WEF field; discover it on the item.
-        // Azure also auto-derives the column from state via the board's stateMappings, so if the
-        // field is absent (item never placed on a board) we rely on that rather than failing.
-        const current = await fetch(witApi, numId);
-        const wefField = Object.keys(current.fields ?? {}).find((key) =>
-          key.endsWith(KANBAN_COLUMN_SUFFIX),
-        );
-        if (wefField !== undefined) {
-          ops.push({ op: Operation.Add, path: fieldPath(wefField), value: column });
+        const home = await columnHome(await fetch(witApi, numId), target);
+        if (home.kind === COLUMN_HOME.NONE) {
+          // The core asks boardColumnUnreachable first and strips the column under `degrade`, so
+          // reaching here means a caller skipped that negotiation. Loud rather than a quiet drop.
+          throw new BaronError(
+            `Cannot write board column '${column}' on ${id}: ${home.reason}`,
+            'BOARD_COLUMN_UNREACHABLE',
+          );
+        }
+        if (home.kind === COLUMN_HOME.KANBAN) {
+          ops.push({ op: Operation.Add, path: fieldPath(home.field), value: column });
+        } else if (home.kind === COLUMN_HOME.TASKBOARD) {
+          taskboard = home;
         }
       }
 
-      if (ops.length === 0) {
+      if (ops.length === 0 && taskboard === undefined) {
         return toNative(await fetch(witApi, numId), state);
       }
-      // State + column go in ONE patch (atomic transition, per ARCHITECTURE decision #6).
-      const updated = await witApi.updateWorkItem(null, ops, numId);
-      return toNative(updated, state);
+      // State + Kanban column go in ONE patch (atomic transition, per ARCHITECTURE decision #6).
+      let updated = ops.length > 0 ? await witApi.updateWorkItem(null, ops, numId) : undefined;
+      if (taskboard !== undefined) {
+        // A Taskboard column is not a field, so it cannot ride the same patch. State goes first: the
+        // column's mapping was checked to agree with it, so this write moves only the column.
+        await (await work()).updateWorkItemColumn(
+          { newColumn: taskboard.column },
+          { project, team },
+          taskboard.iterationId,
+          numId,
+        );
+        updated = await fetch(witApi, numId);
+      }
+      return toNative(updated ?? (await fetch(witApi, numId)), state);
+    },
+
+    async boardColumnUnreachable(id: string, target: NativeTarget): Promise<string | undefined> {
+      if (target[TARGET.BOARD_COLUMN] === undefined) return undefined;
+      const home = await columnHome(await fetch(await api(), Number(id)), target);
+      return home.kind === COLUMN_HOME.NONE ? home.reason : undefined;
     },
 
     async addLabel(id: string, label: string): Promise<void> {

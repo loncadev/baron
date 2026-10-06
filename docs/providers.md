@@ -82,9 +82,17 @@ by GitHub. Without a `typeFiltering` policy that query is **refused**, not answe
 - **GitHub cold reads:** a fresh `issue.get` reports open/closed only; a mid-workflow role is
   recovered on the write path (the transport must not hold the role map). Reverse type-role
   resolution is likewise lossy when every type role maps to the single `issue` type.
-- **Azure board column:** moving a card's column writes the per-board hidden
+- **Azure board column:** a backlog item's column is the per-board hidden
   `WEF_<guid>_Kanban.Column` field discovered at runtime (`System.BoardColumn` is read-only);
-  multi-board projects can expose several — provider-quirky, validated under live smoke.
+  multi-board projects can expose several. A Bug or Task on a sprint has no such field — its
+  column is a record of the team's Taskboard (team from `AZURE_DEVOPS_TEAM`, default
+  `<project> Team`), written in the item's own sprint after the state. When an item cannot take
+  its role's column at all (on no board, a column the Taskboard lacks for its type, or a column
+  whose own state mapping disagrees with the role's state), `gapPolicy.separateBoardColumn`
+  decides before anything is written: `error` (the default) refuses the move with
+  `BOARD_COLUMN_UNREACHABLE` and the reason; `degrade` moves the state alone and logs a warning.
+  An unwritten column is not harmless on Azure: the card shows in the *last* column mapped to its
+  state, so a card in `Test` reads as whatever comes after it.
 
 ## Scm capabilities
 

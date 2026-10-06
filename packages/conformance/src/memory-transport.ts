@@ -28,6 +28,8 @@ interface Rec {
   links: Array<{ toId: string; type: string }>;
   /** Screen answers the last transition carried — what a Jira issue would show on its fields. */
   fields: Record<string, unknown>;
+  /** The board column last written, for a provider whose column is separate from the state. */
+  boardColumn?: string | undefined;
 }
 
 /** The fixed fake identity '@me' resolves to — shared by currentUser/assign/query so they cohere. */
@@ -102,7 +104,18 @@ export interface MemoryTransportOptions {
    * fake that wrote anyway would let a core that skipped the check pass a suite Jira fails.
    */
   readonly screenFor?: Readonly<Record<string, readonly TransitionField[]>> | undefined;
+  /**
+   * The board columns each native type's items can be put in, for a provider whose column is
+   * separate from the state and not every item can reach every column (Azure: a Bug on a sprint
+   * Taskboard has columns a backlog item's board does not). When set the transport implements
+   * `boardColumnUnreachable`, and its `applyTarget` REFUSES a column the item cannot take — so a
+   * core that skipped the question fails here the way it would against the real board.
+   */
+  readonly columnsFor?: Readonly<Record<string, readonly string[]>> | undefined;
 }
+
+/** The NativeTarget key the memory transport reads a board column from. */
+const MEMORY_BOARD_COLUMN_KEY = 'boardColumn';
 
 /**
  * In-memory stand-in for a provider transport. It interprets a {@link NativeTarget} exactly the
@@ -135,6 +148,13 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
     const r = store.get(id);
     if (r === undefined) throw new Error(`memory transport: issue '${id}' not found`);
     return r;
+  };
+
+  const columnUnreachable = (rec: Rec, column: string): string | undefined => {
+    const columns = opts.columnsFor?.[rec.nativeType] ?? [];
+    return columns.includes(column)
+      ? undefined
+      : `${rec.nativeType} items have no column '${column}' (they have: ${columns.join(', ') || 'none'}).`;
   };
 
   return {
@@ -171,6 +191,13 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
       fields?: TransitionFields,
     ): Promise<NativeIssue> {
       const rec = must(id);
+      const column = target[MEMORY_BOARD_COLUMN_KEY];
+      if (column !== undefined && opts.columnsFor !== undefined) {
+        // Checked before anything moves, like a provider that rejects the request whole.
+        const reason = columnUnreachable(rec, column);
+        if (reason !== undefined) throw new Error(`memory transport: ${reason}`);
+        rec.boardColumn = column;
+      }
       const discriminator = target[opts.stateKey];
       if (
         discriminator !== undefined &&
@@ -207,6 +234,18 @@ export function createMemoryTransport(opts: MemoryTransportOptions): IssuesTrans
             const rec = must(id);
             const reachable = opts.reachableFrom?.[rec.discriminator] ?? [];
             return reachable.map((value) => ({ [opts.stateKey]: value }));
+          },
+        }
+      : {}),
+
+    ...(opts.columnsFor !== undefined
+      ? {
+          async boardColumnUnreachable(
+            id: string,
+            target: NativeTarget,
+          ): Promise<string | undefined> {
+            const column = target[MEMORY_BOARD_COLUMN_KEY];
+            return column === undefined ? undefined : columnUnreachable(must(id), column);
           },
         }
       : {}),

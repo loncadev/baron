@@ -1,8 +1,15 @@
 import { deriveBranchName } from './branch-name.js';
 import type { CapabilityManifest } from './capabilities.js';
-import type { IssuesProviderConfig, LabelSpec, NativeTarget } from './config.js';
 import {
+  BOARD_COLUMN_KEY,
+  type IssuesProviderConfig,
+  type LabelSpec,
+  type NativeTarget,
+} from './config.js';
+import {
+  BOARD_COLUMN_GAP,
   BaronError,
+  BoardColumnUnreachableError,
   TransitionFieldsRequiredError,
   TransitionNotPermittedError,
 } from './errors.js';
@@ -171,6 +178,19 @@ export interface IssuesTransport {
    * nothing — and a Jira transport can answer this and `availableTargets` from one read.
    */
   transitionFields?(id: string, target: NativeTarget): Promise<readonly TransitionField[]>;
+  /**
+   * Why this item cannot be put in the target's board column, or undefined when it can — for a
+   * provider whose board column is separate from the state and lives somewhere an individual item may
+   * not reach (an Azure Bug off every sprint, a column the team's Taskboard does not have for this
+   * type, a column whose own state mapping disagrees with the target's state). Takes the whole
+   * target because the last of those is a question about the pair, not the column.
+   *
+   * Asked BEFORE the write, so the core can apply `gapPolicy.separateBoardColumn` with nothing yet
+   * changed: `error` refuses the whole move, `degrade` writes the state alone and warns. The
+   * transport reports, the core decides (invariant 4). Optional, so a provider whose every item can
+   * take every column implements nothing.
+   */
+  boardColumnUnreachable?(id: string, target: NativeTarget): Promise<string | undefined>;
   /** Add a label additively WITHOUT touching the role discriminator (used by link emulation). */
   addLabel(id: string, label: string): Promise<void>;
   /**
@@ -413,7 +433,30 @@ export class BaseIssuesAdapter implements IssuesPort {
     // alone — a Linear state belongs to a team — so the item has to be read before the role can be
     // resolved. Only then: an unscoped provider pays nothing, which is every provider today.
     const scope = this.resolver.scoped ? (await this.transport.getIssue(id)).scope : undefined;
-    const target = this.resolver.toNative(role, scope);
+    let target = this.resolver.toNative(role, scope);
+
+    // A column the item cannot take used to be dropped inside the transport with no word to anyone,
+    // and Azure then renders the card in the LAST column mapped to its state — so a card moved to
+    // Test showed as "Waiting for Release" with nothing verified. Settled here, before any write.
+    const column = target[BOARD_COLUMN_KEY];
+    if (column !== undefined && this.transport.boardColumnUnreachable !== undefined) {
+      const reason = await this.transport.boardColumnUnreachable(id, target);
+      if (reason !== undefined) {
+        const behavior = this.cfg.gapPolicy[BOARD_COLUMN_GAP] ?? { kind: 'error' as const };
+        if (behavior.kind === 'error') {
+          throw new BoardColumnUnreachableError(id, role, column, this.cfg.provider, reason);
+        }
+        this.logger.warn('board column not written; the state moves alone', {
+          capability: BOARD_COLUMN_GAP,
+          provider: this.cfg.provider,
+          id,
+          column,
+          reason,
+        });
+        const { [BOARD_COLUMN_KEY]: _dropped, ...stateOnly } = target;
+        target = stateOnly;
+      }
+    }
 
     // Ask the provider whether this move is reachable from where the item actually is, on a
     // provider that gates it. Verification, not selection: the map settles WHICH target a role
