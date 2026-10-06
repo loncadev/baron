@@ -1,0 +1,83 @@
+name: Release
+
+# Publishing is the maintainer's decision; this workflow only carries it out. Pushing a v* tag
+# queues the job, and the `npm-publish` environment holds it until its required reviewer approves —
+# from the web or the GitHub mobile app. Nothing here holds a long-lived secret: npm and the MCP
+# Registry both accept the short-lived OIDC identity GitHub issues to this job, which is also why the
+# job, not the maintainer's machine, is the one place a release can come from.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+# Two tags pushed close together must not publish in parallel; the second waits.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    permissions:
+      contents: read
+      # The OIDC token npm and the MCP Registry exchange for a publish credential.
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      # No `registry-url` on purpose: it writes an .npmrc carrying a NODE_AUTH_TOKEN placeholder, and
+      # a static token in the way is exactly what OIDC publishing must not find.
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # A tag that disagrees with package.json would publish a version nobody tagged, or none at all.
+      - name: The tag names the version in the packages
+        run: |
+          version=$(node -p "require('./packages/mcp-server/package.json').version")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match the packages' version $version"
+            exit 1
+          fi
+
+      # The same gate CI runs on main, repeated here because this is the tree that ships.
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Lint
+        run: pnpm lint
+      - name: Test
+        run: pnpm test
+      - name: Build (publish artifacts)
+        run: pnpm build
+      - name: server.json in sync
+        run: pnpm sync:server-json --check
+      - name: License check
+        run: pnpm licenses:check
+
+      # pnpm 11 performs the OIDC exchange itself and npm attaches provenance to an OIDC publish.
+      # Versions already on the registry are skipped, so re-running a half-finished release is safe.
+      - name: Publish to npm (trusted publishing)
+        run: pnpm -r --filter "./packages/**" publish --access public --no-git-checks
+
+      - name: Install mcp-publisher
+        run: |
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" \
+            | tar xz mcp-publisher
+
+      # The registry advertises whatever version was last submitted, so it is updated after npm has
+      # the packages it points at. GitHub OIDC proves the io.github.loncadev namespace.
+      - name: Publish to the MCP Registry
+        run: |
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish

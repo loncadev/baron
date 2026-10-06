@@ -45,7 +45,13 @@ until step 2 is done.
       *session token* into `~/.npmrc`, silently shadowing yours — if publish fails with `EOTP`, check
       that the `_authToken` line in `~/.npmrc` is the bypass token, not the session token.
 
-      > **This token type is being withdrawn — see [#62](https://github.com/loncadev/baron/issues/62).**
+      > The checkbox does not always stick: on 2026-10-06 a token created with it ticked came out
+      > without it, and publishing then asked for an OTP a Windows Hello account cannot produce.
+      > Before copying a new token, check that the token list shows a tick in its **Bypass 2FA**
+      > column. A dead token answers `npm whoami` with 401 and a publish with a 404 on the PUT.
+      >
+      > **This token type is being withdrawn — see [#62](https://github.com/loncadev/baron/issues/62)
+      > and the CI flow below, which replaces it.**
       > Since **early August 2026** a bypass-2FA token can no longer perform account or package
       > *management*, which includes **minting its own replacement**: when the current one expires
       > around 2026-09-30, create the new one interactively with 2FA on the npm site, not from the
@@ -66,7 +72,37 @@ until step 2 is done.
       `LICENSE`/`README` into each). For future releases, consider adopting
       [Changesets](https://github.com/changesets/changesets) to automate bumps + changelogs.
 
-**Each release:**
+**Each release — from CI, behind an approval (the default since v0.44.0):**
+
+`.github/workflows/release.yml` publishes to npm and the MCP Registry over OIDC trusted publishing,
+so no token is stored anywhere and nobody runs `publish` on a laptop. The release decision stays a
+human's: the job runs in the `npm-publish` environment and waits for its required reviewer.
+
+```bash
+# 1. Land the bump through the recipes like any other change (task-new → task-start → task-finish → task-land).
+node scripts/bump-version.mjs 0.44.0 && pnpm sync:server-json && pnpm install && pnpm build && pnpm test
+# 2. Tag the landed commit on main. The push queues the Release workflow.
+git switch main && git pull --ff-only
+git tag -a "v$VERSION" -m "v$VERSION" && git push origin "v$VERSION"
+# 3. The maintainer approves the pending deployment (Actions → Release → Review deployments, or the
+#    GitHub mobile app). The job checks the tag against package.json, reruns the CI gate, publishes
+#    every package (provenance attached), then publishes server.json to the MCP Registry.
+# 4. Then: gh release create with notes, the @latest handshake below, and Glama's Sync + Build.
+```
+
+One-time setup, outside the repository (done 2026-10-06):
+
+- **npm, per published package** — *Settings → Trusted publisher → GitHub Actions*: organization
+  `loncadev`, repository `baron`, workflow `release.yml`, environment `npm-publish`. npm does not
+  validate this when saved; a typo surfaces as `ENEEDAUTH` at publish time. A **new** package has
+  no settings page until its first version exists, so its first publish goes through the fallback
+  below (or staged publishing), and its trusted publisher is added straight after.
+- **GitHub** — environment `npm-publish` with the maintainer as required reviewer and a deployment
+  rule that admits only `v*` tags.
+- `repository.url` in every package must point at `github.com/loncadev/baron`, or npm refuses the
+  OIDC publish; `scripts/prep-publish.mjs` writes it.
+
+**Fallback — a token from a laptop (works until npm withdraws bypass tokens, ~January 2027):**
 
 ```bash
 node scripts/bump-version.mjs 0.34.0   # sets every workspace package to one version
@@ -135,6 +171,9 @@ up the new release on their next MCP restart automatically.
 
 The official registry (`registry.modelcontextprotocol.io`) is the surface several others mirror, so
 it goes first and in the same week as a release — that ranking weights recency.
+
+The Release workflow does this step itself (`mcp-publisher login github-oidc`, which proves the
+`io.github.loncadev` namespace from the workflow's own identity). By hand, for the fallback path:
 
 ```bash
 # The tarball carries LICENSE and README.md alongside the binary, so it is unpacked OUTSIDE the
