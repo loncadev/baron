@@ -17,12 +17,10 @@ vi.mock('azure-devops-node-api', () => ({
       getPullRequestById: mocks.getPullRequestById,
       updatePullRequest: mocks.updatePullRequest,
     }),
-    getPolicyApi: async () => ({ getPolicyEvaluations: mocks.getPolicyEvaluations }),
+    getPolicyApi: async () => ({ rest: { get: mocks.getPolicyEvaluations } }),
   })),
   getPersonalAccessTokenHandler: vi.fn(() => ({})),
 }));
-
-import { PolicyEvaluationStatus } from 'azure-devops-node-api/interfaces/PolicyInterfaces.js';
 
 const { createAzureDevOpsScmTransport } = await import('./scm.js');
 
@@ -72,8 +70,9 @@ describe('azure scm createPullRequest', () => {
  * adapter did not read them: every rollup came back `unknown`, so task-land's never-land-red guard
  * had nothing to look at on Azure and every land there passed through a warning instead of a gate.
  *
- * The status values are the SDK's enum, verified against a live project through Baron's own escape
- * hatch — the API is preview-only (`7.1-preview.1`), which no amount of reading the types tells you.
+ * The status values are the REST API's own strings, read raw: the SDK's enum knows six of them and
+ * turns any other into `queued`. The API is preview-only (`7.1-preview.1`), which no amount of
+ * reading the types tells you.
  */
 describe('azure scm branch-policy evaluations', () => {
   beforeEach(() => {
@@ -86,25 +85,32 @@ describe('azure scm branch-policy evaluations', () => {
     });
   });
 
-  const evaluation = (status: number, isEnabled = true) => ({
+  const evaluation = (status: string, isEnabled = true, displayName = 'Build') => ({
     status,
-    configuration: { isEnabled, isBlocking: true },
+    configuration: { isEnabled, isBlocking: true, type: { displayName } },
+  });
+  const evaluations = (...value: ReturnType<typeof evaluation>[]) => ({
+    statusCode: 200,
+    result: { value },
   });
 
   it('counts an approved policy as a passing check', async () => {
-    mocks.getPolicyEvaluations.mockResolvedValue([evaluation(PolicyEvaluationStatus.Approved)]);
+    mocks.getPolicyEvaluations.mockResolvedValue(evaluations(evaluation('approved')));
     const status = await transport().getPullRequestStatus('9');
     expect(status.checks.rollup).toBe('succeeded');
     expect(status.checks.total).toBe(1);
     expect(status.checks.succeeded).toBe(1);
+    expect(status.checks.remedy).toBeUndefined();
     // The artifact id must carry the project GUID: a project NAME returns an empty list rather than
     // an error, which would read as "no policies" — the exact false green this path exists to avoid.
-    expect(mocks.getPolicyEvaluations.mock.calls[0]?.[1]).toContain('project-guid');
+    const url = decodeURIComponent(mocks.getPolicyEvaluations.mock.calls[0]?.[0] as string);
+    expect(url).toContain('vstfs:///CodeReview/CodeReviewId/project-guid/9');
+    expect(url).toContain('api-version=7.1-preview.1');
   });
 
   it('goes red on a rejected policy and on a broken one', async () => {
-    for (const status of [PolicyEvaluationStatus.Rejected, PolicyEvaluationStatus.Broken]) {
-      mocks.getPolicyEvaluations.mockResolvedValue([evaluation(status)]);
+    for (const status of ['rejected', 'broken']) {
+      mocks.getPolicyEvaluations.mockResolvedValue(evaluations(evaluation(status)));
       const result = await transport().getPullRequestStatus('9');
       expect(result.checks.rollup, `status ${status}`).toBe('failed');
       expect(result.checks.failed).toBe(1);
@@ -112,30 +118,58 @@ describe('azure scm branch-policy evaluations', () => {
   });
 
   it('is pending while a policy is queued or running', async () => {
-    mocks.getPolicyEvaluations.mockResolvedValue([
-      evaluation(PolicyEvaluationStatus.Approved),
-      evaluation(PolicyEvaluationStatus.Running),
-    ]);
+    mocks.getPolicyEvaluations.mockResolvedValue(
+      evaluations(evaluation('approved'), evaluation('running'), evaluation('queued')),
+    );
     const status = await transport().getPullRequestStatus('9');
     expect(status.checks.rollup).toBe('pending');
-    expect(status.checks.pending).toBe(1);
+    expect(status.checks.pending).toBe(2);
   });
 
-  it('ignores a policy that is switched off', async () => {
-    mocks.getPolicyEvaluations.mockResolvedValue([
-      evaluation(PolicyEvaluationStatus.Rejected, false),
-    ]);
+  // Measured on a live project (Beetegre-V2 PR #2169): the build succeeded, its policy expired when
+  // the target branch moved, and the PR sat with auto-complete armed. The SDK read that as `queued`,
+  // so task-land said "wait" about something Azure never re-runs on its own.
+  it('counts an expired policy as failed and says to re-queue it, never as pending', async () => {
+    mocks.getPolicyEvaluations.mockResolvedValue(
+      evaluations(evaluation('approved', true, 'Required reviewers'), evaluation('expired')),
+    );
     const status = await transport().getPullRequestStatus('9');
-    // A disabled policy cannot block a merge, so counting it would stop a land nothing is stopping.
+    expect(status.checks.rollup).toBe('failed');
+    expect(status.checks.failed).toBe(1);
+    expect(status.checks.pending).toBe(0);
+    expect(status.checks.remedy).toContain('Build expired');
+    expect(status.checks.remedy).toContain('Re-queue');
+  });
+
+  it('counts a status it does not recognise as not passing, and names it', async () => {
+    mocks.getPolicyEvaluations.mockResolvedValue(evaluations(evaluation('somethingNew')));
+    const status = await transport().getPullRequestStatus('9');
+    expect(status.checks.rollup).toBe('failed');
+    expect(status.checks.remedy).toContain("'somethingNew'");
+  });
+
+  it('ignores a policy that is switched off, and one that does not apply', async () => {
+    mocks.getPolicyEvaluations.mockResolvedValue(
+      evaluations(evaluation('rejected', false), evaluation('notApplicable')),
+    );
+    const status = await transport().getPullRequestStatus('9');
+    // Neither can block a merge, so counting them would stop a land nothing is stopping.
     expect(status.checks.rollup).toBe('none');
     expect(status.checks.total).toBe(0);
   });
 
   it("says 'none' when the repository has no policies, which is not the same as not looking", async () => {
-    mocks.getPolicyEvaluations.mockResolvedValue([]);
+    mocks.getPolicyEvaluations.mockResolvedValue(evaluations());
     const status = await transport().getPullRequestStatus('9');
     expect(status.checks.rollup).toBe('none');
     expect(status.checks.unreadable).toBeUndefined();
+  });
+
+  it("says 'unknown' when the evaluations come back empty-handed with a 404", async () => {
+    mocks.getPolicyEvaluations.mockResolvedValue({ statusCode: 404, result: null });
+    const status = await transport().getPullRequestStatus('9');
+    expect(status.checks.rollup).toBe('unknown');
+    expect(status.checks.remedy).toContain('HTTP 404');
   });
 
   it("says 'unknown' with a remedy when the policies cannot be read at all", async () => {

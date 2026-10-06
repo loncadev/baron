@@ -43,7 +43,7 @@ steps:
       pullRequestId: ${pr.id}
   - require:
       notEquals: ["${status.checks.rollup}", "failed"]
-      message: "${pr.url} has failing checks (${status.checks.failed} of ${status.checks.total}). Fix them and re-run task-land — landing red is what this guard exists to prevent."
+      message: "${pr.url} has failing checks (${status.checks.failed} of ${status.checks.total}). Fix them and re-run task-land — landing red is what this guard exists to prevent. ${status.checks.remedy}"
   # Pending is 'not verified yet', which is the same category of risk as failed, so it stops here too
   # rather than racing the provider. The tool for "merge it once checks pass" is task-finish's
   # auto-complete, which hands the wait to the provider instead of guessing at it.

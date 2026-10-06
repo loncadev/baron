@@ -27,7 +27,6 @@ import {
   GitRefUpdateStatus,
   PullRequestAsyncStatus,
 } from 'azure-devops-node-api/interfaces/GitInterfaces.js';
-import { PolicyEvaluationStatus } from 'azure-devops-node-api/interfaces/PolicyInterfaces.js';
 import { AZURE_DEVOPS_PROVIDER } from './provider.js';
 
 export interface AzureDevOpsScmTransportOptions {
@@ -53,6 +52,36 @@ export interface AzureDevOpsScmTransportOptions {
   readonly completionPollMs?: number | undefined;
   /** Injected for tests; defaults to a real timer. */
   readonly sleep?: ((ms: number) => Promise<void>) | undefined;
+}
+
+/** The evaluations API is preview-only; no GA version serves it. */
+const POLICY_EVALUATIONS_API_VERSION = '7.1-preview.1';
+
+/** Branch-policy evaluation statuses as Azure's REST API spells them. */
+const POLICY_STATUS = {
+  APPROVED: 'approved',
+  REJECTED: 'rejected',
+  BROKEN: 'broken',
+  QUEUED: 'queued',
+  RUNNING: 'running',
+  NOT_APPLICABLE: 'notApplicable',
+  /** The target branch moved past what the policy evaluated. Azure does not re-run it by itself. */
+  EXPIRED: 'expired',
+} as const;
+
+interface RawPolicyEvaluation {
+  readonly status?: string;
+  readonly configuration?: {
+    readonly isEnabled?: boolean;
+    readonly type?: { readonly displayName?: string };
+  };
+}
+
+function describeStalledPolicy(record: RawPolicyEvaluation): string {
+  const name = record.configuration?.type?.displayName ?? 'A branch policy';
+  return record.status === POLICY_STATUS.EXPIRED
+    ? `${name} expired: the target branch moved past what it evaluated, and Azure does not re-run it by itself. Re-queue it on the pull request.`
+    : `${name} reports '${record.status ?? 'no status'}', which Baron does not recognise, so it is counted as not passing. Check it on the pull request.`;
 }
 
 export const COMPLETION_TIMEOUT_MS = 20_000;
@@ -157,6 +186,11 @@ export function createAzureDevOpsScmTransport(
    * the merge through — the same conservative reading GitHub's rollup already gives an optional
    * check, and the cheaper mistake of the two.
    *
+   * An `expired` evaluation — or a status this adapter has never seen — counts as failed, with a
+   * remedy naming it. Azure does not re-run an expired evaluation by itself, so `pending` would tell
+   * the caller to wait for something that never comes; it blocks the merge until someone re-queues
+   * it, which is what `failed` means to every caller of this summary.
+   *
    * A failure to read them returns `unknown`, never `none`: claiming "no checks" would tell a caller
    * the merge is unblocked when Baron simply could not look.
    */
@@ -181,25 +215,42 @@ export function createAzureDevOpsScmTransport(
       // rather than an error, which would read as "no policies" and be exactly the false green this
       // whole path exists to avoid.
       const artifactId = `vstfs:///CodeReview/CodeReviewId/${projectId}/${pullRequestId}`;
-      const records = await (await policyApi()).getPolicyEvaluations(project, artifactId);
+      // Read raw rather than through getPolicyEvaluations: the SDK's enum deserializer knows six
+      // statuses and turns any other string into 0, which is `queued` — so an expired evaluation
+      // came back as one still waiting to run, and nothing downstream could tell them apart.
+      const url =
+        `${orgUrl}/${encodeURIComponent(project)}/_apis/policy/evaluations` +
+        `?artifactId=${encodeURIComponent(artifactId)}&api-version=${POLICY_EVALUATIONS_API_VERSION}`;
+      const response = await (await policyApi()).rest.get<{
+        value?: readonly RawPolicyEvaluation[];
+      }>(url);
+      if (response.result === null) {
+        // typed-rest-client answers a 404 with a null result instead of throwing.
+        return unreadable(`HTTP ${response.statusCode}`);
+      }
       let succeeded = 0;
       let failed = 0;
       let pending = 0;
-      for (const record of records) {
+      const notPassing: string[] = [];
+      for (const record of response.result.value ?? []) {
         if (record.configuration?.isEnabled !== true) continue;
         switch (record.status) {
-          case PolicyEvaluationStatus.Approved:
+          case POLICY_STATUS.APPROVED:
             succeeded += 1;
             break;
-          case PolicyEvaluationStatus.Rejected:
-          case PolicyEvaluationStatus.Broken:
+          case POLICY_STATUS.REJECTED:
+          case POLICY_STATUS.BROKEN:
             failed += 1;
             break;
-          case PolicyEvaluationStatus.Queued:
-          case PolicyEvaluationStatus.Running:
+          case POLICY_STATUS.QUEUED:
+          case POLICY_STATUS.RUNNING:
             pending += 1;
             break;
+          case POLICY_STATUS.NOT_APPLICABLE:
+            break;
           default:
+            failed += 1;
+            notPassing.push(describeStalledPolicy(record));
             break;
         }
       }
@@ -214,7 +265,9 @@ export function createAzureDevOpsScmTransport(
             : pending > 0
               ? ('pending' as const)
               : ('succeeded' as const);
-      return { total, succeeded, failed, pending, rollup };
+      return notPassing.length === 0
+        ? { total, succeeded, failed, pending, rollup }
+        : { total, succeeded, failed, pending, rollup, remedy: notPassing.join(' ') };
     } catch (error) {
       return unreadable(error instanceof Error ? error.message : String(error));
     }

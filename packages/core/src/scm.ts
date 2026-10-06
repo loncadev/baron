@@ -255,7 +255,9 @@ export interface CheckSummary {
   readonly unreadable?: readonly string[] | undefined;
   /**
    * What the caller can do about an incomplete view, in the provider's own terms — a permission to
-   * grant, or the fact that this adapter does not read that source yet.
+   * grant, or the fact that this adapter does not read that source yet. Also set when a check is
+   * counted as failed for a reason that waiting will not fix (an Azure policy that expired), because
+   * "failing checks" alone sends the caller looking for a broken build that does not exist.
    *
    * Provider knowledge, so the provider supplies it. A recipe telling an Azure user to grant
    * "Actions (Read)" is worse than saying nothing: those permissions do not exist there, the rollup
