@@ -1,3 +1,4 @@
+import type { CapabilityName } from './capabilities.js';
 import type { TransitionField } from './transition-fields.js';
 
 /** Base class for all Baron errors so callers can `instanceof BaronError`. */
@@ -133,6 +134,36 @@ export class TransitionNotPermittedError extends BaronError {
     );
   }
 }
+
+/**
+ * The role maps to a board column this particular item cannot be put in, and
+ * `gapPolicy.separateBoardColumn` is `error` (the default). Thrown before anything is written, so the
+ * item is exactly where it was.
+ *
+ * An item-level gap, unlike {@link CapabilityGapError}: the provider has board columns, this item
+ * just cannot reach that one — it sits on no board, or its board has no such column for its type.
+ * The reason is the provider's own, because only the provider knows where its columns live.
+ */
+export class BoardColumnUnreachableError extends BaronError {
+  constructor(
+    readonly id: string,
+    readonly role: string,
+    readonly column: string,
+    readonly provider: string,
+    readonly reason: string,
+  ) {
+    super(
+      `Cannot move ${id} to role '${role}': its board column '${column}' is out of reach on ` +
+        `'${provider}' — ${reason} Nothing was written. Fix the board or the role map, or set ` +
+        `gapPolicy.${BOARD_COLUMN_GAP} to 'degrade' to move the state alone with a warning.`,
+      'BOARD_COLUMN_UNREACHABLE',
+      { id, role, column, provider, reason },
+    );
+  }
+}
+
+/** The gap-policy key that decides what happens to a board column an item cannot take. */
+export const BOARD_COLUMN_GAP = 'separateBoardColumn' satisfies CapabilityName;
 
 /**
  * The provider will make this move, but not without fields the caller did not supply.

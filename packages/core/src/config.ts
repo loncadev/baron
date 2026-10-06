@@ -38,6 +38,12 @@ export interface ProviderRoleMap {
 export const ROLE_LABEL_KEY = 'label';
 
 /**
+ * The NativeTarget key that carries a board column distinct from the workflow state — only on a
+ * provider whose manifest declares `separateBoardColumn` (Azure).
+ */
+export const BOARD_COLUMN_KEY = 'boardColumn';
+
+/**
  * A label Baron provisions so a role's label exists deliberately — a named color and description —
  * instead of the grey, description-less label a provider auto-creates the first time it's applied.
  */

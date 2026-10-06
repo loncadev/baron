@@ -1,5 +1,5 @@
 import type { CapabilityManifest } from './capabilities.js';
-import type { NativeTarget, TypeMap } from './config.js';
+import { BOARD_COLUMN_KEY, type NativeTarget, type TypeMap } from './config.js';
 import type {
   IntrospectedState,
   IntrospectedType,
@@ -200,7 +200,7 @@ function matchStates(
         const probe = COLUMN_KEYWORDS[role];
         const column = probe ? matchColumn(introspection.boardColumns, probe) : undefined;
         if (column !== undefined) {
-          target.boardColumn = column;
+          target[BOARD_COLUMN_KEY] = column;
           notes.push(`Matched board column '${column}' to role '${role}' by keyword; confirm it.`);
         }
       }
