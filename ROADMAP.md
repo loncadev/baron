@@ -112,8 +112,11 @@ plugin skills, and the Docker image, on a fresh project against real providers �
 
 Scope discipline is a feature. These are decided, not pending:
 
-- **Agent orchestration.** Worktree isolation, parallel agent scheduling, and session supervision
-  belong to the harness. Baron sits underneath it and stays there.
+- **Session or runtime orchestration.** Worktree isolation, parallel session scheduling, sandboxes
+  and session supervision belong to the harness or the CI. Baron sits underneath them and stays
+  there. Decision #24 — *proposed*, settled by user interviews closing 2026-10-20 — would let Baron
+  dispatch one stage of a work item to an agent through the customer's own CI; it would move none
+  of the above into Baron.
 - **A memory engine.** Semantic search, embeddings, and decay are a solved and well-funded problem
   elsewhere. Baron's knowledge loop stays small and will carry work-item provenance instead —
   the one thing a general memory product structurally cannot know.

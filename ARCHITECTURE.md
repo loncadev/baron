@@ -60,6 +60,7 @@ deployment, not just work tracking (decision #17).
 | 23 | `trace` is a read model, not a port | "Where is this item, end to end" is answered by **composing the bound ports** on the canonical branch name the core already derives (`issue.trace` / `baron_issue_read op=trace`): issue → branch → most recent PR (any state) + checks → latest CI runs on the branch → most recent deployment whose ref is the branch. No adapter learns anything; a part a port cannot fill is `null` **and named in `missing`** with the reason. The join to a deployment of the merged commit is lossy (it carries the target branch's name) and says so. `actor` and `review` stay parked: `actor` needs an identity decision GitHub and Azure cannot express natively, `review` is a consuming-side product nobody has asked for |
 | 22 | Recipe durability | Every run is **journaled** (`.baron/runs/<id>.jsonl`, append-only: inputs, answers, each `do` with an idempotency key + its result) and **resumable** (`baron run --resume <id>`, `baron_recipe_run { resume }`): completed steps are replayed from the journal, never re-executed; a step's key includes its interpolated parameters, so changed inputs run again; a changed recipe refuses to resume. Compensation (`undo:` on a mutating step) is **deferred** until a real half-completed run gives it a shape |
 | 21 | Reference-flow fidelity & the local-git boundary | Built-ins mirror the **Beetegre-V2 reference flow**: `task-new` CREATES, `task-start` starts an **existing** item on its **core-derived canonical branch** (`<prefix>/<id>-<slug>`, from the type role — never invented, unset for containers), `task-finish` opens the PR **without moving the role** — what merge does is the PROVIDER's, not a Baron rule: a provider whose `done` is a closed state and whose native PR↔item link uses a closing keyword (GitHub `Closes #N`) closes the item on merge, landing it in `done`; one that only mentions the item (Azure `AB#N`) leaves it, and `task-move`/`task-sync` settles it. **Boundary:** Baron owns provider truth (work items, remote branches, PRs); the LOCAL working tree (status/fetch/switch/push) belongs to the harness/skill layer around the recipe call |
+| 24 | Work-state orchestration ("factory rails") — *Proposed* | Baron owns the **stage machine of a work item** and may **dispatch a stage** to a coding agent through a pluggable runner — by default the customer's own CI (`ci.run.trigger` of a pipeline template) using the customer's own model credentials. It never manages interactive sessions, worktrees, sandboxes or model access: isolation and compute stay with the CI or the harness. Autonomy is policy, not code: every provider mutation is `allow`, `approve` or `block` per type role, and an `approve` posts its question to the item and lets work that does not depend on the answer continue. Every agent-made change is journaled with a non-human actor. Narrows ROADMAP's "will not do: agent orchestration" to "session or runtime orchestration". Settled by user interviews closing 2026-10-20; see the section below |
 
 ## The semantic role layer (decision #4)
 
@@ -213,6 +214,60 @@ Meanwhile the highest-leverage work is unchanged and comes first: **adoption** �
 README that sells the single-pane pain in 60 seconds, and distribution — with $0-code monetization
 (GitHub Sponsors, paid support, hosted-beta waitlist) validating willingness-to-pay before any
 entitlement code is written.
+
+## Work-state orchestration (decision #24, proposed)
+
+Teams are moving from one agent in one session to fleets of agents working a backlog: triage,
+spec, implementation, review, verification, ship, monitor. The products that run those fleets
+split into two layers that already have owners — session orchestrators (parallel sessions,
+worktrees, diffs) and cloud control planes (sandboxes, model routing, benchmarks). The third layer
+has no open owner: the **state of the work** as it moves through the loop — which stage an item is
+in, who or what may move it, which gate it has to pass, and a record of every move. That is the
+layer Baron already is. Of the fifteen steps in a typical factory loop, nine are Baron primitives
+today; the rest are triggers, a stage vocabulary, a runner and measurement.
+
+The proposal comes from the project Baron was extracted from. Beetegre-V2 runs a semi-automated
+loop of its own (an orchestrator picks a parallel set by value and file overlap, agents implement
+in worktrees, two reviewers and a UI check gate the PR), and it does not use Baron, because the
+provider truth that loop needs — Taskboard columns, honest check rollups, verified links, open PRs
+and their files — was missing. #227–#239 close that gap first; this decision is about what comes
+after.
+
+**In scope**
+
+- **Stages over roles.** A factory's stages (needs-spec, needs-info, parked, verified…) are role
+  variants on the provider's real board (#231), not a second vocabulary beside the roles.
+- **An `agent` port.** `agent.run({ stage, brief, repo, branch, model, budget })` with a capability
+  manifest (headless, mcp, structured output, cost reporting, resume). First-class adapters for
+  Claude Code and Codex, and one generic Agent Client Protocol adapter for the rest.
+- **The runner is the customer's CI.** A stage is dispatched by triggering a pipeline template the
+  customer owns (`ci.run.trigger`), so isolation, secrets, logs and cost are theirs, on-prem
+  included. The agent writes to the tracker only through recipes (`mutations.channel:
+  recipe-only`).
+- **Autonomy as policy.** `mutations` rules — `allow` / `approve` / `block` — per primitive and type
+  role. An `approve` is Beetegre's BLOCKED contract made general: the agent finishes what does not
+  depend on the answer, the question goes to the item, and the run resumes from its journal (#22).
+- **A non-human actor** on every journaled change, so "what did agents do to our board" has an
+  answer.
+
+**Out of scope**
+
+- Hosting compute or sandboxes, a session GUI, reselling model access. Per the Claude Agent SDK
+  terms a product may not offer claude.ai login: Baron runs the user's own installed CLI on the
+  user's own machine or CI, or uses API keys.
+
+**Open questions, settled by the interviews rather than guessed**
+
+- Whether approvals come back through the tracker alone or also through chat (Teams, Slack).
+- Where a stage's budget comes from: a policy cap, the harness's own cost report, or both.
+- Whether the first runner template is Azure Pipelines or GitHub Actions.
+
+**How it is decided.** Ten interviews by 2026-10-20 — Azure DevOps teams, solo developers, teams
+building their own factories. At least three strong signals (a pilot date, a decision-maker
+introduced, an unprompted price question), one of them from an Azure DevOps team, turn this into
+an accepted decision. Otherwise it is withdrawn, and Baron positions as an open Azure DevOps and
+process component for the platforms that run factories, which the correctness work above serves
+either way.
 
 ## Repository layout
 
