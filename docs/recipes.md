@@ -39,6 +39,12 @@ step from its journaled result instead of executing it, and carries on from the 
 Each replay is said out loud in the messages (`Replayed scm.pr.create from run …`), and the result
 reports how many steps were replayed.
 
+One exception: **reads made after the last completed write are executed again** (`issue.get`,
+`issue.query`, `scm.pr.find`, `scm.pr.status`, and the other ops that change nothing). A run often
+stops because of what such a read returned, such as `task-land` finding checks still running, and
+replaying that answer would stop it the same way on every resume. Reads made *before* a completed
+write stay replayed, because that write's key was built from what they returned.
+
 What decides "already done" is the step's key: the run, the step's position (inside a `for_each`,
 per element), its op, and its **fully interpolated parameters**. A step whose parameters would now
 differ gets a new key and runs — a result produced under other conditions is never reused.

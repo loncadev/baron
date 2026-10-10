@@ -47,6 +47,29 @@ export function isRecipeOp(value: string): value is RecipeOp {
   return RECIPE_OP_VALUES.includes(value);
 }
 
+/**
+ * The ops that change nothing on a provider. A resumed run executes these again instead of
+ * replaying them (see `openJournal`). An op missing from this set is treated as a write, which only
+ * costs a stale answer on resume, never a repeated mutation.
+ */
+const READ_RECIPE_OPS: ReadonlySet<string> = new Set<RecipeOp>([
+  RECIPE_OPS.issueGet,
+  RECIPE_OPS.issueClassify,
+  RECIPE_OPS.issueWhoami,
+  RECIPE_OPS.issueIterations,
+  RECIPE_OPS.issueQuery,
+  RECIPE_OPS.issueTrace,
+  RECIPE_OPS.scmPrStatus,
+  RECIPE_OPS.scmPrFind,
+  RECIPE_OPS.deployDeployments,
+  RECIPE_OPS.learningQuery,
+  RECIPE_OPS.followupList,
+]);
+
+export function isReadOp(op: string): boolean {
+  return READ_RECIPE_OPS.has(op);
+}
+
 export const ASK_TYPES = ['text', 'confirm', 'choice'] as const;
 export type AskType = (typeof ASK_TYPES)[number];
 

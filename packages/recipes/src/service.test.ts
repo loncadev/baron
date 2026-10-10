@@ -250,12 +250,39 @@ describe('RecipeService runs are journaled', () => {
     const stopped = [...journal.runs.keys()].find((id) => id !== created.runId) as string;
     expect(journal.read(stopped)?.at(-1)).toMatchObject({ kind: 'error', op: 'scm.branch.create' });
 
-    // With the scm port bound, the same run finishes; the transition it already made is replayed.
+    // With the scm port bound, the same run finishes. It stopped before writing anything, so the
+    // reads it had made are taken again rather than replayed: the item may have moved meanwhile.
     const whole = createRecipeService(shared, ROOT, { journal });
     const resumed = await whole.resume(stopped);
     expect(resumed.runId).toBe(stopped);
-    expect(resumed.replayed).toBeGreaterThan(0);
+    expect(resumed.replayed).toBe(0);
     expect(journal.read(stopped)?.at(-1)).toMatchObject({ kind: 'end' });
+  });
+
+  it('replays the pull request a stopped task-finish already opened, instead of opening another', async () => {
+    const journal = createMemoryRunJournal();
+    const shared = ports();
+    const issueId = (
+      (
+        await createRecipeService(shared, ROOT, { journal }).run('task-new', {
+          title: 'Finish me',
+          typeRole: 'task',
+        })
+      ).context.issue as { id: string }
+    ).id;
+    // No issues port: task-finish opens the PR, then stops at the comment on the item.
+    const half = createRecipeService(
+      { ...(shared.scm !== undefined ? { scm: shared.scm } : {}) },
+      ROOT,
+      { journal },
+    );
+    const inputs = { issueId, branch: 'feature/finish-me', title: 'Finish me', body: 'b' };
+    await expect(half.run('task-finish', inputs)).rejects.toMatchObject({ code: 'PORT_UNBOUND' });
+    const stopped = [...journal.runs.keys()].at(-1) as string;
+
+    const resumed = await createRecipeService(shared, ROOT, { journal }).resume(stopped);
+    expect(resumed.replayed).toBeGreaterThan(0);
+    expect(resumed.notes.some((n) => n.startsWith('Replayed scm.pr.create'))).toBe(true);
   });
 
   it('refuses to resume a run it never journaled', async () => {

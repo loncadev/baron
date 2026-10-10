@@ -251,6 +251,104 @@ steps:
     ]);
   });
 
+  it('resumes an optional ask answered with nothing as absent, not as null', async () => {
+    const journal = createMemoryRunJournal();
+    const real = issuesPort();
+    let refuse = true;
+    // The first create is refused, as a provider refuses a credential it does not accept.
+    const issues = new Proxy(real, {
+      get(target, prop, receiver) {
+        const value = Reflect.get(target, prop, receiver);
+        if (prop !== 'create' || typeof value !== 'function') return value;
+        return (...args: unknown[]) => {
+          if (refuse) throw new Error('Resource not accessible by personal access token');
+          return Reflect.apply(value, target, args);
+        };
+      },
+    });
+    const recipe = loadRecipe(`
+name: optional-answer
+steps:
+  - ask: { as: title, type: text, message: "Title?" }
+  - ask: { as: parentId, type: text, message: "Parent?", optional: true }
+  - do: issue.create
+    as: issue
+    with:
+      title: \${title}
+      typeRole: task
+      parentId: \${parentId}
+`);
+    await expect(
+      runRecipe(recipe, {
+        ports: { issues },
+        asker: asker(['Orphan', undefined]),
+        run: { id: 'opt-1', journal },
+      }),
+    ).rejects.toMatchObject({ details: { run: { op: 'issue.create' } } });
+
+    refuse = false;
+    const resumed = await runRecipe(recipe, {
+      ports: { issues },
+      asker: asker([]), // asking again would throw: the empty answer counts as given
+      run: { id: 'opt-1', journal, resume: true },
+    });
+    expect(resumed.context.parentId).toBeUndefined();
+    expect(resumed.context.issue).toMatchObject({ title: 'Orphan' });
+  });
+
+  it('reads again on resume what it read after its last write, and replays earlier reads', async () => {
+    const journal = createMemoryRunJournal();
+    const issues = counted(issuesPort());
+    // `first` is read between two writes: the second write's key is built from it, so it must be
+    // replayed. `fresh` is read after the last write and decides whether the run may go on.
+    const recipe = loadRecipe(`
+name: gate-on-read
+steps:
+  - do: issue.create
+    as: parent
+    with: { title: "pending", typeRole: task }
+  - do: issue.get
+    as: first
+    with: { id: "\${parent.id}" }
+  - do: issue.create
+    as: child
+    with: { title: "\${first.title}", typeRole: task }
+  - do: issue.get
+    as: fresh
+    with: { id: "\${child.id}" }
+  - require:
+      notEquals: ["\${fresh.title}", "pending"]
+      message: "still pending"
+  - message: "went on with \${fresh.title}"
+`);
+    await expect(
+      runRecipe(recipe, {
+        ports: { issues: issues.port },
+        asker: asker(),
+        run: { id: 'g-1', journal },
+      }),
+    ).rejects.toMatchObject({ code: 'RECIPE_REQUIRE' });
+
+    const parent = (journal.read('g-1') ?? []).find((e) => e.kind === 'do' && e.path === '0') as {
+      result: { id: string };
+    };
+    const child = (journal.read('g-1') ?? []).find((e) => e.kind === 'do' && e.path === '2') as {
+      result: { id: string };
+    };
+    await issues.port.update(parent.result.id, { title: 'renamed' });
+    await issues.port.update(child.result.id, { title: 'ready' });
+
+    const resumed = await runRecipe(recipe, {
+      ports: { issues: issues.port },
+      asker: asker(),
+      run: { id: 'g-1', journal, resume: true },
+    });
+    expect(resumed.notes).toContain('went on with ready');
+    expect((resumed.context.first as { title: string }).title).toBe('pending');
+    expect(issues.calls.get('create')).toBe(2);
+    expect(resumed.replayed).toBe(3);
+  });
+
   it("wraps a provider's own error so it carries the run and the notes too", async () => {
     const journal = createMemoryRunJournal();
     const issues = new Proxy(issuesPort(), {

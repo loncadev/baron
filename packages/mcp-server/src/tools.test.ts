@@ -835,12 +835,32 @@ describe('callRecipeTool', () => {
     expect(stopped.content[0]?.text).toContain(`Run ${run.id} stopped at scm.branch.create`);
     expect(stopped.content[0]?.text).toContain(`baron_recipe_run { resume: "${run.id}" }`);
 
-    const whole = createRecipeService({ issues, scm: scmPort() }, RECIPE_ROOT, { journal });
+    const scm = scmPort();
+    const whole = createRecipeService({ issues, scm }, RECIPE_ROOT, { journal });
     const resumed = await callRecipeTool(whole, RECIPE_TOOL_NAMES.run, { resume: run.id });
     expect(resumed.isError).toBeUndefined();
     expect(parse(resumed.content[0]?.text ?? '{}').runId).toBe(run.id);
+
+    // task-finish without issues opens the PR, then stops at the comment on the item.
+    const finishing = await callRecipeTool(
+      createRecipeService({ scm }, RECIPE_ROOT, { journal }),
+      RECIPE_TOOL_NAMES.run,
+      {
+        name: 'task-finish',
+        inputs: {
+          issueId: (context.issue as { id: string }).id,
+          branch: 'feature/resumable',
+          title: 'Resumable',
+          body: 'b',
+        },
+      },
+    );
+    expect(finishing.isError).toBe(true);
+    const finish = (finishing.structuredContent?.details as { run: { id: string } }).run;
+    const finished = await callRecipeTool(whole, RECIPE_TOOL_NAMES.run, { resume: finish.id });
+    expect(finished.isError).toBeUndefined();
     // The replay is said out loud in the notes block, so the agent knows nothing was repeated.
-    expect(resumed.content[1]?.text).toContain('Replayed');
+    expect(finished.content[1]?.text).toContain('Replayed scm.pr.create');
   });
 
   it('rejects a missing recipe name as INVALID_ARGS', async () => {

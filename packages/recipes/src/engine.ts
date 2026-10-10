@@ -50,6 +50,7 @@ import {
   isDoStep,
   isForEachStep,
   isMessageStep,
+  isReadOp,
   isRequireStep,
 } from './recipe.js';
 
@@ -624,6 +625,11 @@ interface JournalState {
   readonly journal: RunJournalStore;
   /** Completed `do` steps of the run being resumed, by idempotency key. */
   readonly done: ReadonlyMap<string, DoEntry>;
+  /**
+   * Asks the resumed run answered with nothing. They are kept out of the context, because a null
+   * there reaches a step as a value and fails its validation, where the first run passed nothing.
+   */
+  readonly answeredEmpty: ReadonlySet<string>;
   replayed: number;
   /** The step executing right now, so an error entry can say where the run stopped. */
   current?: { readonly path: string; readonly op: string } | undefined;
@@ -637,6 +643,7 @@ interface JournalState {
 function openJournal(recipe: Recipe, run: RunJournalOptions, context: RecipeContext): JournalState {
   const fingerprint = recipeFingerprint(recipe);
   const done = new Map<string, DoEntry>();
+  const answeredEmpty = new Set<string>();
   if (run.resume !== true) {
     run.journal.append(run.id, {
       kind: 'start',
@@ -646,7 +653,7 @@ function openJournal(recipe: Recipe, run: RunJournalOptions, context: RecipeCont
       fingerprint,
       inputs: { ...context },
     });
-    return { id: run.id, journal: run.journal, done, replayed: 0 };
+    return { id: run.id, journal: run.journal, done, answeredEmpty, replayed: 0 };
   }
 
   const entries = run.journal.read(run.id);
@@ -673,12 +680,26 @@ function openJournal(recipe: Recipe, run: RunJournalOptions, context: RecipeCont
   }
   // Inputs first, then the answers given along the way; an ask restored here is not asked again.
   Object.assign(context, start.inputs);
-  for (const entry of entries) {
-    if (entry.kind === 'ask') context[entry.as] = entry.value;
-    if (entry.kind === 'do') done.set(entry.key, entry);
+  // Reads after the last completed write are executed again rather than replayed. The run stopped
+  // after them, often because of what they returned (checks still pending), so replaying them would
+  // stop it the same way forever. Nothing done depends on them yet, so a fresh answer is safe.
+  // Earlier reads stay replayed: a later write's key is built from what they returned, and a
+  // changed answer would change that key and repeat the write.
+  let lastWrite = -1;
+  for (const [index, entry] of entries.entries()) {
+    if (entry.kind === 'do' && !isReadOp(entry.op)) lastWrite = index;
+  }
+  for (const [index, entry] of entries.entries()) {
+    if (entry.kind === 'ask') {
+      if (entry.value === null || entry.value === undefined) answeredEmpty.add(entry.as);
+      else context[entry.as] = entry.value;
+    }
+    if (entry.kind === 'do' && (index < lastWrite || !isReadOp(entry.op))) {
+      done.set(entry.key, entry);
+    }
   }
   run.journal.append(run.id, { kind: 'resume', at: now() });
-  return { id: run.id, journal: run.journal, done, replayed: 0 };
+  return { id: run.id, journal: run.journal, done, answeredEmpty, replayed: 0 };
 }
 
 /** The code a provider's own error (not a BaronError) is reported under when a step throws it. */
@@ -736,6 +757,7 @@ async function runSteps(
     if (isAskStep(step)) {
       const { as, type, message, choices, optional } = step.ask;
       if (context[as] !== undefined) continue; // pre-seeded; don't re-ask
+      if (state?.answeredEmpty.has(as) === true) continue;
       if (type === 'confirm') {
         context[as] = await options.asker.confirm(message);
       } else if (type === 'choice') {
