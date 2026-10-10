@@ -26,4 +26,3 @@ mcp-publisher.exe
 # they stay out of this public repo.
 dogfood/
 .baron/runs/
-!.baron/credentials.example
