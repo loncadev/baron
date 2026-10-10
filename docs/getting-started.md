@@ -27,7 +27,7 @@ You do **not** clone Baron or run a build — everything is published to npm and
 From inside your project (so Baron can read your git remote), run:
 
 ```bash
-npx -y @lonca/baron-cli@latest init --provider github     # or: --provider azure-devops
+npx -y @zanaat/baron-cli@latest init --provider github     # or: --provider azure-devops
 ```
 
 `init` does the whole setup:
@@ -75,8 +75,8 @@ Pick up new releases with `/plugin marketplace update baron` && `/plugin update 
 ## 2b. Or drive it from the CLI
 
 ```bash
-npx -y @lonca/baron-cli@latest doctor      # validate the policy against the live provider (drift → exit 1)
-npx -y @lonca/baron-cli@latest run --recipe task-start
+npx -y @zanaat/baron-cli@latest doctor      # validate the policy against the live provider (drift → exit 1)
+npx -y @zanaat/baron-cli@latest run --recipe task-start
 ```
 
 `doctor` reports a mapped native state/type/column that no longer exists (exit `0` = no drift).

@@ -35,15 +35,15 @@ import {
   isWorkItemTypeRole,
   isWorkflowRole,
   traceIssue,
-} from '@lonca/baron-core';
+} from '@zanaat/baron-core';
 import {
   FOLLOWUP_STATUSES,
   type FollowupStatus,
   type KnowledgeLoop,
   isFollowupStatus,
-} from '@lonca/baron-knowledge-loop';
-import type { NativeRequest, NativeResponse } from '@lonca/baron-providers';
-import type { RecipeService } from '@lonca/baron-recipes';
+} from '@zanaat/baron-knowledge-loop';
+import type { NativeRequest, NativeResponse } from '@zanaat/baron-providers';
+import type { RecipeService } from '@zanaat/baron-recipes';
 import {
   CONSOLIDATED_CI_DEFINITIONS,
   CONSOLIDATED_DEPLOY_DEFINITIONS,

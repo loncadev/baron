@@ -6,7 +6,7 @@ import {
   type Logger,
   type ProviderRoleMap,
   type TypeMap,
-} from '@lonca/baron-core';
+} from '@zanaat/baron-core';
 import { LINEAR_PROVIDER, LINEAR_STATE_KEY } from './provider.js';
 
 /**

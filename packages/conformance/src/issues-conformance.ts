@@ -9,7 +9,7 @@ import {
   RoleMappingError,
   type TypeMap,
   type WorkflowRole,
-} from '@lonca/baron-core';
+} from '@zanaat/baron-core';
 import { describe, expect, it } from 'vitest';
 
 export interface IssuesConformanceTarget {

@@ -9,8 +9,8 @@ import {
   parsePolicyJson,
   requiredCredentialCapabilities,
   resolveIssuesConfig,
-} from '@lonca/baron-core';
-import { type Env, getProviderDescriptor } from '@lonca/baron-providers';
+} from '@zanaat/baron-core';
+import { type Env, getProviderDescriptor } from '@zanaat/baron-providers';
 import { policyPath } from './paths.js';
 import type { FileSystem } from './ports.js';
 

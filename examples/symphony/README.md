@@ -43,8 +43,8 @@ otherwise spell out in prose live inside Baron's recipes.
 1. Configure Baron in the repository Symphony will clone:
 
    ```bash
-   npx -y @lonca/baron-cli@latest init --provider github   # or: --provider azure-devops
-   npx -y @lonca/baron-cli@latest doctor
+   npx -y @zanaat/baron-cli@latest init --provider github   # or: --provider azure-devops
+   npx -y @zanaat/baron-cli@latest doctor
    ```
 
    `.baron/policy.json` is committed; credentials are not. A fresh Symphony workspace clones the repo

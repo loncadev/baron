@@ -1,5 +1,5 @@
-import { BaronError, type BaronPolicyFile, serializePolicy } from '@lonca/baron-core';
-import { BUILTIN_RECIPE_NAMES } from '@lonca/baron-recipes';
+import { BaronError, type BaronPolicyFile, serializePolicy } from '@zanaat/baron-core';
+import { BUILTIN_RECIPE_NAMES } from '@zanaat/baron-recipes';
 import { describe, expect, it } from 'vitest';
 import { memoryFileSystem, scriptedAsker } from './fakes.js';
 import { policyPath } from './paths.js';

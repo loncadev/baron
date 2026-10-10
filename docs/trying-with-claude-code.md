@@ -35,7 +35,7 @@ Claude Code reads a project's `.mcp.json`. Create **`BeeMaster/.mcp.json`**:
   "mcpServers": {
     "baron": {
       "command": "npx",
-      "args": ["-y", "@lonca/baron-mcp-server@latest"],
+      "args": ["-y", "@zanaat/baron-mcp-server@latest"],
       // Point the server at THIS project; it reads <root>/.baron/policy.json + credentials.
       // Omit to use the working directory. The explicit @latest matters: a bare package name makes
       // npx reuse its cached install without re-checking the registry, pinning you to a stale version.

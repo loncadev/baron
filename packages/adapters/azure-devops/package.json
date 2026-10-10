@@ -1,6 +1,6 @@
 {
-  "name": "@lonca/baron-adapter-azure-devops",
-  "version": "0.43.0",
+  "name": "@zanaat/baron-adapter-azure-devops",
+  "version": "0.44.0",
   "type": "module",
   "license": "Apache-2.0",
   "main": "./src/index.ts",
@@ -24,11 +24,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@lonca/baron-core": "workspace:*",
+    "@zanaat/baron-core": "workspace:*",
     "azure-devops-node-api": "^15.1.2"
   },
   "devDependencies": {
-    "@lonca/baron-conformance": "workspace:*",
+    "@zanaat/baron-conformance": "workspace:*",
     "@types/node": "^22.0.0"
   },
   "description": "Baron adapter for Azure DevOps: issues, scm, ci, deploy.",

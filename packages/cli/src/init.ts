@@ -11,7 +11,7 @@ import {
   parsePolicy,
   proposePolicy,
   serializePolicy,
-} from '@lonca/baron-core';
+} from '@zanaat/baron-core';
 import {
   type Env,
   GITHUB_PROVIDER,
@@ -20,7 +20,7 @@ import {
   getProviderDescriptor,
   mergeCredentials,
   parseCredentials,
-} from '@lonca/baron-providers';
+} from '@zanaat/baron-providers';
 import { openInBrowser } from './open-browser.js';
 import {
   BARON_DIR,

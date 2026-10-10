@@ -4,8 +4,8 @@ import {
   exampleGithubRoleMap,
   exampleGithubTypeMap,
   recommendedGithubGapPolicy,
-} from '@lonca/baron-adapter-github';
-import { createMemoryScmTransport, createMemoryTransport } from '@lonca/baron-conformance';
+} from '@zanaat/baron-adapter-github';
+import { createMemoryScmTransport, createMemoryTransport } from '@zanaat/baron-conformance';
 import { describe, expect, it } from 'vitest';
 import type { RecipePorts } from './engine.js';
 import { createMemoryRunJournal } from './journal.js';

@@ -1,4 +1,4 @@
-# @lonca/baron-knowledge-loop
+# @zanaat/baron-knowledge-loop
 
 Baron knowledge loop: durable learnings and follow-ups with a pluggable store.
 
@@ -8,7 +8,7 @@ one pane of glass (issues, scm, ci, deploy, notify) across providers, via MCP + 
 ## Install
 
 ```bash
-npm install @lonca/baron-knowledge-loop
+npm install @zanaat/baron-knowledge-loop
 ```
 
 ## Documentation

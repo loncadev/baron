@@ -1,12 +1,12 @@
-import { BaronError, parsePolicyJson } from '@lonca/baron-core';
-import { createLocalKnowledgeLoop } from '@lonca/baron-knowledge-loop';
+import { BaronError, parsePolicyJson } from '@zanaat/baron-core';
+import { createLocalKnowledgeLoop } from '@zanaat/baron-knowledge-loop';
 import {
   type Env,
   buildPorts,
   credentialsPath,
   knowledgeDir,
   upsertCredentials,
-} from '@lonca/baron-providers';
+} from '@zanaat/baron-providers';
 import {
   RUN_NOT_FOUND,
   type RecipeAsker,
@@ -18,7 +18,7 @@ import {
   newRunId,
   resolveRecipeByName,
   runRecipe,
-} from '@lonca/baron-recipes';
+} from '@zanaat/baron-recipes';
 import { policyPath } from './paths.js';
 import type { FileSystem } from './ports.js';
 

@@ -1,5 +1,5 @@
-import { createMemoryCiTransport } from '@lonca/baron-conformance';
-import type { NativeRun } from '@lonca/baron-core';
+import { createMemoryCiTransport } from '@zanaat/baron-conformance';
+import type { NativeRun } from '@zanaat/baron-core';
 import { describe, expect, it } from 'vitest';
 import { defineAzureDevOpsCiAdapter } from './ci.js';
 

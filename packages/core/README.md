@@ -1,4 +1,4 @@
-# @lonca/baron-core
+# @zanaat/baron-core
 
 Baron core: capability-port contracts, the semantic role layer, and adapter base classes.
 
@@ -8,7 +8,7 @@ one pane of glass (issues, scm, ci, deploy, notify) across providers, via MCP + 
 ## Install
 
 ```bash
-npm install @lonca/baron-core
+npm install @zanaat/baron-core
 ```
 
 ## Documentation

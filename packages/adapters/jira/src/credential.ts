@@ -1,4 +1,4 @@
-import type { CredentialCapability, CredentialFinding, CredentialProbe } from '@lonca/baron-core';
+import type { CredentialCapability, CredentialFinding, CredentialProbe } from '@zanaat/baron-core';
 import { normalizeSite } from './site.js';
 
 export interface JiraCredentialProbeOptions {

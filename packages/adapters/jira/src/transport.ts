@@ -1,4 +1,4 @@
-import { BaronError } from '@lonca/baron-core';
+import { BaronError } from '@zanaat/baron-core';
 import type {
   IssuesTransport,
   Iteration,
@@ -10,7 +10,7 @@ import type {
   NativeUpdateInput,
   TransitionField,
   TransitionFields,
-} from '@lonca/baron-core';
+} from '@zanaat/baron-core';
 import { JIRA_STATE_KEY } from './provider.js';
 import { normalizeSite } from './site.js';
 

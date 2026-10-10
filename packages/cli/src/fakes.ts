@@ -1,5 +1,5 @@
-import { BARON_DIR } from '@lonca/baron-providers';
-import type { RecipeAsker } from '@lonca/baron-recipes';
+import { BARON_DIR } from '@zanaat/baron-providers';
+import type { RecipeAsker } from '@zanaat/baron-recipes';
 import type { FileSystem, Prompter } from './ports.js';
 
 /** In-memory {@link FileSystem} keyed by exact path; directories are not modelled (mkdirp is a no-op). */

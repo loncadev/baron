@@ -8,7 +8,7 @@ import {
   type NativeQuery,
   type NativeTarget,
   type NativeUpdateInput,
-} from '@lonca/baron-core';
+} from '@zanaat/baron-core';
 import type { Octokit } from 'octokit';
 import { createGithubOctokit } from './octokit.js';
 

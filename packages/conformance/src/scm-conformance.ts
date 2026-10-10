@@ -3,7 +3,7 @@ import {
   type GapPolicy,
   type RecordingLogger,
   type ScmPort,
-} from '@lonca/baron-core';
+} from '@zanaat/baron-core';
 import { describe, expect, it } from 'vitest';
 
 export interface ScmConformanceTarget {

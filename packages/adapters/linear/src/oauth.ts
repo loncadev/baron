@@ -1,4 +1,4 @@
-import { BaronError } from '@lonca/baron-core';
+import { BaronError } from '@zanaat/baron-core';
 
 /**
  * What the PKCE sign-in writes and the transport reads back: the env keys a browser-issued Linear

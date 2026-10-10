@@ -1,4 +1,4 @@
-import { proposeRoleMap } from '@lonca/baron-core';
+import { proposeRoleMap } from '@zanaat/baron-core';
 import { describe, expect, it } from 'vitest';
 import { createLinearIntrospector, linearManifest } from './index.js';
 

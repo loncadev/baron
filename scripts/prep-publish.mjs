@@ -2,7 +2,7 @@
 // One-shot, idempotent codemod to make the workspace packages publish-ready to npm best practices:
 // adds repository/homepage/bugs/author/keywords/description, sets version 0.1.0, copies LICENSE into
 // each package (npm auto-includes it in the tarball), and writes a concise per-package README. Safe to
-// re-run. @lonca/baron-conformance is marked private (test-only; not published in v0.1.0 — see RELEASING.md).
+// re-run. @zanaat/baron-conformance is marked private (test-only; not published in v0.1.0 — see RELEASING.md).
 import {
   copyFileSync,
   existsSync,
@@ -25,51 +25,51 @@ const REPO = 'https://github.com/zanaat-dev/baron';
 const BASE_KEYWORDS = ['baron', 'ai-agents', 'mcp', 'work-orchestration', 'devops'];
 
 const META = {
-  '@lonca/baron-core': {
+  '@zanaat/baron-core': {
     description:
       'Baron core: capability-port contracts, the semantic role layer, and adapter base classes.',
     keywords: ['ports', 'roles'],
   },
-  '@lonca/baron-providers': {
+  '@zanaat/baron-providers': {
     description:
       'Baron provider registry: builds the live ports a policy binds, plus the native escape hatch.',
     keywords: ['providers', 'policy'],
   },
-  '@lonca/baron-recipes': {
+  '@zanaat/baron-recipes': {
     description:
       'Baron recipe engine: run declarative YAML workflows over Baron primitives, deterministically.',
     keywords: ['recipes', 'workflows', 'yaml'],
   },
-  '@lonca/baron-cli': {
+  '@zanaat/baron-cli': {
     description:
       'Baron CLI: introspect a provider, validate the policy, and run recipes (baron init / doctor / run).',
     keywords: ['cli'],
     bin: true,
   },
-  '@lonca/baron-mcp-server': {
+  '@zanaat/baron-mcp-server': {
     description:
       'Baron MCP server: drive issues, scm, ci, deploy, and notify across providers from any MCP client.',
     keywords: ['mcp', 'model-context-protocol', 'claude', 'server'],
     bin: true,
   },
-  '@lonca/baron-knowledge-loop': {
+  '@zanaat/baron-knowledge-loop': {
     description: 'Baron knowledge loop: durable learnings and follow-ups with a pluggable store.',
     keywords: ['knowledge', 'learnings'],
   },
-  '@lonca/baron-conformance': {
+  '@zanaat/baron-conformance': {
     description: 'Baron adapter conformance suite and in-memory transports (test support).',
     keywords: ['conformance', 'testing'],
     private: true,
   },
-  '@lonca/baron-adapter-azure-devops': {
+  '@zanaat/baron-adapter-azure-devops': {
     description: 'Baron adapter for Azure DevOps: issues, scm, ci, deploy.',
     keywords: ['azure-devops', 'adapter'],
   },
-  '@lonca/baron-adapter-github': {
+  '@zanaat/baron-adapter-github': {
     description: 'Baron adapter for GitHub: issues, scm, ci, deploy.',
     keywords: ['github', 'adapter'],
   },
-  '@lonca/baron-adapter-slack': {
+  '@zanaat/baron-adapter-slack': {
     description: 'Baron adapter for Slack: notify.',
     keywords: ['slack', 'adapter', 'notify'],
   },
@@ -86,11 +86,11 @@ function findPackages(dir, out = []) {
 }
 
 function readme(name, meta, relDir) {
-  const short = name.replace('@lonca/baron-', '');
+  const short = name.replace('@zanaat/baron-', '');
   const install = meta.bin
     ? short === 'cli'
-      ? '```bash\nnpm install -g @lonca/baron-cli   # then: baron --help\n```'
-      : '```bash\nnpx -y @lonca/baron-mcp-server\n```'
+      ? '```bash\nnpm install -g @zanaat/baron-cli   # then: baron --help\n```'
+      : '```bash\nnpx -y @zanaat/baron-mcp-server\n```'
     : `\`\`\`bash\nnpm install ${name}\n\`\`\``;
   return `# ${name}
 
@@ -125,8 +125,8 @@ for (const pkgPath of findPackages(join(ROOT, 'packages'))) {
 
   pkg.version = VERSION;
   // Ship only build output — never src (which would drag *.test.ts + the vitest devDep into the
-  // tarball). @lonca/baron-recipes additionally ships its packaged recipe YAML, read at runtime.
-  pkg.files = pkg.name === '@lonca/baron-recipes' ? ['dist', 'recipes'] : ['dist'];
+  // tarball). @zanaat/baron-recipes additionally ships its packaged recipe YAML, read at runtime.
+  pkg.files = pkg.name === '@zanaat/baron-recipes' ? ['dist', 'recipes'] : ['dist'];
   pkg.description = meta.description;
   pkg.keywords = [...new Set([...BASE_KEYWORDS, ...(meta.keywords ?? [])])];
   pkg.author = 'Baron contributors';

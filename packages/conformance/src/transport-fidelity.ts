@@ -1,4 +1,4 @@
-import type { CapabilityManifest, CapabilityName, IssuesTransport } from '@lonca/baron-core';
+import type { CapabilityManifest, CapabilityName, IssuesTransport } from '@zanaat/baron-core';
 import { describe, expect, it } from 'vitest';
 
 export interface TransportFidelityTarget {

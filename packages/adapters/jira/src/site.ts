@@ -1,4 +1,4 @@
-import { BaronError } from '@lonca/baron-core';
+import { BaronError } from '@zanaat/baron-core';
 
 /**
  * Turn whatever a person typed for JIRA_SITE into the root every request is built on.

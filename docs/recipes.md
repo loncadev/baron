@@ -267,5 +267,5 @@ item on merge lands it in `done`; elsewhere `task-move` / `task-sync` settles it
   notify (`notify`) in one run.
 
 Built-ins run by name with no file at all; to adapt one, copy it out of the
-`@lonca/baron-recipes` package (or this repository's `packages/recipes/recipes/`) into `.baron/recipes/` as a starting point for your own; project recipes there are
+`@zanaat/baron-recipes` package (or this repository's `packages/recipes/recipes/`) into `.baron/recipes/` as a starting point for your own; project recipes there are
 runnable by name too.

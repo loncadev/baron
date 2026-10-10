@@ -3,19 +3,19 @@
 // Workspace packages resolve to SOURCE in dev (`main: ./src/index.ts`) and to `dist` only once
 // published — `publishConfig` is what flips them, and `pnpm publish` applies it for us. A container
 // image is a private publish in all but name: `pnpm deploy` copies the packages exactly as they sit
-// on disk, which means in dev mode, and the first `import '@lonca/baron-core'` then hands Node a
+// on disk, which means in dev mode, and the first `import '@zanaat/baron-core'` then hands Node a
 // TypeScript file. The failure mode is nasty precisely because it is late — the image builds clean
 // and dies on start, which is what an indexer reads as a broken server.
 //
-// Walks the whole tree rather than the top-level `@lonca/*` links: pnpm keeps the real directories
-// under `node_modules/.pnpm/<pkg>/node_modules/@lonca/<name>`, so transitively-linked packages (the
+// Walks the whole tree rather than the top-level `@zanaat/*` links: pnpm keeps the real directories
+// under `node_modules/.pnpm/<pkg>/node_modules/@zanaat/<name>`, so transitively-linked packages (the
 // adapters, reached through baron-providers) live one level deeper and were missed by a scope-only
 // pass — visibly, as an ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING on the azure-devops adapter.
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /** Baron's own packages: the only ones whose on-disk manifests are in dev mode here. */
-const WORKSPACE_SCOPE = '@lonca/';
+const WORKSPACE_SCOPE = '@zanaat/';
 
 const root = process.argv[2];
 if (root === undefined) {

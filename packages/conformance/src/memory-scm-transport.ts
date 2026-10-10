@@ -9,7 +9,7 @@ import type {
   PrStateFilter,
   ReviewDecision,
   ScmTransport,
-} from '@lonca/baron-core';
+} from '@zanaat/baron-core';
 
 /**
  * In-memory stand-in for an `scm` transport. Deterministic and network-free so the scm conformance

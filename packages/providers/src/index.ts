@@ -12,7 +12,7 @@ import {
   createAzureDevOpsScmTransport,
   createAzureDevOpsTransport,
   exampleAzureDevOpsLinkMap,
-} from '@lonca/baron-adapter-azure-devops';
+} from '@zanaat/baron-adapter-azure-devops';
 import {
   BARON_GITHUB_CLIENT_ID,
   type DeviceAuth,
@@ -31,7 +31,7 @@ import {
   githubDeployStatusMaps,
   githubManifest,
   githubScmManifest,
-} from '@lonca/baron-adapter-github';
+} from '@zanaat/baron-adapter-github';
 import {
   JIRA_PROVIDER,
   createJiraCredentialProbe,
@@ -39,7 +39,7 @@ import {
   createJiraTransport,
   exampleJiraLinkMap,
   jiraManifest,
-} from '@lonca/baron-adapter-jira';
+} from '@zanaat/baron-adapter-jira';
 import {
   BARON_LINEAR_CLIENT_ID,
   LINEAR_CALLBACK_PORT_ENV,
@@ -54,12 +54,12 @@ import {
   exampleLinearLinkMap,
   linearCallbackUri,
   linearManifest,
-} from '@lonca/baron-adapter-linear';
+} from '@zanaat/baron-adapter-linear';
 import {
   SLACK_PROVIDER,
   createSlackNotifyTransport,
   slackNotifyManifest,
-} from '@lonca/baron-adapter-slack';
+} from '@zanaat/baron-adapter-slack';
 import {
   BaronError,
   type BaronPolicyFile,
@@ -93,7 +93,7 @@ import {
   type ScmTransport,
   parseGapPolicy,
   resolveIssuesConfig,
-} from '@lonca/baron-core';
+} from '@zanaat/baron-core';
 import {
   type NativeHttp,
   type NativeRequest,

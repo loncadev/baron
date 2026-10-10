@@ -1,8 +1,8 @@
-import { KNOWN_PROVIDERS, getProviderDescriptor } from '@lonca/baron-providers';
-import { BUILTIN_RECIPE_NAMES } from '@lonca/baron-recipes';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { KNOWN_PROVIDERS, getProviderDescriptor } from '@zanaat/baron-providers';
+import { BUILTIN_RECIPE_NAMES } from '@zanaat/baron-recipes';
 import { companionNotice } from './companion-check.js';
 import { type McpPorts, type ToolResult, activeToolDefinitions, dispatchTool } from './tools.js';
 import { startUpdateCheck } from './update-check.js';

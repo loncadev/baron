@@ -26,100 +26,100 @@ importers:
 
   packages/adapters/azure-devops:
     dependencies:
-      '@lonca/baron-core':
+      '@zanaat/baron-core':
         specifier: workspace:*
         version: link:../../core
       azure-devops-node-api:
         specifier: ^15.1.2
         version: 15.1.2
     devDependencies:
-      '@lonca/baron-conformance':
-        specifier: workspace:*
-        version: link:../../conformance
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.0
+      '@zanaat/baron-conformance':
+        specifier: workspace:*
+        version: link:../../conformance
 
   packages/adapters/github:
     dependencies:
-      '@lonca/baron-core':
+      '@zanaat/baron-core':
         specifier: workspace:*
         version: link:../../core
       octokit:
         specifier: ^5.0.5
         version: 5.0.5
     devDependencies:
-      '@lonca/baron-conformance':
-        specifier: workspace:*
-        version: link:../../conformance
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.0
+      '@zanaat/baron-conformance':
+        specifier: workspace:*
+        version: link:../../conformance
 
   packages/adapters/jira:
     dependencies:
-      '@lonca/baron-core':
+      '@zanaat/baron-core':
         specifier: workspace:*
         version: link:../../core
     devDependencies:
-      '@lonca/baron-conformance':
-        specifier: workspace:*
-        version: link:../../conformance
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.0
+      '@zanaat/baron-conformance':
+        specifier: workspace:*
+        version: link:../../conformance
 
   packages/adapters/linear:
     dependencies:
-      '@lonca/baron-core':
+      '@zanaat/baron-core':
         specifier: workspace:*
         version: link:../../core
     devDependencies:
-      '@lonca/baron-conformance':
-        specifier: workspace:*
-        version: link:../../conformance
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.0
+      '@zanaat/baron-conformance':
+        specifier: workspace:*
+        version: link:../../conformance
 
   packages/adapters/slack:
     dependencies:
-      '@lonca/baron-core':
+      '@zanaat/baron-core':
         specifier: workspace:*
         version: link:../../core
     devDependencies:
-      '@lonca/baron-conformance':
-        specifier: workspace:*
-        version: link:../../conformance
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.0
+      '@zanaat/baron-conformance':
+        specifier: workspace:*
+        version: link:../../conformance
 
   packages/cli:
     dependencies:
-      '@lonca/baron-core':
+      '@zanaat/baron-core':
         specifier: workspace:*
         version: link:../core
-      '@lonca/baron-knowledge-loop':
+      '@zanaat/baron-knowledge-loop':
         specifier: workspace:*
         version: link:../knowledge-loop
-      '@lonca/baron-providers':
+      '@zanaat/baron-providers':
         specifier: workspace:*
         version: link:../providers
-      '@lonca/baron-recipes':
+      '@zanaat/baron-recipes':
         specifier: workspace:*
         version: link:../recipes
     devDependencies:
-      '@lonca/baron-conformance':
-        specifier: workspace:*
-        version: link:../conformance
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.0
+      '@zanaat/baron-conformance':
+        specifier: workspace:*
+        version: link:../conformance
 
   packages/conformance:
     dependencies:
-      '@lonca/baron-core':
+      '@zanaat/baron-core':
         specifier: workspace:*
         version: link:../core
       vitest:
@@ -130,87 +130,87 @@ importers:
 
   packages/knowledge-loop:
     dependencies:
-      '@lonca/baron-core':
+      '@zanaat/baron-core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
-      '@lonca/baron-conformance':
-        specifier: workspace:*
-        version: link:../conformance
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.0
+      '@zanaat/baron-conformance':
+        specifier: workspace:*
+        version: link:../conformance
 
   packages/mcp-server:
     dependencies:
-      '@lonca/baron-core':
-        specifier: workspace:*
-        version: link:../core
-      '@lonca/baron-knowledge-loop':
-        specifier: workspace:*
-        version: link:../knowledge-loop
-      '@lonca/baron-providers':
-        specifier: workspace:*
-        version: link:../providers
-      '@lonca/baron-recipes':
-        specifier: workspace:*
-        version: link:../recipes
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
         version: 1.29.0(zod@4.4.3)
+      '@zanaat/baron-core':
+        specifier: workspace:*
+        version: link:../core
+      '@zanaat/baron-knowledge-loop':
+        specifier: workspace:*
+        version: link:../knowledge-loop
+      '@zanaat/baron-providers':
+        specifier: workspace:*
+        version: link:../providers
+      '@zanaat/baron-recipes':
+        specifier: workspace:*
+        version: link:../recipes
     devDependencies:
-      '@lonca/baron-adapter-github':
-        specifier: workspace:*
-        version: link:../adapters/github
-      '@lonca/baron-conformance':
-        specifier: workspace:*
-        version: link:../conformance
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.0
+      '@zanaat/baron-adapter-github':
+        specifier: workspace:*
+        version: link:../adapters/github
+      '@zanaat/baron-conformance':
+        specifier: workspace:*
+        version: link:../conformance
 
   packages/providers:
     dependencies:
-      '@lonca/baron-adapter-azure-devops':
+      '@zanaat/baron-adapter-azure-devops':
         specifier: workspace:*
         version: link:../adapters/azure-devops
-      '@lonca/baron-adapter-github':
+      '@zanaat/baron-adapter-github':
         specifier: workspace:*
         version: link:../adapters/github
-      '@lonca/baron-adapter-jira':
+      '@zanaat/baron-adapter-jira':
         specifier: workspace:*
         version: link:../adapters/jira
-      '@lonca/baron-adapter-linear':
+      '@zanaat/baron-adapter-linear':
         specifier: workspace:*
         version: link:../adapters/linear
-      '@lonca/baron-adapter-slack':
+      '@zanaat/baron-adapter-slack':
         specifier: workspace:*
         version: link:../adapters/slack
-      '@lonca/baron-core':
+      '@zanaat/baron-core':
         specifier: workspace:*
         version: link:../core
 
   packages/recipes:
     dependencies:
-      '@lonca/baron-core':
+      '@zanaat/baron-core':
         specifier: workspace:*
         version: link:../core
-      '@lonca/baron-knowledge-loop':
+      '@zanaat/baron-knowledge-loop':
         specifier: workspace:*
         version: link:../knowledge-loop
       yaml:
         specifier: ^2.6.0
         version: 2.9.0
     devDependencies:
-      '@lonca/baron-adapter-github':
-        specifier: workspace:*
-        version: link:../adapters/github
-      '@lonca/baron-conformance':
-        specifier: workspace:*
-        version: link:../conformance
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.0
+      '@zanaat/baron-adapter-github':
+        specifier: workspace:*
+        version: link:../adapters/github
+      '@zanaat/baron-conformance':
+        specifier: workspace:*
+        version: link:../conformance
 
 packages:
 

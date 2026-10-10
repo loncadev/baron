@@ -1,4 +1,4 @@
-import { CredentialPermissionError, type PortName } from '@lonca/baron-core';
+import { CredentialPermissionError, type PortName } from '@zanaat/baron-core';
 import { Octokit } from 'octokit';
 import { GITHUB_PROVIDER } from './provider.js';
 

@@ -43,7 +43,7 @@ export function formatServerBehindNotice(companion: string, server: string): str
   return (
     `⚠️ The Baron plugin here is v${companion} but this server is v${server}. Its skills may call ` +
     'recipes and tools this older server does not have. If your launcher uses ' +
-    '`@lonca/baron-mcp-server@latest`, restart the MCP server to pick the new one up; if it pins a ' +
+    '`@zanaat/baron-mcp-server@latest`, restart the MCP server to pick the new one up; if it pins a ' +
     'version, raise it.'
   );
 }

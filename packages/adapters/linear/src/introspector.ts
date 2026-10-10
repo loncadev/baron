@@ -1,5 +1,5 @@
-import type { Introspector, ProviderIntrospection, StateCategory } from '@lonca/baron-core';
-import { BaronError } from '@lonca/baron-core';
+import type { Introspector, ProviderIntrospection, StateCategory } from '@zanaat/baron-core';
+import { BaronError } from '@zanaat/baron-core';
 import { LINEAR_PROVIDER, LINEAR_STATE_KEY } from './provider.js';
 
 export interface LinearIntrospectorOptions {

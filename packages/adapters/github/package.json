@@ -1,6 +1,6 @@
 {
-  "name": "@lonca/baron-adapter-github",
-  "version": "0.43.0",
+  "name": "@zanaat/baron-adapter-github",
+  "version": "0.44.0",
   "type": "module",
   "license": "Apache-2.0",
   "main": "./src/index.ts",
@@ -24,11 +24,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@lonca/baron-core": "workspace:*",
+    "@zanaat/baron-core": "workspace:*",
     "octokit": "^5.0.5"
   },
   "devDependencies": {
-    "@lonca/baron-conformance": "workspace:*",
+    "@zanaat/baron-conformance": "workspace:*",
     "@types/node": "^22.0.0"
   },
   "description": "Baron adapter for GitHub: issues, scm, ci, deploy.",

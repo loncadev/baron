@@ -1,4 +1,4 @@
-import { CredentialPermissionError } from '@lonca/baron-core';
+import { CredentialPermissionError } from '@zanaat/baron-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Stub octokit: the conformance suite runs on the in-memory transport, so it cannot see what the

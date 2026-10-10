@@ -1,5 +1,5 @@
-import { GITHUB_PROVIDER } from '@lonca/baron-adapter-github';
-import { LINEAR_PROVIDER } from '@lonca/baron-adapter-linear';
+import { GITHUB_PROVIDER } from '@zanaat/baron-adapter-github';
+import { LINEAR_PROVIDER } from '@zanaat/baron-adapter-linear';
 import { describe, expect, it } from 'vitest';
 import { getProviderDescriptor } from './index.js';
 

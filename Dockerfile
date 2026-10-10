@@ -20,7 +20,7 @@ WORKDIR /src
 #
 # Globbed rather than enumerated. The list used to name every package by hand and broke the moment
 # one was added: adding the Linear adapter left it out, pnpm never linked the workspace for it, and
-# the image failed to build with "Cannot find module '@lonca/baron-core'" — a hand-kept list with
+# the image failed to build with "Cannot find module '@zanaat/baron-core'" — a hand-kept list with
 # nothing tying it to the packages that actually exist, which is the exact defect this repository
 # has spent its time removing everywhere else. `--parents` keeps the directory structure that a
 # plain glob would flatten.
@@ -34,7 +34,7 @@ RUN pnpm build
 # `deploy` resolves the workspace links into a self-contained tree, so the runtime stage needs no
 # pnpm and no workspace layout. --prod drops the dev toolchain (tsup, vitest, biome) that dominates
 # the install.
-RUN pnpm --filter @lonca/baron-mcp-server deploy --prod --legacy /app
+RUN pnpm --filter @zanaat/baron-mcp-server deploy --prod --legacy /app
 
 # The deployed tree is a private publish in all but name, so it needs the same transform a publish
 # applies. Without this the copied workspace packages stay in DEV mode and Node is handed TypeScript.

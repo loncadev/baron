@@ -1,4 +1,9 @@
-import { type CiPort, type GapPolicy, RUN_STATUSES, type RecordingLogger } from '@lonca/baron-core';
+import {
+  type CiPort,
+  type GapPolicy,
+  RUN_STATUSES,
+  type RecordingLogger,
+} from '@zanaat/baron-core';
 import { describe, expect, it } from 'vitest';
 
 export interface CiConformanceTarget {

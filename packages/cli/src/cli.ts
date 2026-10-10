@@ -6,15 +6,15 @@ import {
   resolveIssuesConfig,
   roleLabelSpecs,
   typeRoleLabelSpecs,
-} from '@lonca/baron-core';
+} from '@zanaat/baron-core';
 import {
   type Env,
   KNOWN_PROVIDERS,
   buildIssuesPort,
   credentialsPath,
   mergeCredentials,
-} from '@lonca/baron-providers';
-import { type RecipeAsker, newRunId } from '@lonca/baron-recipes';
+} from '@zanaat/baron-providers';
+import { type RecipeAsker, newRunId } from '@zanaat/baron-recipes';
 import { runDoctor } from './doctor.js';
 import { runInit } from './init.js';
 import { policyPath } from './paths.js';

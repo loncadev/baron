@@ -9,7 +9,7 @@ import type {
   NativeUpdateInput,
   TransitionField,
   TransitionFields,
-} from '@lonca/baron-core';
+} from '@zanaat/baron-core';
 
 interface Rec {
   id: string;

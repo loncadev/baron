@@ -4,8 +4,8 @@ import type {
   Introspector,
   ProviderIntrospection,
   StateCategory,
-} from '@lonca/baron-core';
-import { BaronError } from '@lonca/baron-core';
+} from '@zanaat/baron-core';
+import { BaronError } from '@zanaat/baron-core';
 import { JIRA_PROVIDER, JIRA_STATE_KEY } from './provider.js';
 import { normalizeSite } from './site.js';
 

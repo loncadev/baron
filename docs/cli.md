@@ -1,7 +1,7 @@
 # CLI
 
 The `baron` command has three subcommands. All side effects go through the policy in the current
-directory's `.baron/` (override the root with `--root`). Run it via `npx -y @lonca/baron-cli@latest …`,
+directory's `.baron/` (override the root with `--root`). Run it via `npx -y @zanaat/baron-cli@latest …`,
 or from a clone of this repo with `pnpm baron …` (a `tsx` runner is wired up).
 
 ```

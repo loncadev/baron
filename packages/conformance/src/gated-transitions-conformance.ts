@@ -5,7 +5,7 @@ import {
   type ProviderRoleMap,
   type TransitionField,
   TransitionFieldsRequiredError,
-} from '@lonca/baron-core';
+} from '@zanaat/baron-core';
 import { describe, expect, it } from 'vitest';
 import { createMemoryTransport } from './memory-transport.js';
 

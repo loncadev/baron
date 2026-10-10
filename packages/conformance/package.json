@@ -1,6 +1,6 @@
 {
-  "name": "@lonca/baron-conformance",
-  "version": "0.43.0",
+  "name": "@zanaat/baron-conformance",
+  "version": "0.44.0",
   "type": "module",
   "license": "Apache-2.0",
   "main": "./src/index.ts",
@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@lonca/baron-core": "workspace:*"
+    "@zanaat/baron-core": "workspace:*"
   },
   "peerDependencies": {
     "vitest": "^2.1.8"

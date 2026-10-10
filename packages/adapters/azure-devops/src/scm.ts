@@ -17,7 +17,7 @@ import {
   type ReviewDecision,
   type ScmManifest,
   type ScmTransport,
-} from '@lonca/baron-core';
+} from '@zanaat/baron-core';
 import * as azdev from 'azure-devops-node-api';
 import type { IPolicyApi } from 'azure-devops-node-api/PolicyApi.js';
 import {

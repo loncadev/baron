@@ -7,13 +7,13 @@ Open-core scope
 ---------------
 The OSS packages in this repository are licensed under Apache-2.0:
 
-  @lonca/baron-core, @lonca/baron-providers, @lonca/baron-recipes, @lonca/baron-cli,
-  @lonca/baron-mcp-server, @lonca/baron-knowledge-loop, @lonca/baron-conformance, and the
-  adapters @lonca/baron-adapter-azure-devops, @lonca/baron-adapter-github,
-  @lonca/baron-adapter-jira, @lonca/baron-adapter-linear, @lonca/baron-adapter-slack, plus the
+  @zanaat/baron-core, @zanaat/baron-providers, @zanaat/baron-recipes, @zanaat/baron-cli,
+  @zanaat/baron-mcp-server, @zanaat/baron-knowledge-loop, @zanaat/baron-conformance, and the
+  adapters @zanaat/baron-adapter-azure-devops, @zanaat/baron-adapter-github,
+  @zanaat/baron-adapter-jira, @zanaat/baron-adapter-linear, @zanaat/baron-adapter-slack, plus the
   Claude Code plugin under plugins/claude-code.
 
-  (@lonca/baron-conformance is licensed the same way but is not published: it is a devDependency
+  (@zanaat/baron-conformance is licensed the same way but is not published: it is a devDependency
   of the adapters and the CLI, never a runtime dependency of anything shipped.)
 
 Commercial-tier features (SSO, secret-manager integrations, multi-team governance, audit) are

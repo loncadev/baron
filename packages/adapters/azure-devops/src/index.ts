@@ -7,7 +7,7 @@ import {
   type Logger,
   type ProviderRoleMap,
   type TypeMap,
-} from '@lonca/baron-core';
+} from '@zanaat/baron-core';
 import { AZURE_DEVOPS_PROVIDER } from './provider.js';
 
 export { AZURE_DEVOPS_PROVIDER } from './provider.js';

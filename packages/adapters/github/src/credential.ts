@@ -3,7 +3,7 @@ import type {
   CredentialFinding,
   CredentialProbe,
   CredentialStatus,
-} from '@lonca/baron-core';
+} from '@zanaat/baron-core';
 import { acceptedPermission, createGithubOctokit } from './octokit.js';
 import type { GithubTransportOptions } from './transport.js';
 

@@ -1,4 +1,4 @@
-# @lonca/baron-mcp-server
+# @zanaat/baron-mcp-server
 
 Baron MCP server: drive issues, scm, ci, deploy, and notify across providers from any MCP client.
 
@@ -8,7 +8,7 @@ one pane of glass (issues, scm, ci, deploy, notify) across providers, via MCP + 
 ## Install
 
 ```bash
-npx -y @lonca/baron-mcp-server
+npx -y @zanaat/baron-mcp-server
 ```
 
 ## Documentation
