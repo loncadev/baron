@@ -23,3 +23,6 @@ examples
 **/*.test.ts
 **/*.md
 !README.md
+
+# The docs site is built and published by its own workflow; the server image never needs it.
+site

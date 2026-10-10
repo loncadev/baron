@@ -22,6 +22,7 @@ pnpm test          # vitest run (all packages)
 pnpm typecheck     # tsc --noEmit per package
 pnpm lint          # biome check
 pnpm lint:fix      # biome check --write
+pnpm --filter @zanaat/baron-site dev   # baron.zanaat.dev locally (landing page + docs/ via Starlight)
 ```
 
 Workspace packages resolve to **source** (`src/index.ts`) in dev — no build step needed to run

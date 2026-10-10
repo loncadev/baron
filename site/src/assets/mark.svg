@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="30" height="24" viewBox="0 0 30 24" role="img" aria-label="Baron">
+  <style>
+    svg { color: #8c97ab; }
+    @media (prefers-color-scheme: dark) { svg { color: #5b6984; } }
+  </style>
+  <!-- The rail: five role stops, in_progress lit, as on the landing page. -->
+  <g fill="currentColor">
+    <rect x="0" y="10" width="4" height="4" rx="1"/>
+    <rect x="6" y="10" width="4" height="4" rx="1"/>
+    <rect x="18" y="10" width="4" height="4" rx="1"/>
+    <rect x="24" y="10" width="4" height="4" rx="1"/>
+  </g>
+  <rect x="11.5" y="6" width="5" height="12" rx="1.5" fill="#e0901f"/>
+</svg>

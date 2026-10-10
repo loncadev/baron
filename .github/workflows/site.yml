@@ -1,0 +1,64 @@
+name: Site
+
+# baron.zanaat.dev: the landing page and docs/ through Starlight. A pull request that touches them
+# builds the site so a broken page fails review; main publishes it to GitHub Pages.
+on:
+  push:
+    branches: [main]
+    paths: ['site/**', 'docs/**', 'pnpm-lock.yaml', '.github/workflows/site.yml']
+  pull_request:
+    branches: [main]
+    paths: ['site/**', 'docs/**', 'pnpm-lock.yaml', '.github/workflows/site.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: site-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the site
+        run: pnpm --filter @zanaat/baron-site build
+
+      - name: Upload the Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site/dist
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    # Two pushes close together must not deploy over each other half way.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

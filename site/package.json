@@ -1,0 +1,22 @@
+{
+  "name": "@zanaat/baron-site",
+  "private": true,
+  "type": "module",
+  "description": "baron.zanaat.dev: the landing page and the docs (Astro + Starlight). Never published.",
+  "scripts": {
+    "sync-docs": "node scripts/sync-docs.mjs",
+    "predev": "pnpm run sync-docs",
+    "prebuild": "pnpm run sync-docs",
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "devDependencies": {
+    "@astrojs/starlight": "0.42.4",
+    "@fontsource-variable/bricolage-grotesque": "5.3.0",
+    "@fontsource/ibm-plex-mono": "5.3.0",
+    "@fontsource/ibm-plex-sans": "5.3.0",
+    "astro": "7.3.5",
+    "starlight-llms-txt": "0.12.0"
+  }
+}

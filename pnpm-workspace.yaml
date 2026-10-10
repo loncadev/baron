@@ -1,6 +1,7 @@
 packages:
   - "packages/*"
   - "packages/adapters/*"
+  - "site"
 
 # pnpm 11 refuses to install until every dependency with a build script has been ruled on. Both of
 # these ship their real binaries as optional platform packages; the scripts are only sanity checks,

@@ -1,0 +1,82 @@
+/*
+ * Direction A, "control room": ink-navy ground, one accent (rail-signal amber), mono for every label
+ * that names a role, a port or a command. Starlight's dark theme is :root; its light theme is
+ * [data-theme='light']. The landing page reads the same --baron-* tokens.
+ */
+:root {
+  --baron-ink: #0b1220;
+  --baron-surface: #111a2b;
+  --baron-line: #22304a;
+  --baron-text: #e6ebf3;
+  --baron-muted: #8c9ab3;
+  --baron-signal: #f2a33a;
+  --baron-signal-soft: #2a2213;
+  --baron-display: "Bricolage Grotesque Variable", "Segoe UI", system-ui, sans-serif;
+
+  --sl-font: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --sl-font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+
+  --sl-color-accent-low: #3a2a10;
+  --sl-color-accent: #d98a24;
+  --sl-color-accent-high: #f7c27a;
+  --sl-color-white: #ffffff;
+  --sl-color-gray-1: #e6ebf3;
+  --sl-color-gray-2: #c3ccdb;
+  --sl-color-gray-3: #8c9ab3;
+  --sl-color-gray-4: #5b6984;
+  --sl-color-gray-5: #22304a;
+  --sl-color-gray-6: #111a2b;
+  --sl-color-black: #0b1220;
+}
+
+:root[data-theme="light"] {
+  --baron-ink: #f7f8fa;
+  --baron-surface: #ffffff;
+  --baron-line: #d8dee8;
+  --baron-text: #121a27;
+  --baron-muted: #566178;
+  --baron-signal: #a85a08;
+  --baron-signal-soft: #fbeedd;
+
+  --sl-color-accent-low: #fbe6c8;
+  --sl-color-accent: #a85a08;
+  --sl-color-accent-high: #5c3104;
+  --sl-color-white: #121a27;
+  --sl-color-gray-1: #1d2738;
+  --sl-color-gray-2: #34405a;
+  --sl-color-gray-3: #566178;
+  --sl-color-gray-4: #8c97ab;
+  --sl-color-gray-5: #d8dee8;
+  --sl-color-gray-6: #eef1f5;
+  --sl-color-gray-7: #f7f8fa;
+  --sl-color-black: #ffffff;
+}
+
+h1,
+h2,
+h3,
+.sl-markdown-content :is(h1, h2, h3) {
+  font-family: var(--baron-display);
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.sl-markdown-content code:not(pre code) {
+  color: var(--sl-color-accent-high);
+}
+
+/* Sidebar group labels read as instrument labels. */
+.sidebar-content .group-label .large {
+  font-family: var(--sl-font-mono);
+  font-size: var(--sl-text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sl-color-gray-3);
+}
+
+.site-title {
+  font-family: var(--sl-font-mono);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+}
