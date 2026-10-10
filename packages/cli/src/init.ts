@@ -873,7 +873,7 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
   await options.afterWrite?.(path);
   options.prompter.note('Next steps:');
   options.prompter.note(
-    '  • Drive it from Claude Code: `/plugin marketplace add loncadev/baron` then `/plugin install baron@baron`.',
+    '  • Drive it from Claude Code: `/plugin marketplace add zanaat-dev/baron` then `/plugin install baron@baron`.',
   );
   options.prompter.note('  • Or validate the setup now: `baron doctor`.');
 

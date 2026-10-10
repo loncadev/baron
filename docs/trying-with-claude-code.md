@@ -16,7 +16,7 @@ is for configuring and for recipe runs; the MCP server is for letting Claude dri
 together (so they never drift), and updates in one step:
 
 ```
-/plugin marketplace add loncadev/baron
+/plugin marketplace add zanaat-dev/baron
 /plugin install baron@baron
 ```
 

@@ -4,7 +4,7 @@ Baron is the layer that lets your coding agent **write** to your work tracker â€
 running unchanged on Azure DevOps, GitHub, or Jira.
 
 This file states where Baron is going and, just as importantly, where it is not. Individual work
-is tracked as [GitHub issues](https://github.com/loncadev/baron/issues), grouped into the three
+is tracked as [GitHub issues](https://github.com/zanaat-dev/baron/issues), grouped into the three
 gates below. [ARCHITECTURE.md](./ARCHITECTURE.md) remains the source of truth for *why* the system
 is shaped the way it is; this file is only about sequence.
 

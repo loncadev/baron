@@ -29,7 +29,7 @@ export interface GithubDeviceAuthOptions {
 }
 
 /**
- * Baron's own OAuth App, registered under the `loncadev` org.
+ * Baron's own OAuth App, registered under the `zanaat-dev` org.
  *
  * Shipping an id is what makes the device flow actually happen: without one it is never offered, and
  * every user has to register an app before they can avoid registering a token — one chore for

@@ -21,7 +21,7 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const VERSION = JSON.parse(
   readFileSync(join(ROOT, 'packages/mcp-server/package.json'), 'utf8'),
 ).version;
-const REPO = 'https://github.com/loncadev/baron';
+const REPO = 'https://github.com/zanaat-dev/baron';
 const BASE_KEYWORDS = ['baron', 'ai-agents', 'mcp', 'work-orchestration', 'devops'];
 
 const META = {

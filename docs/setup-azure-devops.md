@@ -8,7 +8,7 @@ A complete, copy-paste walkthrough to wire Baron to an **Azure DevOps** project 
 > it was written and verified that way against a real Azure DevOps project.
 >
 > You do not have to: Baron is on npm, so the CLI runs via `npx -y @lonca/baron-cli@latest` and the
-> MCP server via the Claude Code plugin (`/plugin marketplace add loncadev/baron`) or
+> MCP server via the Claude Code plugin (`/plugin marketplace add zanaat-dev/baron`) or
 > `npx @lonca/baron-mcp-server@latest`. Every `pnpm baron <cmd>` below has an
 > `npx -y @lonca/baron-cli@latest <cmd>` equivalent, and recipes now run by name
 > (`--recipe task-start`), so nothing here needs the repository except the clone itself.
@@ -187,7 +187,7 @@ Claude Code reads a project's `.mcp.json`. Create `<your-project>/.mcp.json`:
 - **Sprints (optional):** iterations are team-scoped. Baron defaults to Azure's `"<project> Team"`;
   if your sprints live under a differently-named team, add `AZURE_DEVOPS_TEAM=<team name>` to
   `.baron/credentials`.
-- **Prefer the plugin** (`/plugin marketplace add loncadev/baron` && `/plugin install baron@baron`) —
+- **Prefer the plugin** (`/plugin marketplace add zanaat-dev/baron` && `/plugin install baron@baron`) —
   it brings the MCP server *and* the skills, and no `.mcp.json` is needed. If you wire the server
   manually instead, use `"command": "npx", "args": ["-y", "@lonca/baron-mcp-server@latest"]` (keep the
   `BARON_ROOT` env). The explicit `@latest` matters — a bare name makes `npx` reuse its cached install

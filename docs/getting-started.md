@@ -56,7 +56,7 @@ Install the plugin once — it registers Baron's MCP server **and** the workflow
 they can't drift apart:
 
 ```
-/plugin marketplace add loncadev/baron
+/plugin marketplace add zanaat-dev/baron
 /plugin install baron@baron
 ```
 

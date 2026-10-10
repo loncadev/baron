@@ -41,7 +41,7 @@ plugins/claude-code/
 From the marketplace this repo publishes (`.claude-plugin/marketplace.json` at the repo root):
 
 ```
-/plugin marketplace add loncadev/baron
+/plugin marketplace add zanaat-dev/baron
 /plugin install baron@baron
 ```
 

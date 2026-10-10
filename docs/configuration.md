@@ -116,7 +116,7 @@ all when output is not going to a terminal. No client secret is involved, which 
 local CLI can do it — the same mechanism `gh` uses.
 
 **It is on by default.** Baron ships the client id of its own GitHub App, registered under the
-`loncadev` organisation that owns this repository, so an interactive `baron init` offers the browser
+`zanaat-dev` organisation that owns this repository, so an interactive `baron init` offers the browser
 sign-in without anyone registering anything first. A client id is public by design — it is not a
 secret, and it grants nothing on its own. What it identifies is the consent screen you approve, and
 shipping one means that screen names Baron rather than whichever stranger's app a copy-pasted id
