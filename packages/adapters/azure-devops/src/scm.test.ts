@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   createPullRequest: vi.fn(),
   getPullRequestById: vi.fn(),
+  getPullRequestWorkItemRefs: vi.fn(),
   updatePullRequest: vi.fn(),
   getPolicyEvaluations: vi.fn(),
 }));
@@ -15,6 +16,7 @@ vi.mock('azure-devops-node-api', () => ({
     getGitApi: async () => ({
       createPullRequest: mocks.createPullRequest,
       getPullRequestById: mocks.getPullRequestById,
+      getPullRequestWorkItemRefs: mocks.getPullRequestWorkItemRefs,
       updatePullRequest: mocks.updatePullRequest,
     }),
     getPolicyApi: async () => ({ rest: { get: mocks.getPolicyEvaluations } }),
@@ -37,20 +39,47 @@ describe('azure scm createPullRequest', () => {
   // Each case inspects calls[0], so recorded calls must not carry over between tests.
   beforeEach(() => vi.clearAllMocks());
 
-  it("links the work item with Azure's AB# mention and keeps the description", async () => {
+  it('links the work item through workItemRefs, mentions it in the description, and reads the link back', async () => {
     mocks.createPullRequest.mockResolvedValue({ pullRequestId: 9, title: 't', isDraft: true });
-    await transport().createPullRequest({
+    mocks.getPullRequestWorkItemRefs.mockResolvedValue([{ id: '1488', url: 'u' }]);
+    const pr = await transport().createPullRequest({
       title: 't',
       body: 'What changed and why.',
       sourceBranch: 'bug/1488-x',
       targetBranch: 'dev',
       draft: true,
-      linkedIssueKey: '1488',
+      linkedIssueKey: 'AB#1488',
     });
 
-    const description = mocks.createPullRequest.mock.calls[0]?.[0]?.description as string;
-    expect(description).toContain('What changed and why.');
-    expect(description).toContain('AB#1488');
+    const sent = mocks.createPullRequest.mock.calls[0]?.[0];
+    expect(sent?.workItemRefs).toEqual([{ id: '1488' }]);
+    expect(sent?.description).toContain('What changed and why.');
+    expect(sent?.description).toContain('AB#1488');
+    expect(mocks.getPullRequestWorkItemRefs).toHaveBeenCalledWith('repo', 9, 'proj');
+    expect(pr.issueLinked).toBe(true);
+  });
+
+  it('reports a link that did not land, and one it could not confirm, as not linked', async () => {
+    mocks.createPullRequest.mockResolvedValue({ pullRequestId: 11, title: 't', isDraft: false });
+    mocks.getPullRequestWorkItemRefs.mockResolvedValueOnce([]);
+    const missing = await transport().createPullRequest({
+      title: 't',
+      sourceBranch: 's',
+      targetBranch: 'dev',
+      draft: false,
+      linkedIssueKey: '7',
+    });
+    expect(missing.issueLinked).toBe(false);
+
+    mocks.getPullRequestWorkItemRefs.mockRejectedValueOnce(new Error('TF401019'));
+    const unread = await transport().createPullRequest({
+      title: 't',
+      sourceBranch: 's',
+      targetBranch: 'dev',
+      draft: false,
+      linkedIssueKey: '7',
+    });
+    expect(unread.issueLinked).toBe(false);
   });
 
   it('omits the description entirely when there is nothing to say', async () => {
@@ -62,6 +91,8 @@ describe('azure scm createPullRequest', () => {
       draft: true,
     });
     expect(mocks.createPullRequest.mock.calls[0]?.[0]?.description).toBeUndefined();
+    expect(mocks.createPullRequest.mock.calls[0]?.[0]?.workItemRefs).toBeUndefined();
+    expect(mocks.getPullRequestWorkItemRefs).not.toHaveBeenCalled();
   });
 });
 

@@ -60,6 +60,13 @@ export interface PullRequest {
    * provider refused (e.g. GitHub repos with "Allow auto-merge" off) — reported, never silent.
    */
   readonly autoCompleteEnabled?: boolean | undefined;
+  /**
+   * Whether the provider confirms the PR is linked to `linkedIssueKey`, read back after creating it.
+   * False means the link did not land, and the caller is told rather than left to assume it. Absent
+   * when no item was named, or when the relation leaves the provider nothing to confirm: a GitHub
+   * `relates` is a mention in the body, not a link GitHub records.
+   */
+  readonly issueLinked?: boolean | undefined;
 }
 
 /** A normalized PR discussion thread reference. */
@@ -163,6 +170,8 @@ export interface NativePullRequest {
    * provider refused (e.g. GitHub repos with "Allow auto-merge" off) — reported, never silent.
    */
   readonly autoCompleteEnabled?: boolean | undefined;
+  /** See {@link PullRequest.issueLinked}; the transport reads the link back from the provider. */
+  readonly issueLinked?: boolean | undefined;
 }
 
 export interface NativeThread {
@@ -425,6 +434,7 @@ export class BaseScmAdapter implements ScmPort {
       // A freshly created PR is open by definition — surface it uniformly with prForBranch results.
       state: 'open',
       autoCompleteEnabled: native.autoCompleteEnabled,
+      issueLinked: native.issueLinked,
     };
   }
 
@@ -456,6 +466,7 @@ export class BaseScmAdapter implements ScmPort {
       draft: native.draft,
       state: native.state,
       autoCompleteEnabled: native.autoCompleteEnabled,
+      issueLinked: native.issueLinked,
     };
   }
 

@@ -42,8 +42,8 @@ steps:
       title: ${title}
       sourceBranch: ${branch}
       body: ${body}
-      # Abstract: the adapter renders the provider's native linking keyword (GitHub `Closes #N`,
-      # Azure `AB#N`), so the tracker really associates PR and item — not just a comment with a URL.
+      # Abstract: the adapter links PR and item the provider's native way (GitHub `Closes #N`,
+      # Azure work-item refs) and reads the link back into `pr.issueLinked`, checked below.
       linkedIssueKey: ${issueId}
       linkedIssueRelation: ${relation}
       # The person finishing the task owns the PR. Providers without PR assignees (Azure) negotiate
@@ -67,3 +67,7 @@ steps:
   - message: "Opened PR ${pr.url} for ${issueId}. Role unchanged — the merge outcome is the provider's; task-move or task-sync settles the rest."
     when:
       falsy: "${existingPr}"
+  # A link that did not land looks like one that did until someone opens the item, so say it now.
+  - message: "WARNING — ${pr.url} is NOT linked to ${issueId}: the provider did not record the link Baron asked for. Link them in the tracker by hand, or a reviewer opening ${issueId} will not find this PR."
+    when:
+      equals: ["${pr.issueLinked}", "false"]
