@@ -134,15 +134,22 @@ const MERGE_STRATEGY: Record<MergeStrategy, GitPullRequestMergeStrategy> = {
 
 type GitApi = Awaited<ReturnType<InstanceType<typeof azdev.WebApi>['getGitApi']>>;
 
+/** The numeric work-item id inside a key, whether it is written `1488` or `AB#1488`. */
+function workItemId(issueKey: string | undefined): string | undefined {
+  const id = issueKey?.replace(/^AB#/i, '');
+  return id === undefined || id.length === 0 ? undefined : id;
+}
+
 /**
- * Append Azure's native work-item mention (`AB#123`) so the PR is genuinely LINKED to the item —
- * Azure resolves the mention into a real work-item link on the PR. A comment carrying the PR URL
- * (which the recipe also posts) is not a link; this is.
+ * Append the `AB#123` mention, so a reader of the description sees which item it serves. It is
+ * not what links them: `AB#` is the syntax of the Azure Boards app for GitHub, and nothing showed
+ * Azure Repos turning it into a link. The link is the `workItemRefs` sent with the create, read
+ * back afterwards.
  */
-function withIssueLink(body: string | undefined, issueKey: string | undefined): string | undefined {
-  if (issueKey === undefined || issueKey.length === 0) return body;
-  const link = `AB#${issueKey.replace(/^AB#/i, '')}`;
-  return body === undefined || body.length === 0 ? link : `${body}\n\n${link}`;
+function withIssueMention(body: string | undefined, id: string | undefined): string | undefined {
+  if (id === undefined) return body;
+  const mention = `AB#${id}`;
+  return body === undefined || body.length === 0 ? mention : `${body}\n\n${mention}`;
 }
 
 /**
@@ -332,16 +339,30 @@ export function createAzureDevOpsScmTransport(
 
     async createPullRequest(input: NativePullRequestInput): Promise<NativePullRequest> {
       const git = await api();
-      const description = withIssueLink(input.body, input.linkedIssueKey);
+      const issueId = workItemId(input.linkedIssueKey);
+      const description = withIssueMention(input.body, issueId);
       const toCreate: GitPullRequest = {
         sourceRefName: `refs/heads/${input.sourceBranch}`,
         targetRefName: `refs/heads/${input.targetBranch}`,
         title: input.title,
         isDraft: input.draft,
         ...(description !== undefined ? { description } : {}),
+        // What `az repos pr create --work-items` sends: Azure records the PR on the item's links.
+        ...(issueId !== undefined ? { workItemRefs: [{ id: issueId }] } : {}),
       };
       const pr = await git.createPullRequest(toCreate, repository, project);
       const id = String(pr.pullRequestId ?? '');
+
+      // Read the link back instead of trusting the request: a PR whose link did not land looks
+      // exactly like one whose link did, until someone opens the item. A failed read is reported
+      // as not linked, because nothing confirmed it.
+      const issueLinked =
+        issueId === undefined
+          ? undefined
+          : await git
+              .getPullRequestWorkItemRefs(repository, Number(id), project)
+              .then((refs) => refs.some((ref) => ref.id === issueId))
+              .catch(() => false);
 
       // Auto-complete is a follow-up update: Azure needs the PR to exist, then records WHO enabled it
       // plus what to do on completion. Report the outcome rather than failing the created PR — an
@@ -368,6 +389,7 @@ export function createAzureDevOpsScmTransport(
 
       return {
         autoCompleteEnabled,
+        issueLinked,
         id,
         number: id,
         title: pr.title ?? input.title,

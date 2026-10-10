@@ -88,6 +88,23 @@ export function runScmConformance(target: ScmConformanceTarget): void {
       }
     });
 
+    it('reports whether a PR that names a work item is linked to it, and says nothing otherwise', async () => {
+      const { adapter } = target.build();
+      const linked = await adapter.createPullRequest({
+        title: 'Linked',
+        sourceBranch: 'feature/linked',
+        targetBranch: 'main',
+        linkedIssueKey: '42',
+      });
+      expect(typeof linked.issueLinked).toBe('boolean');
+      const plain = await adapter.createPullRequest({
+        title: 'Plain',
+        sourceBranch: 'feature/plain',
+        targetBranch: 'main',
+      });
+      expect(plain.issueLinked).toBeUndefined();
+    });
+
     it('defaults the base branch to the repo default when fromBranch/targetBranch are omitted', async () => {
       const { adapter } = target.build();
       // Omitting the base must not throw — the port resolves it from the provider's default branch,

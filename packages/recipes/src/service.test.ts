@@ -11,7 +11,7 @@ import type { RecipePorts } from './engine.js';
 import { createMemoryRunJournal } from './journal.js';
 import { createRecipeService } from './service.js';
 
-function ports(): RecipePorts {
+function ports(scm = createMemoryScmTransport()): RecipePorts {
   return {
     issues: defineGithubIssuesAdapter(
       {
@@ -24,9 +24,33 @@ function ports(): RecipePorts {
         defaultDiscriminator: 'open',
       }),
     ),
-    scm: defineGithubScmAdapter(createMemoryScmTransport()),
+    scm: defineGithubScmAdapter(scm),
   };
 }
+
+describe('task-finish and the link between PR and item', () => {
+  const finish = async (linksIssues: boolean) => {
+    const service = createRecipeService(ports(createMemoryScmTransport({ linksIssues })), ROOT);
+    const issue = (await service.run('task-new', { title: 'Link me', typeRole: 'task' })).context
+      .issue as { id: string };
+    return service.run('task-finish', {
+      issueId: issue.id,
+      branch: `feature/link-${linksIssues}`,
+      title: 'Link me',
+      body: 'b',
+    });
+  };
+
+  it('warns when the provider did not record the link it was asked for', async () => {
+    const { notes } = await finish(false);
+    expect(notes.some((n) => n.startsWith('WARNING') && n.includes('NOT linked'))).toBe(true);
+  });
+
+  it('says nothing more when the link is confirmed', async () => {
+    const { notes } = await finish(true);
+    expect(notes.some((n) => n.includes('NOT linked'))).toBe(false);
+  });
+});
 
 // A root with no .baron/recipes — only the built-ins are available.
 const ROOT = 'baron-test-no-project-recipes';

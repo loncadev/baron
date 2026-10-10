@@ -13,6 +13,10 @@ const mocks = vi.hoisted(() => ({
   checksListForRef: vi.fn(),
   listWorkflowRuns: vi.fn(),
   combinedStatus: vi.fn(),
+  // By default GitHub records no closing reference; a case that needs one says so.
+  graphql: vi.fn(async (_query: string, _variables?: Record<string, unknown>) => ({
+    node: { closingIssuesReferences: { nodes: [] as { number: number }[] } },
+  })),
 }));
 
 vi.mock('octokit', () => ({
@@ -20,6 +24,7 @@ vi.mock('octokit', () => ({
     // The real client carries hooks; the factory installs a version hook and, for a bound port,
     // a permission-error hook on it.
     hook: { before: vi.fn(), error: vi.fn() },
+    graphql: mocks.graphql,
     rest: {
       pulls: { create: mocks.create, get: mocks.prGet, listReviews: mocks.listReviews },
       git: { getRef: mocks.getRef, createRef: mocks.createRef },
@@ -88,6 +93,42 @@ describe('github scm createPullRequest', () => {
       draft: true,
     });
     expect(mocks.create.mock.calls[0]?.[0]?.body).toBeUndefined();
+    expect(mocks.graphql).not.toHaveBeenCalled();
+  });
+
+  it('reads a closing link back, and reports one GitHub did not record as not linked', async () => {
+    mocks.create.mockResolvedValue({ data: { ...CREATED_PR.data, node_id: 'PR_n5' } });
+    const refs = (...numbers: number[]) => ({
+      node: { closingIssuesReferences: { nodes: numbers.map((number) => ({ number })) } },
+    });
+    const draft = { title: 't', sourceBranch: 's', targetBranch: 'main', draft: false };
+
+    mocks.graphql.mockResolvedValueOnce(refs(3));
+    const linked = await transport().createPullRequest({ ...draft, linkedIssueKey: '3' });
+    expect(linked.issueLinked).toBe(true);
+    expect(mocks.graphql.mock.calls[0]?.[1]).toEqual({ pr: 'PR_n5' });
+
+    mocks.graphql.mockResolvedValueOnce(refs());
+    const unresolved = await transport().createPullRequest({ ...draft, linkedIssueKey: '3' });
+    expect(unresolved.issueLinked).toBe(false);
+
+    mocks.graphql.mockRejectedValueOnce(new Error('Resource not accessible'));
+    const unread = await transport().createPullRequest({ ...draft, linkedIssueKey: '3' });
+    expect(unread.issueLinked).toBe(false);
+  });
+
+  it('claims nothing for a relates link, which GitHub keeps only as a mention', async () => {
+    mocks.create.mockResolvedValue(CREATED_PR);
+    const pr = await transport().createPullRequest({
+      title: 't',
+      sourceBranch: 's',
+      targetBranch: 'main',
+      draft: false,
+      linkedIssueKey: '3',
+      linkedIssueRelation: 'relates',
+    });
+    expect(pr.issueLinked).toBeUndefined();
+    expect(mocks.graphql).not.toHaveBeenCalled();
   });
 });
 

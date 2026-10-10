@@ -312,8 +312,31 @@ export function createGithubScmTransport(options: GithubTransportOptions): ScmTr
           .catch(() => false);
       }
 
+      // A closing keyword is a link GitHub records, so read it back. It does not record one for a
+      // keyword it cannot resolve (an issue in another repository named without its owner/repo),
+      // and that PR would otherwise look linked. `relates` leaves nothing to read: `Refs #N` is
+      // a mention, so issueLinked stays absent rather than claiming either way.
+      const issueNumber = input.linkedIssueKey?.replace(/^#/, '');
+      let issueLinked: boolean | undefined;
+      if (
+        issueNumber !== undefined &&
+        issueNumber.length > 0 &&
+        input.linkedIssueRelation !== 'relates'
+      ) {
+        issueLinked = await octokit
+          .graphql<{ node: { closingIssuesReferences: { nodes: { number: number }[] } } }>(
+            'query($pr: ID!) { node(id: $pr) { ... on PullRequest { closingIssuesReferences(first: 50) { nodes { number } } } } }',
+            { pr: data.node_id },
+          )
+          .then((r) =>
+            r.node.closingIssuesReferences.nodes.some((n) => String(n.number) === issueNumber),
+          )
+          .catch(() => false);
+      }
+
       return {
         autoCompleteEnabled,
+        issueLinked,
         id: String(data.number),
         number: String(data.number),
         title: data.title,

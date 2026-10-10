@@ -31,6 +31,11 @@ export interface MemoryScmTransportOptions {
    * with a decision it should refuse to merge over.
    */
   readonly reviewDecision?: ReviewDecision | undefined;
+  /**
+   * Whether a PR that names a work item comes back linked to it. Defaults to true. Settable to false
+   * because a link that silently fails to land is the defect this flag exists to expose.
+   */
+  readonly linksIssues?: boolean | undefined;
 }
 
 const ALL_GREEN: CheckSummary = {
@@ -74,6 +79,7 @@ export function createMemoryScmTransport(opts: MemoryScmTransportOptions = {}): 
         targetBranch: input.targetBranch,
         draft: input.draft,
         state: 'open',
+        ...(input.linkedIssueKey !== undefined ? { issueLinked: opts.linksIssues ?? true } : {}),
       };
       prs.push(pr);
       return pr;
