@@ -8,7 +8,7 @@
       "type": "stdio",
       "command": "npx",
       "args": ["-y", "@zanaat/baron-mcp-server@latest"],
-      "env": { "BARON_PLUGIN_VERSION": "0.44.0" }
+      "env": { "BARON_PLUGIN_VERSION": "0.44.1" }
     }
   }
 }
