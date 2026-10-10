@@ -1,6 +1,6 @@
 # Releasing Baron
 
-Both milestones below are **done** — the repo is public at `github.com/loncadev/baron` and the
+Both milestones below are **done** — the repo is public at `github.com/zanaat-dev/baron` and the
 packages are on npm. Section 1 is kept as the record of what the first push required; the live
 procedure starts at [section 2](#2-npm-publish).
 
@@ -50,7 +50,7 @@ until step 2 is done.
       > Before copying a new token, check that the token list shows a tick in its **Bypass 2FA**
       > column. A dead token answers `npm whoami` with 401 and a publish with a 404 on the PUT.
       >
-      > **This token type is being withdrawn — see [#62](https://github.com/loncadev/baron/issues/62)
+      > **This token type is being withdrawn — see [#62](https://github.com/zanaat-dev/baron/issues/62)
       > and the CI flow below, which replaces it.**
       > Since **early August 2026** a bypass-2FA token can no longer perform account or package
       > *management*, which includes **minting its own replacement**: when the current one expires
@@ -93,13 +93,13 @@ git tag -a "v$VERSION" -m "v$VERSION" && git push origin "v$VERSION"
 One-time setup, outside the repository (done 2026-10-06):
 
 - **npm, per published package** — *Settings → Trusted publisher → GitHub Actions*: organization
-  `loncadev`, repository `baron`, workflow `release.yml`, environment `npm-publish`. npm does not
+  `zanaat-dev`, repository `baron`, workflow `release.yml`, environment `npm-publish`. npm does not
   validate this when saved; a typo surfaces as `ENEEDAUTH` at publish time. A **new** package has
   no settings page until its first version exists, so its first publish goes through the fallback
   below (or staged publishing), and its trusted publisher is added straight after.
 - **GitHub** — environment `npm-publish` with the maintainer as required reviewer and a deployment
   rule that admits only `v*` tags.
-- `repository.url` in every package must point at `github.com/loncadev/baron`, or npm refuses the
+- `repository.url` in every package must point at `github.com/zanaat-dev/baron`, or npm refuses the
   OIDC publish; `scripts/prep-publish.mjs` writes it.
 
 **Fallback — a token from a laptop (works until npm withdraws bypass tokens, ~January 2027):**
@@ -173,7 +173,7 @@ The official registry (`registry.modelcontextprotocol.io`) is the surface severa
 it goes first and in the same week as a release — that ranking weights recency.
 
 The Release workflow does this step itself (`mcp-publisher login github-oidc`, which proves the
-`io.github.loncadev` namespace from the workflow's own identity). By hand, for the fallback path:
+`io.github.zanaat-dev` namespace from the workflow's own identity). By hand, for the fallback path:
 
 ```bash
 # The tarball carries LICENSE and README.md alongside the binary, so it is unpacked OUTSIDE the
@@ -205,11 +205,24 @@ mcp-publisher publish                                   # reads ./server.json fr
 
 [reg-1468]: https://github.com/modelcontextprotocol/registry/issues/1468
 
-Two further conditions, both real: whoever publishes must be an **Owner** of `loncadev` (membership
+Two further conditions, both real: whoever publishes must be an **Owner** of `zanaat-dev` (membership
 `role: admin`, `state: active` — an unaccepted invitation does not count), and the publish must come
 **after** the npm release, because the registry fetches the referenced npm version and compares its
 `mcpName` against `server.json`'s `name`. A freshly published npm version can 404 for a moment; the
 registry says so explicitly, so retry once before suspecting the marker.
+
+Until v0.43.0 the server was listed as `io.github.loncadev/baron`. The repository moved to
+`zanaat-dev` on 2026-10-10, and a registry name is bound to the namespace that publishes it, so the
+rename is a **new** listing rather than an update. The old one cannot be updated again, because no
+later npm version carries its `mcpName`. Once the first `io.github.zanaat-dev/baron` version is
+live, deprecate the old listing by hand. That takes a login as an Owner of `loncadev`, which the
+workflow's OIDC identity is not:
+
+```bash
+mcp-publisher login github --token "$(gh auth token)"
+mcp-publisher status --status deprecated --all-versions \
+  --message "Moved to io.github.zanaat-dev/baron" io.github.loncadev/baron
+```
 
 ## 4. Discovery surfaces
 
@@ -218,13 +231,13 @@ follow at any pace. Two need a human at a browser and cannot be scripted:
 
 - **Glama** — `glama.ai/mcp/servers` → *Add Server* (a JS button; there is no deep-link form URL).
   Baron appears there anyway, ingested from the official registry, but unclaimed. Claiming is what
-  buys control of the display metadata and build spec. Because `loncadev` is an organisation rather
+  buys control of the display metadata and build spec. Because `zanaat-dev` is an organisation rather
   than a personal account, signing in with GitHub is not enough on its own: the root `glama.json`
   names the maintainer, and the claim flow must be **re-run** after that file lands. Glama builds
   every open-source server in a sandbox — the committed `Dockerfile` keeps us off the inferred-build
   path, whose failure withholds the listing from search and category results.
 - **Claude Code plugin marketplace** — `platform.claude.com/plugins/submit`. Not required to ship:
-  `/plugin marketplace add loncadev/baron` already works from the committed
+  `/plugin marketplace add zanaat-dev/baron` already works from the committed
   `.claude-plugin/marketplace.json`. Never open a PR against `anthropics/claude-plugins-community`;
   it closes them automatically and syncs from an internal pipeline instead.
 - **Docker MCP Catalog** — a PR against `docker/mcp-registry` adding `servers/baron/server.yaml`

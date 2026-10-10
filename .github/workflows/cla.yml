@@ -29,11 +29,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           path-to-signatures: .github/cla-signatures.json
-          path-to-document: https://github.com/loncadev/baron/blob/main/CONTRIBUTING.md#contribution-terms
+          path-to-document: https://github.com/zanaat-dev/baron/blob/main/CONTRIBUTING.md#contribution-terms
           branch: main
           custom-notsigned-prcomment: >-
             Thanks for the contribution. Before it can be merged, please read the
-            [contribution terms](https://github.com/loncadev/baron/blob/main/CONTRIBUTING.md#contribution-terms)
+            [contribution terms](https://github.com/zanaat-dev/baron/blob/main/CONTRIBUTING.md#contribution-terms)
             — Apache-2.0 licensing plus a relicensing grant that keeps Baron's open-core model viable —
             and post the line below as a comment on this pull request. It is recorded once and covers
             your future contributions.

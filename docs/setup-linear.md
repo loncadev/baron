@@ -177,7 +177,7 @@ failing later, far from the cause.
 The simplest path is the plugin, which brings the MCP server *and* the skills:
 
 ```
-/plugin marketplace add loncadev/baron
+/plugin marketplace add zanaat-dev/baron
 /plugin install baron@baron
 ```
 

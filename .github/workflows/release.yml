@@ -76,7 +76,7 @@ jobs:
             | tar xz mcp-publisher
 
       # The registry advertises whatever version was last submitted, so it is updated after npm has
-      # the packages it points at. GitHub OIDC proves the io.github.loncadev namespace.
+      # the packages it points at. GitHub OIDC proves the io.github.zanaat-dev namespace.
       - name: Publish to the MCP Registry
         run: |
           ./mcp-publisher login github-oidc

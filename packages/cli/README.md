@@ -2,7 +2,7 @@
 
 Baron CLI: introspect a provider, validate the policy, and run recipes (baron init / doctor / run).
 
-Part of **[Baron](https://github.com/loncadev/baron)** — a platform-agnostic work-orchestration layer for AI coding agents:
+Part of **[Baron](https://github.com/zanaat-dev/baron)** — a platform-agnostic work-orchestration layer for AI coding agents:
 one pane of glass (issues, scm, ci, deploy, notify) across providers, via MCP + CLI.
 
 ## Install
@@ -13,7 +13,7 @@ npm install -g @lonca/baron-cli   # then: baron --help
 
 ## Documentation
 
-See the [Baron documentation](https://github.com/loncadev/baron#readme). Source: [`packages/cli`](https://github.com/loncadev/baron/tree/main/packages/cli).
+See the [Baron documentation](https://github.com/zanaat-dev/baron#readme). Source: [`packages/cli`](https://github.com/zanaat-dev/baron/tree/main/packages/cli).
 
 ## License
 

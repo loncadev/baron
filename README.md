@@ -96,7 +96,7 @@ actually do before you start work.
 Or drive it from an agent — install the Claude Code plugin (MCP server + workflow skills in one):
 
 ```
-/plugin marketplace add loncadev/baron
+/plugin marketplace add zanaat-dev/baron
 /plugin install baron@baron
 ```
 
@@ -108,7 +108,7 @@ Or wire the **MCP server** into your agent and call the tools directly across ev
 `baron_notify_send`, plus `baron_recipe_run` for whole workflows. In Claude Code, the plugin also
 ships per-recipe **skills** (`/baron:task-start`, `/baron:ship`). See [docs/mcp.md](./docs/mcp.md).
 
-The server is listed in the official **MCP Registry** as `io.github.loncadev/baron`, and runs as a
+The server is listed in the official **MCP Registry** as `io.github.zanaat-dev/baron`, and runs as a
 container for anyone who would rather not have Node on the host — see
 [docs/mcp.md](./docs/mcp.md#running-it-as-a-container).
 

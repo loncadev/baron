@@ -2,7 +2,7 @@
   "name": "baron",
   "owner": {
     "name": "Lonca",
-    "url": "https://github.com/loncadev"
+    "url": "https://github.com/zanaat-dev"
   },
   "description": "Baron — platform-agnostic work orchestration for AI coding agents.",
   "plugins": [
@@ -10,7 +10,7 @@
       "name": "baron",
       "source": {
         "source": "git-subdir",
-        "url": "https://github.com/loncadev/baron",
+        "url": "https://github.com/zanaat-dev/baron",
         "path": "plugins/claude-code"
       },
       "description": "Drive issues, scm, ci, deploy, and notify across providers from one normalized contract: the Baron MCP server plus the packaged task-* workflow skills."
