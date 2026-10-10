@@ -77,7 +77,22 @@ jobs:
 
       # The registry advertises whatever version was last submitted, so it is updated after npm has
       # the packages it points at. GitHub OIDC proves the io.github.zanaat-dev namespace.
+      # The registry also fetches that npm version itself, and seconds after a publish npm can still
+      # answer 404 (v0.44.1 failed that way). So wait until npm serves it, and give the registry's
+      # own lookup a few more tries. Both are bounded; a real failure still fails the job.
       - name: Publish to the MCP Registry
         run: |
+          pkg=$(node -p "require('./server.json').packages[0].identifier")
+          version=$(node -p "require('./server.json').version")
+          for i in $(seq 1 30); do
+            npm view "$pkg@$version" version --prefer-online >/dev/null 2>&1 && break
+            [ "$i" = 30 ] && { echo "::error::npm never served $pkg@$version"; exit 1; }
+            sleep 10
+          done
           ./mcp-publisher login github-oidc
-          ./mcp-publisher publish
+          for i in 1 2 3 4; do
+            ./mcp-publisher publish && exit 0
+            [ "$i" = 4 ] && exit 1
+            echo "Registry publish failed (attempt $i); retrying in 30s"
+            sleep 30
+          done
