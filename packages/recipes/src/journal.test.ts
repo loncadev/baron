@@ -7,9 +7,9 @@ import {
   exampleGithubRoleMap,
   exampleGithubTypeMap,
   recommendedGithubGapPolicy,
-} from '@lonca/baron-adapter-github';
-import { createMemoryScmTransport, createMemoryTransport } from '@lonca/baron-conformance';
-import { BaronError, type IssuesPort } from '@lonca/baron-core';
+} from '@zanaat/baron-adapter-github';
+import { createMemoryScmTransport, createMemoryTransport } from '@zanaat/baron-conformance';
+import { BaronError, type IssuesPort } from '@zanaat/baron-core';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { RecipeAsker } from './ask.js';
 import { type RecipePorts, runRecipe } from './engine.js';

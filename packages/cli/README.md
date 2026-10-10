@@ -1,4 +1,4 @@
-# @lonca/baron-cli
+# @zanaat/baron-cli
 
 Baron CLI: introspect a provider, validate the policy, and run recipes (baron init / doctor / run).
 
@@ -8,7 +8,7 @@ one pane of glass (issues, scm, ci, deploy, notify) across providers, via MCP + 
 ## Install
 
 ```bash
-npm install -g @lonca/baron-cli   # then: baron --help
+npm install -g @zanaat/baron-cli   # then: baron --help
 ```
 
 ## Documentation

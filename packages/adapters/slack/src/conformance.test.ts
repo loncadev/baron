@@ -1,5 +1,5 @@
-import { createMemoryNotifyTransport, runNotifyConformance } from '@lonca/baron-conformance';
-import { RecordingLogger } from '@lonca/baron-core';
+import { createMemoryNotifyTransport, runNotifyConformance } from '@zanaat/baron-conformance';
+import { RecordingLogger } from '@zanaat/baron-core';
 import { defineSlackNotifyAdapter } from './index.js';
 
 runNotifyConformance({

@@ -21,7 +21,7 @@ import {
   type ReviewDecision,
   type ScmManifest,
   type ScmTransport,
-} from '@lonca/baron-core';
+} from '@zanaat/baron-core';
 import { createGithubOctokit } from './octokit.js';
 import { GITHUB_PROVIDER } from './provider.js';
 import type { GithubTransportOptions } from './transport.js';

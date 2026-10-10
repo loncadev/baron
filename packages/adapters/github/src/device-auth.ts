@@ -3,7 +3,7 @@ import {
   BaronError,
   type DeviceAuth,
   type DeviceCodePrompt,
-} from '@lonca/baron-core';
+} from '@zanaat/baron-core';
 
 // The contract moved to the core once a second provider (Linear, with a local callback) needed
 // it; re-exported here so existing imports keep resolving.

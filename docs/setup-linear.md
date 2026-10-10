@@ -39,7 +39,7 @@ start rather than after one of them surprises you:
 - **Claude Code** (CLI, desktop, or IDE extension).
 - Optional but recommended: a **GitHub repo** as your project's `origin`, so branches and PRs work.
 
-Everything below uses `npx -y @lonca/baron-cli@latest`. The explicit `@latest` matters: a bare name
+Everything below uses `npx -y @zanaat/baron-cli@latest`. The explicit `@latest` matters: a bare name
 makes `npx` reuse a cached install without re-checking the registry, silently pinning you to a stale
 version.
 
@@ -95,7 +95,7 @@ Linear will not renew (revoked in Linear's settings), the error says to run `ini
 From your project root:
 
 ```bash
-npx -y @lonca/baron-cli@latest init --provider linear
+npx -y @zanaat/baron-cli@latest init --provider linear
 ```
 
 It explains what it is about to do, gathers credentials, then reads your workspace and **proposes** a
@@ -158,7 +158,7 @@ attached to one team. It never touches your existing issues.
 ## 4. `baron doctor` — validate against the live workspace
 
 ```bash
-npx -y @lonca/baron-cli@latest doctor
+npx -y @zanaat/baron-cli@latest doctor
 ```
 
 ```
@@ -188,7 +188,7 @@ To wire the server by hand instead, create `<your-project>/.mcp.json`:
   "mcpServers": {
     "baron": {
       "command": "npx",
-      "args": ["-y", "@lonca/baron-mcp-server@latest"],
+      "args": ["-y", "@zanaat/baron-mcp-server@latest"],
       "env": { "BARON_ROOT": "<your-project>" }
     }
   }
@@ -205,10 +205,10 @@ To wire the server by hand instead, create `<your-project>/.mcp.json`:
 Ask Claude, or run the recipes yourself:
 
 ```bash
-npx -y @lonca/baron-cli@latest run --recipe task-new     # file an issue in Linear
-npx -y @lonca/baron-cli@latest run --recipe task-start   # move it, cut the branch, assign it
-npx -y @lonca/baron-cli@latest run --recipe task-finish  # open a draft PR, link it on the issue
-npx -y @lonca/baron-cli@latest run --recipe task-land    # undraft, wait for checks, merge
+npx -y @zanaat/baron-cli@latest run --recipe task-new     # file an issue in Linear
+npx -y @zanaat/baron-cli@latest run --recipe task-start   # move it, cut the branch, assign it
+npx -y @zanaat/baron-cli@latest run --recipe task-finish  # open a draft PR, link it on the issue
+npx -y @zanaat/baron-cli@latest run --recipe task-land    # undraft, wait for checks, merge
 ```
 
 `task-start` on a Linear issue with GitHub bound to `scm` reports both halves:

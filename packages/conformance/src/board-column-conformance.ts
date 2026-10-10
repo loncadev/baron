@@ -6,7 +6,7 @@ import {
   type IssuesPort,
   type Logger,
   type ProviderRoleMap,
-} from '@lonca/baron-core';
+} from '@zanaat/baron-core';
 import { describe, expect, it } from 'vitest';
 import { createMemoryTransport } from './memory-transport.js';
 

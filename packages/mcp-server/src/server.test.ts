@@ -1,16 +1,16 @@
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import {
   defineGithubIssuesAdapter,
   defineGithubScmAdapter,
   exampleGithubRoleMap,
   exampleGithubTypeMap,
   recommendedGithubGapPolicy,
-} from '@lonca/baron-adapter-github';
-import { createMemoryScmTransport, createMemoryTransport } from '@lonca/baron-conformance';
-import type { IssuesPort, ScmPort } from '@lonca/baron-core';
-import { KNOWN_PROVIDERS, getProviderDescriptor } from '@lonca/baron-providers';
-import { BUILTIN_RECIPE_NAMES } from '@lonca/baron-recipes';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+} from '@zanaat/baron-adapter-github';
+import { createMemoryScmTransport, createMemoryTransport } from '@zanaat/baron-conformance';
+import type { IssuesPort, ScmPort } from '@zanaat/baron-core';
+import { KNOWN_PROVIDERS, getProviderDescriptor } from '@zanaat/baron-providers';
+import { BUILTIN_RECIPE_NAMES } from '@zanaat/baron-recipes';
 import { describe, expect, it } from 'vitest';
 import { TOOL_NAMES } from './consolidated.js';
 import { SERVER_INSTRUCTIONS, createMcpServer } from './server.js';

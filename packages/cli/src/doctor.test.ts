@@ -3,14 +3,14 @@ import {
   createMemoryIntrospector,
   githubIntrospectionFixture,
   scopedIntrospectionFixture,
-} from '@lonca/baron-conformance';
+} from '@zanaat/baron-conformance';
 import {
   BaronError,
   type CredentialCapability,
   type CredentialProbe,
   type CredentialStatus,
   WORK_ITEM_TYPE_ROLES,
-} from '@lonca/baron-core';
+} from '@zanaat/baron-core';
 import { describe, expect, it } from 'vitest';
 import { runDoctor } from './doctor.js';
 import { memoryFileSystem, scriptedPrompter } from './fakes.js';

@@ -78,13 +78,13 @@ Published to npm — no clone, no build. From inside your project:
 # 1. Configure — one command. Auto-detects owner/repo from your git remote, offers to sign you in
 #    through your browser (or paste a token instead), writes .baron/credentials (gitignored) +
 #    .baron/policy.json (issues + scm bound).
-npx -y @lonca/baron-cli@latest init --provider github      # or: --provider azure-devops
+npx -y @zanaat/baron-cli@latest init --provider github      # or: --provider azure-devops
 
 # 2. Check the policy against the live provider (drift → exit 1)
-npx -y @lonca/baron-cli@latest doctor
+npx -y @zanaat/baron-cli@latest doctor
 
 # 3. Run a workflow recipe
-npx -y @lonca/baron-cli@latest run --recipe task-start          # by name; or pass a path
+npx -y @zanaat/baron-cli@latest run --recipe task-start          # by name; or pass a path
 ```
 
 On GitHub, step 1 opens the approval page and you confirm a short code — no permission list to read,

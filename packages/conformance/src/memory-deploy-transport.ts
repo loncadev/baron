@@ -4,7 +4,7 @@ import type {
   Environment,
   EnvironmentQuery,
   NativeDeployment,
-} from '@lonca/baron-core';
+} from '@zanaat/baron-core';
 
 export interface MemoryDeployOptions {
   readonly environments?: readonly Environment[];

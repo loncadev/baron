@@ -1,4 +1,4 @@
-import type { CredentialCapability, CredentialFinding, CredentialProbe } from '@lonca/baron-core';
+import type { CredentialCapability, CredentialFinding, CredentialProbe } from '@zanaat/baron-core';
 
 export interface LinearCredentialProbeOptions {
   readonly apiKey: string;

@@ -2,8 +2,8 @@ import {
   createMemoryTransport,
   runIssuesConformance,
   runTransportFidelityConformance,
-} from '@lonca/baron-conformance';
-import { RecordingLogger } from '@lonca/baron-core';
+} from '@zanaat/baron-conformance';
+import { RecordingLogger } from '@zanaat/baron-core';
 import {
   defineJiraIssuesAdapter,
   exampleJiraRoleMap,

@@ -1,6 +1,6 @@
 {
-  "name": "@lonca/baron-adapter-jira",
-  "version": "0.43.0",
+  "name": "@zanaat/baron-adapter-jira",
+  "version": "0.44.0",
   "type": "module",
   "license": "Apache-2.0",
   "main": "./src/index.ts",
@@ -24,10 +24,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@lonca/baron-core": "workspace:*"
+    "@zanaat/baron-core": "workspace:*"
   },
   "devDependencies": {
-    "@lonca/baron-conformance": "workspace:*",
+    "@zanaat/baron-conformance": "workspace:*",
     "@types/node": "^22.0.0"
   },
   "description": "Baron adapter for Jira Cloud: issues, with workflow-gated transitions and transition screens.",

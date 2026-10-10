@@ -1,4 +1,4 @@
-import { TransitionFieldsRequiredError, TransitionNotPermittedError } from '@lonca/baron-core';
+import { TransitionFieldsRequiredError, TransitionNotPermittedError } from '@zanaat/baron-core';
 import { describe, expect, it } from 'vitest';
 import { defineJiraIssuesAdapter, exampleJiraRoleMap, exampleJiraTypeMap } from './index.js';
 import { JIRA_STATE_KEY } from './provider.js';

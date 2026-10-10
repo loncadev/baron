@@ -1,6 +1,6 @@
 # MCP server & plugin
 
-Baron's core is exposed as a stdio **MCP server** (`@lonca/baron-mcp-server`, bin `baron-mcp`), so any MCP
+Baron's core is exposed as a stdio **MCP server** (`@zanaat/baron-mcp-server`, bin `baron-mcp`), so any MCP
 client — Claude Code, Cursor, Codex, … — can drive work tracking and source control by calling
 tools. The Claude Code plugin is a thin wrapper that registers it.
 
@@ -99,8 +99,8 @@ preventing a single provider write.
 ## Update notice
 
 At startup the server checks the npm registry (once, in the background, 4s timeout) for a newer
-`@lonca/baron-mcp-server`. When one exists, every successful tool result carries an extra content
-block: `⚠️ @lonca/baron-mcp-server v0.3.0 outdated → v0.4.0 available. Restart the baron MCP
+`@zanaat/baron-mcp-server`. When one exists, every successful tool result carries an extra content
+block: `⚠️ @zanaat/baron-mcp-server v0.3.0 outdated → v0.4.0 available. Restart the baron MCP
 server…` — the first block stays untouched parseable JSON, and error results are never decorated.
 An `@latest` npx launcher picks the new version up on the next restart. Offline/air-gapped
 installs stay silent (a failed check is never an error); set `BARON_NO_UPDATE_CHECK=1` to disable
@@ -180,7 +180,7 @@ The same image is listed in the [Docker MCP Catalog](https://hub.docker.com/mcp)
 built and signed by Docker from the pinned commit in
 [docker/mcp-registry](https://github.com/docker/mcp-registry/tree/main/servers/baron). Enabling it
 from Docker Desktop's MCP Toolkit asks for one required value — the host path of the project that
-holds your `.baron/policy.json` — and mounts it over `/project`. Run `npx @lonca/baron init` in that
+holds your `.baron/policy.json` — and mounts it over `/project`. Run `npx @zanaat/baron-cli init` in that
 project first; the container has no `baron` CLI and cannot create the policy for you.
 
 Provider credentials are optional in the form. Whatever you enter arrives as environment variables
@@ -201,7 +201,7 @@ been merged into skills.) Install it for local development with:
 claude --plugin-dir ./plugins/claude-code
 ```
 
-Its `.claude-plugin/plugin.json` launches the server via `npx -y @lonca/baron-mcp-server@latest`
+Its `.claude-plugin/plugin.json` launches the server via `npx -y @zanaat/baron-mcp-server@latest`
 (the explicit `@latest` keeps `npx` from reusing a stale cached install); to run a local build
 instead, point the `mcpServers.baron` command at it. See
 [plugins/claude-code/README.md](../plugins/claude-code/README.md).

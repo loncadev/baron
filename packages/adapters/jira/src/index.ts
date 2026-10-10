@@ -7,7 +7,7 @@ import {
   type Logger,
   type ProviderRoleMap,
   type TypeMap,
-} from '@lonca/baron-core';
+} from '@zanaat/baron-core';
 import { JIRA_PROVIDER, JIRA_STATE_KEY } from './provider.js';
 
 /**

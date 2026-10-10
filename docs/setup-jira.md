@@ -68,7 +68,7 @@ project key, and write them to `.baron/credentials`, which is gitignored. Nothin
 From your project root:
 
 ```bash
-npx -y @lonca/baron-cli@latest init --provider jira
+npx -y @zanaat/baron-cli@latest init --provider jira
 ```
 
 It explains what it is about to do, offers to take branches and pull requests from the repository
@@ -128,7 +128,7 @@ Jira. Decline, and `scm.*` operations report `PORT_UNBOUND` — never a silent n
 ## 4. `baron doctor` — validate against the live project
 
 ```bash
-npx -y @lonca/baron-cli@latest doctor
+npx -y @zanaat/baron-cli@latest doctor
 ```
 
 ```
@@ -160,7 +160,7 @@ To wire the server by hand instead, create `<your-project>/.mcp.json`:
   "mcpServers": {
     "baron": {
       "command": "npx",
-      "args": ["-y", "@lonca/baron-mcp-server@latest"],
+      "args": ["-y", "@zanaat/baron-mcp-server@latest"],
       "env": { "BARON_ROOT": "<your-project>" }
     }
   }
@@ -177,10 +177,10 @@ To wire the server by hand instead, create `<your-project>/.mcp.json`:
 Ask Claude, or run the recipes yourself:
 
 ```bash
-npx -y @lonca/baron-cli@latest run --recipe task-new     # file an issue in Jira
-npx -y @lonca/baron-cli@latest run --recipe task-start   # move it, cut the branch, assign it
-npx -y @lonca/baron-cli@latest run --recipe task-finish  # open a draft PR, link it on the issue
-npx -y @lonca/baron-cli@latest run --recipe task-land    # undraft, wait for checks, merge
+npx -y @zanaat/baron-cli@latest run --recipe task-new     # file an issue in Jira
+npx -y @zanaat/baron-cli@latest run --recipe task-start   # move it, cut the branch, assign it
+npx -y @zanaat/baron-cli@latest run --recipe task-finish  # open a draft PR, link it on the issue
+npx -y @zanaat/baron-cli@latest run --recipe task-land    # undraft, wait for checks, merge
 ```
 
 A recipe that creates an item and walks it through every hop ran like this on the real project —

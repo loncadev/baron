@@ -7,10 +7,10 @@ A complete, copy-paste walkthrough to wire Baron to an **Azure DevOps** project 
 > **This walkthrough runs Baron from a clone** (`pnpm baron …`) and says so in its prerequisites —
 > it was written and verified that way against a real Azure DevOps project.
 >
-> You do not have to: Baron is on npm, so the CLI runs via `npx -y @lonca/baron-cli@latest` and the
+> You do not have to: Baron is on npm, so the CLI runs via `npx -y @zanaat/baron-cli@latest` and the
 > MCP server via the Claude Code plugin (`/plugin marketplace add zanaat-dev/baron`) or
-> `npx @lonca/baron-mcp-server@latest`. Every `pnpm baron <cmd>` below has an
-> `npx -y @lonca/baron-cli@latest <cmd>` equivalent, and recipes now run by name
+> `npx @zanaat/baron-mcp-server@latest`. Every `pnpm baron <cmd>` below has an
+> `npx -y @zanaat/baron-cli@latest <cmd>` equivalent, and recipes now run by name
 > (`--recipe task-start`), so nothing here needs the repository except the clone itself.
 
 ---
@@ -189,7 +189,7 @@ Claude Code reads a project's `.mcp.json`. Create `<your-project>/.mcp.json`:
   `.baron/credentials`.
 - **Prefer the plugin** (`/plugin marketplace add zanaat-dev/baron` && `/plugin install baron@baron`) —
   it brings the MCP server *and* the skills, and no `.mcp.json` is needed. If you wire the server
-  manually instead, use `"command": "npx", "args": ["-y", "@lonca/baron-mcp-server@latest"]` (keep the
+  manually instead, use `"command": "npx", "args": ["-y", "@zanaat/baron-mcp-server@latest"]` (keep the
   `BARON_ROOT` env). The explicit `@latest` matters — a bare name makes `npx` reuse its cached install
   without re-checking the registry, silently pinning you to a stale version.
 - **Restart Claude Code** (or reload MCP servers) so it picks up the new server. Confirm it started:

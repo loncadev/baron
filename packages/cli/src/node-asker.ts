@@ -1,5 +1,5 @@
 import { stdout } from 'node:process';
-import type { RecipeAsker } from '@lonca/baron-recipes';
+import type { RecipeAsker } from '@zanaat/baron-recipes';
 import { askLine } from './stdin-line.js';
 
 /** The real, Node-backed {@link RecipeAsker} for `baron run`: stdin prompts, stdout notes. */

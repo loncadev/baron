@@ -1,4 +1,4 @@
-# @lonca/baron-recipes
+# @zanaat/baron-recipes
 
 Baron recipe engine: run declarative YAML workflows over Baron primitives, deterministically.
 
@@ -8,7 +8,7 @@ one pane of glass (issues, scm, ci, deploy, notify) across providers, via MCP + 
 ## Install
 
 ```bash
-npm install @lonca/baron-recipes
+npm install @zanaat/baron-recipes
 ```
 
 ## Documentation

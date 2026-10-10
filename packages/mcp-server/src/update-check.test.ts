@@ -30,14 +30,14 @@ describe('startUpdateCheck', () => {
 
   it('reports a notice when the registry has a newer version', async () => {
     const checker = startUpdateCheck({
-      name: '@lonca/baron-mcp-server',
+      name: '@zanaat/baron-mcp-server',
       currentVersion: '0.3.0',
       env: {},
       fetchJson: registry('0.4.0'),
     });
     expect(checker.notice()).toBeUndefined(); // async: not yet resolved
     await flush();
-    expect(checker.notice()).toBe(formatUpdateNotice('@lonca/baron-mcp-server', '0.3.0', '0.4.0'));
+    expect(checker.notice()).toBe(formatUpdateNotice('@zanaat/baron-mcp-server', '0.3.0', '0.4.0'));
   });
 
   it('stays silent when up to date, when the registry fails, and when opted out', async () => {
@@ -90,7 +90,7 @@ describe('withUpdateNotice', () => {
 
 describe('OWN_PACKAGE', () => {
   it('reads the real package identity (fixes the hardcoded 0.0.0 serverInfo)', () => {
-    expect(OWN_PACKAGE.name).toBe('@lonca/baron-mcp-server');
+    expect(OWN_PACKAGE.name).toBe('@zanaat/baron-mcp-server');
     expect(OWN_PACKAGE.version).toMatch(/^\d+\.\d+\.\d+$/);
     expect(OWN_PACKAGE.version).not.toBe('0.0.0');
   });

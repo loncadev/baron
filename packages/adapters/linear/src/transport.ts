@@ -1,4 +1,4 @@
-import { BaronError } from '@lonca/baron-core';
+import { BaronError } from '@zanaat/baron-core';
 import type {
   IssuesTransport,
   Iteration,
@@ -9,7 +9,7 @@ import type {
   NativeQuery,
   NativeTarget,
   NativeUpdateInput,
-} from '@lonca/baron-core';
+} from '@zanaat/baron-core';
 import {
   LINEAR_REFRESH_TOKEN_KEY,
   LINEAR_TOKEN_EXPIRES_AT_KEY,

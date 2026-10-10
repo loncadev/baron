@@ -9,7 +9,7 @@ import {
   type NativeQuery,
   type NativeTarget,
   type NativeUpdateInput,
-} from '@lonca/baron-core';
+} from '@zanaat/baron-core';
 import * as azdev from 'azure-devops-node-api';
 import {
   type WorkItem,

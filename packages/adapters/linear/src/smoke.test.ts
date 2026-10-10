@@ -3,7 +3,7 @@ import {
   type ProviderRoleMap,
   parsePolicyJson,
   resolveIssuesConfig,
-} from '@lonca/baron-core';
+} from '@zanaat/baron-core';
 import { describe, expect, it } from 'vitest';
 import {
   LINEAR_PROVIDER,

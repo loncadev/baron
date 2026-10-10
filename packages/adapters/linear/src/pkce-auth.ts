@@ -5,7 +5,7 @@ import {
   BaronError,
   type DeviceAuth,
   type DeviceCodePrompt,
-} from '@lonca/baron-core';
+} from '@zanaat/baron-core';
 
 import { refusedPage, signedInPage } from './callback-page.js';
 import {

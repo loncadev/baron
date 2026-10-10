@@ -1,4 +1,4 @@
-import { CredentialPermissionError } from '@lonca/baron-core';
+import { CredentialPermissionError } from '@zanaat/baron-core';
 import { describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ before: vi.fn(), error: vi.fn() }));

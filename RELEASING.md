@@ -35,9 +35,12 @@ until step 2 is done.
 
 **One-time:**
 
-- [x] **Scope: `@lonca/baron-*`** (published 2026-07-02). The `@baron` org was taken; packages live
-      under the owned `@lonca` org, prefixed `baron-` because plain `@lonca/*` names (e.g.
-      `@lonca/core`) already exist.
+- [x] **Scope: `@zanaat/baron-*`.** The `@baron` org was taken. Up to v0.43.0 the packages were
+      `@lonca/baron-*` (first published 2026-07-02), but `@lonca` is the Lonca SDK's product scope,
+      so Baron moved under the umbrella `@zanaat` org from v0.44.0. The `baron-` prefix stays so the
+      scope can hold other products. A new package name cannot take its first version over OIDC:
+      each one is published by hand once, then gets its trusted publisher. The old `@lonca/baron-*`
+      packages are deprecated with a pointer to their new names, never unpublished.
 - [x] **Auth (the hard-won lesson):** the account has 2FA `auth-and-writes`, so publishing needs a
       **granular access token with the "Bypass two-factor authentication" checkbox CHECKED**
       (classic/Automation tokens were removed by npm in Dec 2025; write tokens are capped at 90 days —
@@ -58,7 +61,7 @@ until step 2 is done.
       > expiring token. Around **January 2027** these tokens lose direct publish entirely — the
       > release process moves to trusted publishing (OIDC from CI) or staged publishing with a human
       > approval. Publishing still works today; v0.32.0 shipped this way.
-- [x] **`@lonca/baron-conformance` is `private: true`** — it's only ever a
+- [x] **`@zanaat/baron-conformance` is `private: true`** — it's only ever a
       *devDependency* of the adapters/cli/mcp-server, so no published package needs it at runtime. To
       publish it later (so third parties can conformance-test their own adapters), split its entry
       points (pure in-memory transports vs. the vitest-coupled suites), add a `build`/`files`/
@@ -135,9 +138,9 @@ Notes:
 - pnpm publishes in **dependency order** and rewrites `workspace:*` deps to the real version — no manual
   ordering needed.
 - Only what each package's `files` declares ships — `["dist"]` everywhere except
-  `@lonca/baron-recipes`, which adds `recipes` so the built-in YAML resolves by name at runtime.
+  `@zanaat/baron-recipes`, which adds `recipes` so the built-in YAML resolves by name at runtime.
   Tests, `src`, `scripts/`, and dev config never ship.
-- `@lonca/baron-mcp-server` exposes bin `baron-mcp`; `@lonca/baron-cli` exposes bin `baron`. Both target `dist/bin.js`,
+- `@zanaat/baron-mcp-server` exposes bin `baron-mcp`; `@zanaat/baron-cli` exposes bin `baron`. Both target `dist/bin.js`,
   so `pnpm build` must run first.
 
 **After publishing, smoke-test the consumer path** (always with an explicit `@latest` or version —
@@ -145,8 +148,8 @@ a bare package name makes `npx` reuse its cached install without re-checking the
 be smoke-testing a stale version):
 
 ```bash
-node scripts/mcp-handshake.mjs npx -y @lonca/baron-mcp-server@latest   # speaks the protocol to it
-npx -y @lonca/baron-cli@latest --help                                  # should print the CLI usage
+node scripts/mcp-handshake.mjs npx -y @zanaat/baron-mcp-server@latest   # speaks the protocol to it
+npx -y @zanaat/baron-cli@latest --help                                  # should print the CLI usage
 ```
 
 The handshake script is worth using over a bare `npx`: a server that starts and then fails to answer
@@ -156,7 +159,7 @@ and prints the version and tool count, so a stale cache or a broken publish show
 number rather than as silence.
 
 **To try the bits that would ship before publishing them**, build a self-contained tree the way the
-Dockerfile does — `pnpm --filter @lonca/baron-cli deploy --prod --legacy <dir>` then
+Dockerfile does — `pnpm --filter @zanaat/baron-cli deploy --prod --legacy <dir>` then
 `node scripts/apply-publish-config.mjs <dir>` — and run `node <dir>/dist/bin.js`. Do it from a
 **throwaway copy of the repository, not the working tree**: under pnpm 11, `deploy` rewrites the
 workspace packages' own `package.json` files to their `publishConfig` (main/types/exports flipped to
@@ -257,6 +260,6 @@ no submission at all: it ingests the official registry.
 ## Commercial tier (later)
 
 Enterprise features live in a **separate private repo** under a commercial license (e.g. Elastic
-License v2), depend on the published `@lonca/baron-*` packages, and publish to a **private** registry — never
+License v2), depend on the published `@zanaat/baron-*` packages, and publish to a **private** registry — never
 mixed into this repo. Only build the entitlement machinery once there is a paying design-partner
 (ARCHITECTURE.md #20).

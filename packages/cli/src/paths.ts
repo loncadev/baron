@@ -1,9 +1,9 @@
-import { BARON_DIR } from '@lonca/baron-providers';
+import { BARON_DIR } from '@zanaat/baron-providers';
 
 // BARON_DIR + policyPath + credentialsPath are shared infra (the MCP server reads the same policy /
 // credentials); re-export them so CLI consumers keep a single import surface while the canonical
-// definition lives in @lonca/baron-providers.
-export { BARON_DIR, policyPath, credentialsPath } from '@lonca/baron-providers';
+// definition lives in @zanaat/baron-providers.
+export { BARON_DIR, policyPath, credentialsPath } from '@zanaat/baron-providers';
 
 export function credentialsExamplePath(root: string): string {
   return `${root}/${BARON_DIR}/credentials.example`;

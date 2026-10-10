@@ -1,4 +1,4 @@
-# @lonca/baron-conformance
+# @zanaat/baron-conformance
 
 Baron adapter conformance suite and in-memory transports (test support).
 

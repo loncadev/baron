@@ -3,8 +3,8 @@ import {
   createMemoryIntrospector,
   githubIntrospectionFixture,
   scopedIntrospectionFixture,
-} from '@lonca/baron-conformance';
-import { parsePolicy, resolveIssuesConfig } from '@lonca/baron-core';
+} from '@zanaat/baron-conformance';
+import { parsePolicy, resolveIssuesConfig } from '@zanaat/baron-core';
 import { describe, expect, it } from 'vitest';
 import { memoryFileSystem, scriptedPrompter } from './fakes.js';
 import { gitignoreMatches, runInit } from './init.js';

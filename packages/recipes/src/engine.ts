@@ -24,12 +24,12 @@ import {
   isWorkItemTypeRole,
   isWorkflowRole,
   traceIssue,
-} from '@lonca/baron-core';
+} from '@zanaat/baron-core';
 import {
   type FollowupStatus,
   type KnowledgeLoop,
   isFollowupStatus,
-} from '@lonca/baron-knowledge-loop';
+} from '@zanaat/baron-knowledge-loop';
 import type { RecipeAsker } from './ask.js';
 import { type RecipeContext, interpolate } from './interpolate.js';
 import {
